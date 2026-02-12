@@ -390,24 +390,77 @@ CREATE POLICY audit_logs_insert_all ON audit_logs
 -- =====================================================
 -- STORAGE RLS POLICIES (Conceptual - applied in Supabase Storage UI or via CLI)
 -- =====================================================
--- Staff can upload/download files for their firm
--- CREATE POLICY documents_storage_staff ON storage.objects
---   FOR ALL
---   USING (
---     bucket_id = 'documents'
---     AND (storage.foldername(name))[1] = 'firms'
---     AND (storage.foldername(name))[2] IN (
---       SELECT firm_id::text FROM staff WHERE auth_user_id = auth.uid()
---     )
---   );
+-- =====================================================
+-- STORAGE RLS POLICIES
+-- =====================================================
 
--- Clients can upload/download their own files
--- CREATE POLICY documents_storage_client ON storage.objects
---   FOR ALL
---   USING (
---     bucket_id = 'documents'
---     AND (storage.foldername(name))[3] = 'clients'
---     AND (storage.foldername(name))[4] IN (
---       SELECT client_id::text FROM clients WHERE auth_user_id = auth.uid()
---     )
---   );
+-- =====================================================
+-- STORAGE BUCKETS INITIALIZATION
+-- =====================================================
+-- Attempt to insert buckets if they don't exist
+INSERT INTO storage.buckets (id, name, public) VALUES 
+  ('documents', 'documents', false),
+  ('firm-assets', 'firm-assets', true),
+  ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- =====================================================
+-- STORAGE RLS POLICIES
+-- =====================================================
+
+-- 1. Documents Bucket (Private)
+-- Structure: {firm_id}/{client_id}/{filename}
+
+-- Staff can view/upload/delete documents for their firm
+CREATE POLICY documents_staff_all ON storage.objects
+  FOR ALL
+  USING (
+    bucket_id = 'documents'
+    AND (storage.foldername(name))[1] IN (
+      SELECT firm_id::text FROM staff WHERE auth_user_id = auth.uid()
+    )
+  );
+
+-- Clients can view/upload documents for themselves
+CREATE POLICY documents_client_all ON storage.objects
+  FOR ALL
+  USING (
+    bucket_id = 'documents'
+    AND (storage.foldername(name))[2] IN (
+      SELECT client_id::text FROM clients WHERE auth_user_id = auth.uid()
+    )
+  );
+
+-- 2. Firm Assets Bucket (Public)
+-- Structure: {firm_id}/logo.png
+
+-- Everyone can view firm assets (Public)
+CREATE POLICY firm_assets_select_public ON storage.objects
+  FOR SELECT
+  USING (bucket_id = 'firm-assets');
+
+-- Staff can upload/update their firm's assets
+CREATE POLICY firm_assets_insert_update_staff ON storage.objects
+  FOR INSERT
+  WITH CHECK (
+    bucket_id = 'firm-assets'
+    AND (storage.foldername(name))[1] IN (
+      SELECT firm_id::text FROM staff WHERE auth_user_id = auth.uid()
+    )
+  );
+
+-- 3. Avatars Bucket (Public)
+-- Structure: {user_id}/avatar.png
+
+-- Everyone can view avatars
+CREATE POLICY avatars_select_public ON storage.objects
+  FOR SELECT
+  USING (bucket_id = 'avatars');
+
+-- Users can upload/update their own avatar
+CREATE POLICY avatars_insert_update_self ON storage.objects
+  FOR ALL
+  USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );

@@ -8,6 +8,7 @@ export const useFirmData = () => {
     const [loading, setLoading] = useState(true);
     const [returns, setReturns] = useState<TaxReturn[]>([]);
     const [firmId, setFirmId] = useState<string | null>(null);
+    const [userAvatar, setUserAvatar] = useState<string | null>(null);
     const [firmSettings, setFirmSettings] = useState({
         name: '',
         logo: '',
@@ -51,7 +52,7 @@ export const useFirmData = () => {
             // 1. Get Staff Member info to find firm_id
             const { data: staffData, error: staffError } = await supabase
                 .from('staff')
-                .select('firm_id, full_name')
+                .select('firm_id, full_name, avatar_url')
                 .eq('auth_user_id', user.id)
                 .single();
 
@@ -64,6 +65,7 @@ export const useFirmData = () => {
             }
 
             setFirmId(staffData.firm_id);
+            if (staffData.avatar_url) setUserAvatar(staffData.avatar_url);
 
             // 1b. Fetch Firm Settings
             const { data: firmData } = await supabase
@@ -140,5 +142,5 @@ export const useFirmData = () => {
         fetchData();
     }, [fetchData]);
 
-    return { returns, setReturns, loading, refresh: fetchData, firmId, firmSettings, setFirmSettings };
+    return { returns, setReturns, loading, refresh: fetchData, firmId, firmSettings, setFirmSettings, userAvatar, setUserAvatar };
 };

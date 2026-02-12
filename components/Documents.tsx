@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  FileText, 
-  Upload, 
-  Download, 
-  Eye, 
-  MoreVertical, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
+import {
+  FileText,
+  Upload,
+  Download,
+  Eye,
+  MoreVertical,
+  Search,
+  Filter,
+  CheckCircle2,
   Clock,
   AlertCircle,
   XCircle,
@@ -19,16 +19,20 @@ import {
   Plus
 } from 'lucide-react';
 import { TaxDocument, UserRole, isStaffRole, DocStatus, TaxReturn, FILE_UPLOAD_TYPES } from '../types';
+import { supabase } from '../services/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DocumentsProps {
   role: UserRole;
   returns: TaxReturn[];
   setReturns: React.Dispatch<React.SetStateAction<TaxReturn[]>>;
+  firmId: string | null;
 }
 
-const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns }) => {
+const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId }) => {
+  const { user } = useAuth();
   const isStaff = isStaffRole(role);
-  
+
   // States
   const [filterStatus, setFilterStatus] = useState<DocStatus | 'All'>(isStaff ? 'Uploaded' : 'All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,10 +40,11 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState('');
   const [tempFileName, setTempFileName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Find the selected return object
-  const selectedReturn = useMemo(() => 
-    returns.find(r => r.id === selectedReturnId), 
+  const selectedReturn = useMemo(() =>
+    returns.find(r => r.id === selectedReturnId),
     [returns, selectedReturnId]
   );
 
@@ -96,28 +101,70 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns }) => {
     }));
   };
 
-  const handleFileUpload = () => {
-    if (!selectedDocType || !tempFileName || !selectedReturnId || selectedReturnId === 'All') return;
-    
+  const handleFileUpload = async () => {
+    if (!selectedDocType || !selectedFile || !selectedReturnId || selectedReturnId === 'All' || !firmId || !user) return;
+
+    setIsUploading(true);
     const docInfo = FILE_UPLOAD_TYPES[selectedDocType];
-    const newFile = {
-      name: `${docInfo.label} - ${tempFileName}`,
-      size: '2.4 MB',
-      type: 'PDF',
-      status: 'Uploaded' as DocStatus,
-      // Fix: year: '4-digit' is not valid, should be 'numeric' or '2-digit'
-      uploadDate: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-    };
 
-    setReturns(prev => prev.map(r => 
-      r.id === selectedReturnId 
-        ? { ...r, files: [newFile, ...r.files] } 
-        : r
-    ));
+    try {
+      // 1. Upload to Supabase Storage
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${Date.now()}_${selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const filePath = `${firmId}/${selectedReturnId}/${fileName}`;
 
-    setTempFileName('');
-    setSelectedDocType('');
-    setIsUploading(false);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(filePath, selectedFile);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL? No, it's a private bucket. We store the path.
+
+      // 2. Insert into DB
+      const { data: dbDoc, error: dbError } = await supabase
+        .from('documents')
+        .insert({
+          firm_id: firmId,
+          client_id: selectedReturnId,
+          file_name: selectedFile.name,
+          file_type: fileExt || 'unknown',
+          file_size: selectedFile.size,
+          file_url: filePath, // Storing storage path
+          document_category: selectedDocType,
+          uploaded_by: user.id,
+          uploader_type: isStaff ? 'staff' : 'client'
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      // 3. Optimistic UI Update
+      const newFile = {
+        name: selectedFile.name,
+        size: (selectedFile.size / 1024 / 1024).toFixed(2) + ' MB',
+        type: (fileExt || 'PDF').toUpperCase(),
+        status: 'Uploaded' as DocStatus,
+        uploadDate: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+      };
+
+      setReturns(prev => prev.map(r =>
+        r.id === selectedReturnId
+          ? { ...r, files: [newFile, ...r.files] }
+          : r
+      ));
+
+      setTempFileName('');
+      setSelectedFile(null);
+      setSelectedDocType('');
+      setIsUploading(false);
+
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert('Failed to upload document. Please try again.');
+      setIsUploading(false);
+    }
   };
 
   const getStatusColor = (status: DocStatus) => {
@@ -152,7 +199,7 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns }) => {
           </label>
           <div className="relative max-w-md group">
             <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-brand group-focus-within:scale-110 transition-transform" size={18} />
-            <select 
+            <select
               value={selectedReturnId}
               onChange={(e) => {
                 setSelectedReturnId(e.target.value);
@@ -174,9 +221,8 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns }) => {
         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
           <button
             onClick={() => setFilterStatus('All')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
-              filterStatus === 'All' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filterStatus === 'All' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
           >
             All <span className="text-[10px] opacity-60 font-medium">({stats.all})</span>
           </button>
@@ -184,9 +230,8 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns }) => {
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
-                filterStatus === status ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${filterStatus === status ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
             >
               {status} <span className="text-[10px] opacity-60 font-medium">({status === 'Uploaded' ? stats.uploaded : status === 'Under Review' ? stats.review : status === 'Approved' ? stats.approved : stats.rejected})</span>
             </button>
@@ -199,81 +244,87 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns }) => {
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white sticky top-0 z-10">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search documents by name..." 
+            <input
+              type="text"
+              placeholder="Search documents by name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand outline-none transition-all"
             />
           </div>
-          
+
           <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setIsUploading(!isUploading)}
-                disabled={selectedReturnId === 'All'}
-                className="flex items-center gap-2 px-6 py-2 bg-brand text-white text-sm font-black rounded-xl hover:shadow-lg disabled:opacity-40 disabled:grayscale transition-all shadow-sm"
-              >
-                {/* Fix: X icon is now imported correctly */}
-                {isUploading ? <X size={18} /> : <Upload size={18} />}
-                {isUploading ? "Cancel Upload" : "Upload to Selected Case"}
-              </button>
+            <button
+              onClick={() => setIsUploading(!isUploading)}
+              disabled={selectedReturnId === 'All'}
+              className="flex items-center gap-2 px-6 py-2 bg-brand text-white text-sm font-black rounded-xl hover:shadow-lg disabled:opacity-40 disabled:grayscale transition-all shadow-sm"
+            >
+              {/* Fix: X icon is now imported correctly */}
+              {isUploading ? <X size={18} /> : <Upload size={18} />}
+              {isUploading ? "Cancel Upload" : "Upload to Selected Case"}
+            </button>
           </div>
         </div>
 
         {/* Inline Upload Form */}
         {isUploading && (
           <div className="p-8 bg-brand-light/40 border-b border-brand/10 animate-in slide-in-from-top-2 duration-300">
-             <div className="max-w-2xl mx-auto space-y-6">
-                <div className="text-center mb-4">
-                  <h4 className="font-black text-slate-800">Add to Case: {selectedReturn?.clientName}</h4>
-                  <p className="text-xs text-slate-500">{selectedReturn?.year} {selectedReturn?.type}</p>
+            <div className="max-w-2xl mx-auto space-y-6">
+              <div className="text-center mb-4">
+                <h4 className="font-black text-slate-800">Add to Case: {selectedReturn?.clientName}</h4>
+                <p className="text-xs text-slate-500">{selectedReturn?.year} {selectedReturn?.type}</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Categorize Document</label>
+                  <select
+                    value={selectedDocType}
+                    onChange={(e) => setSelectedDocType(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-4 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all shadow-sm"
+                  >
+                    <option value="">-- Select Document Category --</option>
+                    {Object.entries(groupedFileUploadTypes).map(([category, items]) => (
+                      <optgroup key={category} label={category}>
+                        {/* Fix: Explicitly cast items to any[] to avoid 'unknown' type error during mapping */}
+                        {(items as any[]).map(item => (
+                          <option key={item.key} value={item.key}>{item.label}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Categorize Document</label>
-                    <select 
-                      value={selectedDocType}
-                      onChange={(e) => setSelectedDocType(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-4 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all shadow-sm"
-                    >
-                      <option value="">-- Select Document Category --</option>
-                      {Object.entries(groupedFileUploadTypes).map(([category, items]) => (
-                        <optgroup key={category} label={category}>
-                          {/* Fix: Explicitly cast items to any[] to avoid 'unknown' type error during mapping */}
-                          {(items as any[]).map(item => (
-                            <option key={item.key} value={item.key}>{item.label}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Selected File</label>
-                    <div className="relative group">
-                      <input 
-                        type="file" 
-                        onChange={(e) => setTempFileName(e.target.files?.[0]?.name || '')}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                      />
-                      <div className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-400 group-hover:border-brand/50 transition-colors flex items-center justify-between">
-                         <span className="truncate">{tempFileName || "Choose File..."}</span>
-                         <Plus size={16} />
-                      </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Selected File</label>
+                  <div className="relative group">
+                    <input
+                      type="file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setTempFileName(file.name);
+                        }
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                    />
+                    <div className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-400 group-hover:border-brand/50 transition-colors flex items-center justify-between">
+                      <span className="truncate">{tempFileName || "Choose File..."}</span>
+                      <Plus size={16} />
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <button 
-                  onClick={handleFileUpload}
-                  disabled={!selectedDocType || !tempFileName}
-                  className="w-full py-3 bg-brand text-white text-sm font-black rounded-xl hover:bg-opacity-90 transition-all disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
-                >
-                  Confirm Upload to Case
-                </button>
-             </div>
+              <button
+                onClick={handleFileUpload}
+                disabled={!selectedDocType || !tempFileName}
+                className="w-full py-3 bg-brand text-white text-sm font-black rounded-xl hover:bg-opacity-90 transition-all disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+              >
+                {isUploading ? <Loader2 className="animate-spin" /> : "Confirm Upload to Case"}
+              </button>
+            </div>
           </div>
         )}
 
@@ -374,15 +425,15 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns }) => {
             </tbody>
           </table>
         </div>
-        
+
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
             {selectedReturnId === 'All' ? 'Showing Aggregated Firm Documents' : `Filtered by Case: ${selectedReturn?.id}`}
           </p>
           <div className="flex items-center gap-4">
-              <span className="text-[10px] font-black text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-                Total Files: {filteredDocs.length}
-              </span>
+            <span className="text-[10px] font-black text-slate-500 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+              Total Files: {filteredDocs.length}
+            </span>
           </div>
         </div>
       </div>

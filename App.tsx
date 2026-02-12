@@ -102,7 +102,7 @@ const initialTaxReturns: TaxReturn[] = [
 
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
-  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings } = useFirmData();
+  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, userAvatar } = useFirmData();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null); // TODO: fetch from user profile
   const [activeTab, setActiveTab] = useState<NavItem>(NavItem.Dashboard);
   // const [returns, setReturns] = useState<TaxReturn[]>(initialTaxReturns);
@@ -202,7 +202,7 @@ const AuthenticatedApp: React.FC = () => {
           />
         );
       case NavItem.Documents:
-        return <Documents role={currentRole} returns={returns} setReturns={setReturns} />;
+        return <Documents role={currentRole} returns={returns} setReturns={setReturns} firmId={firmId} />;
       case NavItem.Tasks:
         return <Tasks />;
       case NavItem.Settings:
@@ -238,11 +238,11 @@ const AuthenticatedApp: React.FC = () => {
   const isClient = selectedRole === UserRole.Client;
   const isSuperAdmin = selectedRole === UserRole.SuperAdmin;
 
-  const ProfileBubble = ({ name, subtext, avatarSeed }: any) => (
+  const ProfileBubble = ({ name, subtext, avatarSeed, avatarUrl }: any) => (
     <button className="flex items-center gap-3 bg-white p-1.5 pr-4 rounded-full border border-slate-200 shadow-sm hover:shadow-md transition-shadow group shrink-0">
       <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
         <img
-          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`}
+          src={avatarUrl ? `${avatarUrl}?t=${Date.now()}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`}
           alt={name}
           className="w-full h-full object-cover"
         />
@@ -316,6 +316,7 @@ const AuthenticatedApp: React.FC = () => {
                 name={user?.user_metadata?.full_name || "User"}
                 subtext={isSuperAdmin ? "FilersHub HQ" : isClient ? "Applewood LLC" : (selectedRole === UserRole.FirmOwner ? "Owner & CEO" : "Tax Professional")}
                 avatarSeed={user?.email || "User"}
+                avatarUrl={userAvatar}
               />
             </div>
           </header>
