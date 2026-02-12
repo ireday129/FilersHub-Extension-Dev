@@ -12,9 +12,11 @@ import {
   TrendingUp,
   Mail,
   ExternalLink,
-  Shield
+  Shield,
+  LogOut
 } from 'lucide-react';
 import { Firm } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 const mockFirms: Firm[] = [
   {
@@ -64,9 +66,15 @@ const mockFirms: Firm[] = [
 ];
 
 const SuperAdminDashboard: React.FC = () => {
+  const { signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<'All' | 'Core' | 'Pro'>('All');
   const logoUrl = "https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png";
+
+  const handleLogout = async () => {
+    await signOut();
+    window.location.href = '/'; // Force redirect to home/login
+  };
 
   const filteredFirms = useMemo(() => {
     return mockFirms.filter(f => {
@@ -89,7 +97,16 @@ const SuperAdminDashboard: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="flex flex-col items-center justify-center mb-8">
+      <div className="flex flex-col items-center justify-center mb-8 relative">
+        <div className="absolute right-0 top-0">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+          >
+            <LogOut size={16} />
+            Sign Out
+          </button>
+        </div>
         <img src={logoUrl} alt="FilersHub" className="h-12 w-auto mb-4" />
         <h1 className="text-2xl font-bold text-slate-900">Platform Administration</h1>
         <p className="text-slate-500 text-sm">Manage firms, monitor installations, and track growth.</p>

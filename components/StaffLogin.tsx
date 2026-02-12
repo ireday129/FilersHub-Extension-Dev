@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
 import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { WatermarkBackground } from './WatermarkBackground';
 import { supabase } from '../services/supabase';
 
 const StaffLogin: React.FC = () => {
@@ -37,7 +38,8 @@ const StaffLogin: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            <WatermarkBackground />
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden relative z-10">
                 {/* Header */}
                 <div className="p-8 pb-6 text-center border-b border-slate-50">
                     <img src={logoUrl} alt="FilersHub" className="h-10 mx-auto mb-6" />
