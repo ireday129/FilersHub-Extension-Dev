@@ -6,19 +6,21 @@ import Clients from './components/Clients';
 import Documents from './components/Documents';
 import Tasks from './components/Tasks';
 import Settings from './components/Settings';
-import RoleSelection from './components/RoleSelection';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
-import { LogOut, ChevronDown } from 'lucide-react';
+import Login from './components/auth/Login';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LogOut, ChevronDown, Loader2 } from 'lucide-react';
+import { useFirmData } from './hooks/useFirmData';
 
 const initialTaxReturns: TaxReturn[] = [
-  { 
-    id: 'tr1', 
+  {
+    id: 'tr1',
     clientName: 'John Doe',
-    year: '2023', 
-    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label, 
-    status: TaxReturnStatus.Filed, 
-    preparer: 'Sarah Johnson', 
-    date: 'Mar 15, 2024', 
+    year: '2023',
+    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label,
+    status: TaxReturnStatus.Filed,
+    preparer: 'Sarah Johnson',
+    date: 'Mar 15, 2024',
     amount: '$2,105.00',
     agi: '$85,400.00',
     federalBalance: '$1,200.00 Refund',
@@ -30,14 +32,14 @@ const initialTaxReturns: TaxReturn[] = [
       { name: 'Tax_Payment_Confirmation.png', size: '1.1 MB', type: 'Image' }
     ]
   },
-  { 
-    id: 'tr2', 
+  {
+    id: 'tr2',
     clientName: 'Jane Smith',
-    year: '2023', 
-    type: TAX_RETURN_TYPES.BUSINESS_S_CORP_1120S.label, 
-    status: TaxReturnStatus.ComplianceReview, 
-    preparer: 'David Smith', 
-    date: 'Apr 02, 2024', 
+    year: '2023',
+    type: TAX_RETURN_TYPES.BUSINESS_S_CORP_1120S.label,
+    status: TaxReturnStatus.ComplianceReview,
+    preparer: 'David Smith',
+    date: 'Apr 02, 2024',
     amount: 'N/A',
     agi: '--',
     federalBalance: '--',
@@ -48,14 +50,14 @@ const initialTaxReturns: TaxReturn[] = [
       { name: 'Business_Expenses_Summary.xlsx', size: '840 KB', type: 'XLSX' }
     ]
   },
-  { 
-    id: 'tr3', 
+  {
+    id: 'tr3',
     clientName: 'Sarah Jenkins',
-    year: '2022', 
-    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label, 
-    status: TaxReturnStatus.Accepted, 
-    preparer: 'Marcus Aurelius', 
-    date: 'Apr 10, 2023', 
+    year: '2022',
+    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label,
+    status: TaxReturnStatus.Accepted,
+    preparer: 'Marcus Aurelius',
+    date: 'Apr 10, 2023',
     amount: '$1,850.00',
     agi: '$72,100.00',
     federalBalance: '$850.00 Refund',
@@ -65,14 +67,14 @@ const initialTaxReturns: TaxReturn[] = [
       { name: '1040_Full_Return_2022.pdf', size: '3.1 MB', type: 'PDF' }
     ]
   },
-  { 
-    id: 'tr4', 
+  {
+    id: 'tr4',
     clientName: 'Robert California',
-    year: '2024', 
-    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label, 
-    status: TaxReturnStatus.IntakeReceived, 
-    preparer: 'Sarah Johnson', 
-    date: 'May 12, 2024', 
+    year: '2024',
+    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label,
+    status: TaxReturnStatus.IntakeReceived,
+    preparer: 'Sarah Johnson',
+    date: 'May 12, 2024',
     amount: 'N/A',
     agi: '--',
     federalBalance: '--',
@@ -80,14 +82,14 @@ const initialTaxReturns: TaxReturn[] = [
     paymentType: 'Invoice',
     files: []
   },
-  { 
-    id: 'tr5', 
+  {
+    id: 'tr5',
     clientName: 'Stanley Hudson',
-    year: '2023', 
-    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label, 
-    status: TaxReturnStatus.InPreparation, 
-    preparer: 'David Smith', 
-    date: 'Jun 10, 2024', 
+    year: '2023',
+    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label,
+    status: TaxReturnStatus.InPreparation,
+    preparer: 'David Smith',
+    date: 'Jun 10, 2024',
     amount: 'N/A',
     agi: '--',
     federalBalance: '--',
@@ -97,18 +99,26 @@ const initialTaxReturns: TaxReturn[] = [
   },
 ];
 
-const App: React.FC = () => {
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+
+
+const AuthenticatedApp: React.FC = () => {
+  const { user, signOut } = useAuth();
+  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings } = useFirmData();
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null); // TODO: fetch from user profile
   const [activeTab, setActiveTab] = useState<NavItem>(NavItem.Dashboard);
-  const [returns, setReturns] = useState<TaxReturn[]>(initialTaxReturns);
+  // const [returns, setReturns] = useState<TaxReturn[]>(initialTaxReturns);
   const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
 
-  // Global Firm Settings
-  const [firmSettings, setFirmSettings] = useState({
-    name: 'FilersHub-Extension-Dev',
-    logo: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png',
-    color: '#4aa936'
-  });
+  // Global Firm Settings - now fetched from useFirmData
+
+
+  // Temporary: force role for now since we haven't implemented profile fetching yet
+  useEffect(() => {
+    if (!selectedRole) {
+      // Logic to determine role would go here. For now default to FirmOwner for dev
+      setSelectedRole(UserRole.FirmOwner);
+    }
+  }, [selectedRole]);
 
   // Handle Hash Routing
   useEffect(() => {
@@ -118,14 +128,14 @@ const App: React.FC = () => {
         setSelectedRole(UserRole.SuperAdmin);
       } else if (hash === '') {
         // Only reset if we were specifically in super admin mode via hash
-        setSelectedRole(prev => prev === UserRole.SuperAdmin ? null : prev);
+        setSelectedRole(prev => prev === UserRole.SuperAdmin ? UserRole.FirmOwner : prev);
       }
     };
 
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []); // Remove dependency on selectedRole to avoid state-update loops
+  }, []);
 
   // Dynamic Theme Injection
   useEffect(() => {
@@ -151,8 +161,17 @@ const App: React.FC = () => {
   }, [firmSettings.color]);
 
   const renderContent = () => {
+    if (dataLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
+          <Loader2 className="w-10 h-10 animate-spin mb-4 text-blue-600" />
+          <p className="font-medium">Loading firm data...</p>
+        </div>
+      );
+    }
+
     const currentRole = selectedRole || UserRole.Client;
-    
+
     if (selectedRole === UserRole.SuperAdmin) {
       return <SuperAdminDashboard />;
     }
@@ -160,20 +179,22 @@ const App: React.FC = () => {
     switch (activeTab) {
       case NavItem.Dashboard:
         return (
-          <Dashboard 
-            role={currentRole} 
-            returns={returns} 
-            setReturns={setReturns} 
+          <Dashboard
+            role={currentRole}
+            returns={returns}
+            setReturns={setReturns}
             selectedReturnId={selectedReturnId}
             setSelectedReturnId={setSelectedReturnId}
+            refreshData={refresh}
+            firmId={firmId}
           />
         );
       case NavItem.Clients:
         return (
-          <Clients 
-            role={currentRole} 
-            returns={returns} 
-            setSelectedReturnId={setSelectedReturnId} 
+          <Clients
+            role={currentRole}
+            returns={returns}
+            setSelectedReturnId={setSelectedReturnId}
             setActiveTab={setActiveTab}
           />
         );
@@ -183,49 +204,45 @@ const App: React.FC = () => {
         return <Tasks />;
       case NavItem.Settings:
         return (
-          <Settings 
-            firmSettings={firmSettings} 
-            setFirmSettings={setFirmSettings} 
+          <Settings
+            firmSettings={firmSettings}
+            setFirmSettings={setFirmSettings}
+            firmId={firmId}
           />
         );
       default:
         return (
-          <Dashboard 
-            role={currentRole} 
-            returns={returns} 
-            setReturns={setReturns} 
+          <Dashboard
+            role={currentRole}
+            returns={returns}
+            setReturns={setReturns}
             selectedReturnId={selectedReturnId}
             setSelectedReturnId={setSelectedReturnId}
+            refreshData={refresh}
+            firmId={firmId}
           />
         );
     }
   };
 
-  const handleExitSession = useCallback(() => {
+  const handleExitSession = async () => {
+    await signOut();
     setSelectedRole(null);
     setActiveTab(NavItem.Dashboard);
-    setSelectedReturnId(null);
-    if (window.location.hash === '#super-admin') {
-      window.location.hash = '';
-    }
-  }, []);
+  };
 
-  if (!selectedRole) {
-    return <RoleSelection onSelectRole={setSelectedRole} />;
-  }
-
-  const isStaff = isStaffRole(selectedRole);
+  const isStaff = selectedRole ? isStaffRole(selectedRole) : false;
   const isClient = selectedRole === UserRole.Client;
   const isSuperAdmin = selectedRole === UserRole.SuperAdmin;
 
   const ProfileBubble = ({ name, subtext, avatarSeed }: any) => (
     <button className="flex items-center gap-3 bg-white p-1.5 pr-4 rounded-full border border-slate-200 shadow-sm hover:shadow-md transition-shadow group shrink-0">
       <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
-          <img 
-          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`} 
-          alt={name} 
+        <img
+          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`}
+          alt={name}
           className="w-full h-full object-cover"
-          />
+        />
       </div>
       <div className="text-left">
         <p className="text-[11px] font-bold text-slate-800 leading-tight">{name}</p>
@@ -238,46 +255,45 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       {!isSuperAdmin && (
-        <Navbar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          role={selectedRole} 
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          role={selectedRole || UserRole.FirmOwner}
           firmName={firmSettings.name}
           firmLogo={firmSettings.logo}
         />
       )}
-      
+
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           <header className="mb-8 flex flex-col md:flex-row md:items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
-                <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border shadow-sm ${
-                  isSuperAdmin
-                    ? 'text-purple-600 bg-purple-50 border-purple-100'
-                    : isStaff 
-                      ? 'text-indigo-600 bg-indigo-50 border-indigo-100' 
-                      : 'text-brand bg-brand-light border-brand/20'
-                }`}>
+                <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border shadow-sm ${isSuperAdmin
+                  ? 'text-purple-600 bg-purple-50 border-purple-100'
+                  : isStaff
+                    ? 'text-indigo-600 bg-indigo-50 border-indigo-100'
+                    : 'text-brand bg-brand-light border-brand/20'
+                  }`}>
                   {isSuperAdmin ? 'Platform SuperAdmin' : isStaff ? 'Staff Workspace' : 'Client Workspace'} • {selectedRole}
                 </span>
-                <button 
+                <button
                   onClick={handleExitSession}
                   className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded border border-slate-100"
                 >
-                  <LogOut size={10} /> Exit Session
+                  <LogOut size={10} /> Sign Out
                 </button>
               </div>
               <h1 className="text-2xl font-bold text-slate-800">
-                {isSuperAdmin ? "Platform Overview" : isClient ? "Hello, John" : activeTab}
+                {isSuperAdmin ? "Platform Overview" : isClient ? `Hello, ${user?.email}` : activeTab}
               </h1>
               <p className="text-slate-500 text-sm mt-1">
-                {isSuperAdmin 
-                  ? "Monitoring firms and platform infrastructure usage." 
+                {isSuperAdmin
+                  ? "Monitoring firms and platform infrastructure usage."
                   : isClient ? `Welcome to the ${firmSettings.name} Portal` : `Manage firm operations as a ${selectedRole}.`}
               </p>
             </div>
-            
+
             <div className="flex flex-col items-end gap-2">
               {!isSuperAdmin && isStaff && (
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm">
@@ -292,19 +308,45 @@ const App: React.FC = () => {
                   Global Administration Mode
                 </div>
               )}
-              
-              <ProfileBubble 
-                name={isSuperAdmin ? "Platform Admin" : isClient ? "John Doe" : (selectedRole === UserRole.FirmOwner ? "Sarah Johnson" : (selectedRole === UserRole.Manager ? "Marcus Aurelius" : "David Smith"))}
+
+              <ProfileBubble
+                name={user?.email || "User"}
                 subtext={isSuperAdmin ? "FilersHub HQ" : isClient ? "Applewood LLC" : (selectedRole === UserRole.FirmOwner ? "Owner & CEO" : "Tax Professional")}
-                avatarSeed={isSuperAdmin ? "Admin" : isClient ? "John" : (selectedRole === UserRole.FirmOwner ? "Sarah" : "Marcus")}
+                avatarSeed={user?.email || "User"}
               />
             </div>
           </header>
-          
+
           {renderContent()}
         </div>
       </main>
     </div>
+  );
+};
+
+const AppContent: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
+
+  return <AuthenticatedApp />;
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 };
 

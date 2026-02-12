@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { 
-  Upload, 
-  Palette, 
-  Users, 
-  Save, 
-  Shield, 
-  Globe, 
-  Building2, 
-  Hash, 
-  CreditCard, 
-  Check, 
+import {
+  Upload,
+  Palette,
+  Users,
+  Save,
+  Shield,
+  Globe,
+  Building2,
+  Hash,
+  CreditCard,
+  Check,
   Sparkles,
   Zap,
   CheckCircle2
 } from 'lucide-react';
 import { UserRole } from '../types';
+import { supabase } from '../services/supabase';
 
 interface StaffMember {
   id: string;
@@ -35,9 +36,10 @@ interface SettingsProps {
     logo: string;
     color: string;
   }>>;
+  firmId: string | null;
 }
 
-const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings }) => {
+const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firmId }) => {
   const [localSettings, setLocalSettings] = useState(firmSettings);
   const [staff, setStaff] = useState<StaffMember[]>([
     { id: '1', name: 'Marcus Aurelius', email: 'marcus@filershub.com', role: UserRole.Manager, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus' },
@@ -57,15 +59,35 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings }) =>
   const portalUrl = `access.filershub.com/${firmSlug || 'portal'}`;
 
   const handleRoleChange = (id: string, newRole: UserRole) => {
-    setStaff(prev => prev.map(member => 
+    setStaff(prev => prev.map(member =>
       member.id === id ? { ...member, role: newRole } : member
     ));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!firmId) return;
+
+    // Optimistic update
     setFirmSettings(localSettings);
-    // Simulate API Feedback
-    alert(`Firm branding updated to ${localSettings.name}`);
+
+    try {
+      const { error } = await supabase
+        .from('firms')
+        .update({
+          firm_name: localSettings.name,
+          logo_url: localSettings.logo,
+          brand_color: localSettings.color,
+          updated_at: new Date().toISOString()
+        })
+        .eq('firm_id', firmId);
+
+      if (error) throw error;
+
+      alert(`Firm branding updated to ${localSettings.name}`);
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      alert('Failed to save settings');
+    }
   };
 
   const PlanFeature = ({ text }: { text: string }) => (
@@ -91,7 +113,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings }) =>
               <p className="text-xs text-slate-500">Manage your firm identity and portal aesthetics.</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={handleSave}
             className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-opacity-90 transition-colors shadow-sm"
           >
@@ -108,8 +130,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings }) =>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Firm Name</label>
                 <div className="relative group">
                   <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand transition-colors" />
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={localSettings.name}
                     onChange={(e) => setLocalSettings(p => ({ ...p, name: e.target.value }))}
                     placeholder="Enter your firm name"
@@ -135,15 +157,15 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings }) =>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Firm Logo</label>
               <div className="flex items-center gap-6">
                 <div className="w-28 h-28 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center overflow-hidden group hover:border-brand/40 transition-colors">
-                  <img 
-                    src={localSettings.logo} 
-                    alt="Firm Logo" 
+                  <img
+                    src={localSettings.logo}
+                    alt="Firm Logo"
                     className="w-20 h-auto object-contain transition-transform group-hover:scale-105"
                   />
                 </div>
                 <div className="space-y-3">
                   <div className="relative">
-                    <input 
+                    <input
                       type="text"
                       placeholder="Logo Image URL"
                       value={localSettings.logo}
@@ -169,33 +191,32 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings }) =>
                   <button
                     key={color}
                     onClick={() => setLocalSettings(p => ({ ...p, color }))}
-                    className={`w-11 h-11 rounded-xl border-4 transition-all hover:scale-110 ${
-                      localSettings.color.toLowerCase() === color.toLowerCase() ? 'border-slate-800 shadow-md' : 'border-transparent'
-                    }`}
+                    className={`w-11 h-11 rounded-xl border-4 transition-all hover:scale-110 ${localSettings.color.toLowerCase() === color.toLowerCase() ? 'border-slate-800 shadow-md' : 'border-transparent'
+                      }`}
                     style={{ backgroundColor: color }}
                   />
                 ))}
               </div>
-              
+
               <div className="flex items-center gap-4">
                 <div className="h-10 w-[1px] bg-slate-200 hidden md:block"></div>
                 <div className="space-y-2">
-                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Custom Hex Code</label>
-                   <div className="relative group">
-                     <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand" />
-                     <input 
-                       type="text"
-                       value={localSettings.color}
-                       onChange={(e) => {
-                         let val = e.target.value;
-                         if (!val.startsWith('#')) val = '#' + val;
-                         setLocalSettings(p => ({ ...p, color: val }));
-                       }}
-                       className="pl-9 pr-4 py-2 w-32 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 focus:ring-2 focus:ring-brand outline-none uppercase"
-                     />
-                   </div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Custom Hex Code</label>
+                  <div className="relative group">
+                    <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand" />
+                    <input
+                      type="text"
+                      value={localSettings.color}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        if (!val.startsWith('#')) val = '#' + val;
+                        setLocalSettings(p => ({ ...p, color: val }));
+                      }}
+                      className="pl-9 pr-4 py-2 w-32 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 focus:ring-2 focus:ring-brand outline-none uppercase"
+                    />
+                  </div>
                 </div>
-                <div 
+                <div
                   className="w-10 h-10 rounded-lg shadow-inner border border-slate-100"
                   style={{ backgroundColor: localSettings.color }}
                 ></div>
@@ -244,7 +265,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings }) =>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <Shield size={14} className="text-brand" />
-                      <select 
+                      <select
                         value={member.role}
                         onChange={(e) => handleRoleChange(member.id, e.target.value as UserRole)}
                         className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer focus:text-brand"
@@ -285,7 +306,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings }) =>
               <div className="absolute -top-3 left-6 px-3 py-1 bg-brand text-white text-[10px] font-bold rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
                 <CheckCircle2 size={12} /> Active Plan
               </div>
-              
+
               <div className="mb-6">
                 <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                   Firm Core

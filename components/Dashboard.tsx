@@ -1,23 +1,23 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { 
-  TrendingUp, 
-  Clock, 
-  AlertCircle, 
-  CheckCircle2, 
-  FileText, 
-  Download, 
-  Eye, 
-  Megaphone, 
-  ChevronRight, 
+import {
+  TrendingUp,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  FileText,
+  Download,
+  Eye,
+  Megaphone,
+  ChevronRight,
   ChevronDown,
-  ArrowLeft, 
-  FileCode, 
-  Calendar, 
-  User, 
-  CheckCircle, 
-  Filter, 
-  Upload, 
-  Plus, 
+  ArrowLeft,
+  FileCode,
+  Calendar,
+  User,
+  CheckCircle,
+  Filter,
+  Upload,
+  Plus,
   X,
   DollarSign,
   Landmark,
@@ -40,6 +40,8 @@ import {
   Hand
 } from 'lucide-react';
 import { UserRole, TaxReturnStatus, FILE_UPLOAD_TYPES, TAX_RETURN_TYPES, isStaffRole, TAX_YEARS, TaxReturn, DocStatus } from '../types';
+import { uploadDocument } from '../services/documents';
+import { supabase } from '../services/supabase';
 
 interface DashboardProps {
   role: UserRole;
@@ -47,6 +49,8 @@ interface DashboardProps {
   setReturns: React.Dispatch<React.SetStateAction<TaxReturn[]>>;
   selectedReturnId: string | null;
   setSelectedReturnId: (id: string | null) => void;
+  refreshData: () => Promise<void>;
+  firmId: string | null;
 }
 
 const STATUS_EMOJIS: Record<TaxReturnStatus, string> = {
@@ -93,7 +97,7 @@ const initialAnnouncements = [
 ];
 
 const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOver, onDrop, onDragEnd, onDelete }: any) => (
-  <div 
+  <div
     draggable={draggable}
     onDragStart={onDragStart}
     onDragOver={onDragOver}
@@ -103,7 +107,7 @@ const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOv
   >
     {draggable && (
       <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <button 
+        <button
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
@@ -150,33 +154,30 @@ const StatusStepper = ({ currentStatus, paymentType, isClientWorkspace }: { curr
         const statusIdx = STATUS_ORDER.indexOf(status);
         const isCompleted = statusIdx < currentIndex;
         const isActive = status === currentStatus;
-        
+
         if (status === TaxReturnStatus.Rejected && isAccepted) return null;
         if (status === TaxReturnStatus.Accepted && isRejected) return null;
 
         return (
           <div key={status} className={`flex items-start gap-3 group transition-all ${isActive ? 'scale-105' : ''}`}>
             <div className="flex flex-col items-center">
-              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                isCompleted 
-                  ? 'bg-brand border-brand text-white' 
-                  : isActive 
-                    ? 'border-brand bg-white text-brand animate-pulse shadow-[0_0_12px_rgba(74,169,54,0.4)]' 
-                    : 'border-slate-200 bg-white text-slate-300'
-              }`}>
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isCompleted
+                ? 'bg-brand border-brand text-white'
+                : isActive
+                  ? 'border-brand bg-white text-brand animate-pulse shadow-[0_0_12px_rgba(74,169,54,0.4)]'
+                  : 'border-slate-200 bg-white text-slate-300'
+                }`}>
                 {isCompleted ? <CheckCircle size={12} /> : <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-brand' : 'bg-transparent'}`} />}
               </div>
               {index < filteredStatusOrder.length - 1 && (
-                <div className={`w-0.5 h-6 my-1 transition-colors ${
-                  isCompleted ? 'bg-brand' : 'bg-slate-100'
-                }`} />
+                <div className={`w-0.5 h-6 my-1 transition-colors ${isCompleted ? 'bg-brand' : 'bg-slate-100'
+                  }`} />
               )}
             </div>
             <div className="pt-0.5 flex items-center gap-2">
               <span className="text-sm">{STATUS_EMOJIS[status]}</span>
-              <p className={`text-[11px] font-bold tracking-widest transition-all ${
-                isActive ? 'text-brand animate-pulse scale-110 origin-left' : isCompleted ? 'text-slate-700' : 'text-slate-400'
-              }`}>
+              <p className={`text-[11px] font-bold tracking-widest transition-all ${isActive ? 'text-brand animate-pulse scale-110 origin-left' : isCompleted ? 'text-slate-700' : 'text-slate-400'
+                }`}>
                 {status.toUpperCase()}
               </p>
             </div>
@@ -187,14 +188,14 @@ const StatusStepper = ({ currentStatus, paymentType, isClientWorkspace }: { curr
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, selectedReturnId, setSelectedReturnId }) => {
+const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, selectedReturnId, setSelectedReturnId, refreshData, firmId }) => {
   const isFirmOwner = role === UserRole.FirmOwner;
   const isManager = role === UserRole.Manager;
   const isTaxPro = role === UserRole.TaxPro;
   const isClient = role === UserRole.Client;
   const isStaff = isStaffRole(role);
   const canToggleView = isFirmOwner || isManager;
-  
+
   const [announcements, setAnnouncements] = useState(initialAnnouncements);
   const [sortStatus, setSortStatus] = useState<string>('Default');
   const [filterYear, setFilterYear] = useState<string>('All');
@@ -208,7 +209,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [isLayoutDirty, setIsLayoutDirty] = useState(false);
   const [isSavingLayout, setIsSavingLayout] = useState(false);
-  
+
   const [isUploading, setIsUploading] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState('');
   const [tempFileName, setTempFileName] = useState('');
@@ -279,15 +280,15 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     } else if (sortStatus === 'Client') {
       base.sort((a, b) => a.clientName.localeCompare(b.clientName));
     }
-    
+
     return base;
   }, [returns, role, filterYear, filterType, sortStatus, isTaxPro, canToggleView, viewScope, staffName]);
 
   const statusCounts = useMemo(() => {
-    const scopeReturns = (isTaxPro || (canToggleView && viewScope === 'My')) 
-      ? returns.filter(r => r.preparer === staffName) 
+    const scopeReturns = (isTaxPro || (canToggleView && viewScope === 'My'))
+      ? returns.filter(r => r.preparer === staffName)
       : returns;
-      
+
     const counts: Partial<Record<TaxReturnStatus, number>> = {};
     DEFAULT_DASHBOARD_STATUSES.forEach(status => {
       counts[status] = scopeReturns.filter(r => r.status === status).length;
@@ -306,9 +307,34 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     setSaveStatus('idle');
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 1. Update Supabase
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          tax_return_status: selectedReturn.status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('client_id', selectedReturn.id);
+
+      if (error) throw error;
+
+      // 2. Trigger GHL Sync via Edge Function
+      // Fire and forget (don't block UI on this)
+      supabase.functions.invoke('ghl-update', {
+        body: {
+          clientId: selectedReturn.id,
+          status: selectedReturn.status,
+          firmId: firmId
+        }
+      });
+
       setSaveStatus('success');
+
+      // Refresh local data
+      await refreshData();
+
     } catch (err) {
+      console.error("Error saving case:", err);
       setSaveStatus('error');
     } finally {
       setIsSaving(false);
@@ -343,28 +369,34 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     }
   }, [saveStatus]);
 
-  const handleFileUpload = () => {
-    if (!selectedDocType || !tempFileName || !selectedReturnId) return;
-    
-    const docInfo = FILE_UPLOAD_TYPES[selectedDocType];
-    const newFile = {
-      name: `${docInfo.label} - ${tempFileName}`,
-      size: '2.4 MB',
-      type: 'PDF',
-      status: 'Uploaded' as DocStatus,
-      signatureStatus: 'None' as const,
-      uploadDate: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
-    };
+  const handleFileUpload = async () => {
+    if (!selectedDocType || !tempFileName || !selectedReturnId || !firmId) return;
 
-    setReturns(prev => prev.map(r => 
-      r.id === selectedReturnId 
-        ? { ...r, files: [newFile, ...r.files] } 
-        : r
-    ));
+    // Find the file input element to get the actual file object
+    const fileInput = document.getElementById('file-upload-input') as HTMLInputElement;
+    const file = fileInput?.files?.[0];
 
-    setTempFileName('');
-    setSelectedDocType('');
-    setIsUploading(false);
+    if (!file) {
+      alert("No file selected");
+      return;
+    }
+
+    setIsUploading(true); // Ensure loading state
+
+    try {
+      await uploadDocument(file, selectedReturnId, firmId, selectedDocType);
+
+      // Refresh data to show new file
+      await refreshData();
+
+      setTempFileName('');
+      setSelectedDocType('');
+      setIsUploading(false);
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Failed to upload document. Please try again.");
+      setIsUploading(false);
+    }
   };
 
   const handleFinalReturnUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -380,13 +412,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     const rect = docPreviewRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
+
     setSignatureFields(prev => [...prev, { id: Date.now(), x, y }]);
   };
 
   const handleRequestFinalSignature = () => {
     if (!finalReturnFile || !selectedReturnId) return;
-    
+
     const newFile = {
       name: `FINAL - ${finalReturnFile}`,
       size: '3.8 MB',
@@ -396,9 +428,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
       uploadDate: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
     };
 
-    setReturns(prev => prev.map(r => 
-      r.id === selectedReturnId 
-        ? { ...r, status: TaxReturnStatus.ReadyForSignature, files: [newFile, ...r.files] } 
+    setReturns(prev => prev.map(r =>
+      r.id === selectedReturnId
+        ? { ...r, status: TaxReturnStatus.ReadyForSignature, files: [newFile, ...r.files] }
         : r
     ));
 
@@ -415,9 +447,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
           files: r.files.map(f => {
             if (f.name === fileName) {
               const current = f.signatureStatus || 'None';
-              return { 
-                ...f, 
-                signatureStatus: current === 'None' ? 'Pending' : 'None' 
+              return {
+                ...f,
+                signatureStatus: current === 'None' ? 'Pending' : 'None'
               };
             }
             return f;
@@ -453,12 +485,12 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     if (!isFirmOwner || draggedIndex === null) return;
     e.preventDefault();
-    
+
     const newList = [...orderedStatuses];
     const draggedItem = newList[draggedIndex];
     newList.splice(draggedIndex, 1);
     newList.splice(targetIndex, 0, draggedItem);
-    
+
     setOrderedStatuses(newList);
     setDraggedIndex(null);
     setIsLayoutDirty(true);
@@ -509,7 +541,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
         <div className="flex items-center gap-4 mb-2">
-          <button 
+          <button
             onClick={() => setSelectedReturnId(null)}
             className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
           >
@@ -529,7 +561,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-slate-400 font-medium">{selectedReturn.files.length} Files</span>
                   {(isClient || isStaff) && (
-                    <button 
+                    <button
                       onClick={() => setIsUploading(!isUploading)}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all shadow-sm"
                     >
@@ -539,14 +571,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   )}
                 </div>
               </div>
-              
+
               {(isClient || isStaff) && isUploading && (
                 <div className="p-6 bg-brand-light/40 border-b border-brand/10 animate-in slide-in-from-top-2 duration-300">
                   <div className="max-w-xl mx-auto space-y-4">
                     <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Categorize Document</label>
-                        <select 
+                        <select
                           value={selectedDocType}
                           onChange={(e) => setSelectedDocType(e.target.value)}
                           className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-4 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all shadow-sm"
@@ -561,10 +593,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                           ))}
                         </select>
                       </div>
-                      
+
                       <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-6 hover:bg-white hover:border-brand/40 transition-all text-center group">
-                        <input 
-                          type="file" 
+                        <input
+                          type="file"
                           id="file-upload-input"
                           onChange={(e) => setTempFileName(e.target.files?.[0]?.name || '')}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -581,7 +613,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       </div>
                     </div>
 
-                    <button 
+                    <button
                       onClick={handleFileUpload}
                       disabled={!selectedDocType || !tempFileName}
                       className="w-full py-2.5 bg-brand text-white text-sm font-bold rounded-xl hover:bg-brand/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
@@ -621,7 +653,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     </div>
                     <div className="flex items-center gap-1">
                       {isStaff && (
-                        <button 
+                        <button
                           onClick={() => handleRequestSignature(selectedReturn.id, file.name)}
                           className={`p-2 rounded-lg transition-all ${file.signatureStatus === 'Pending' ? 'bg-amber-50 text-amber-600' : 'text-slate-400 hover:text-brand hover:bg-brand-light'}`}
                           title={file.signatureStatus === 'Pending' ? "Cancel Signature Request" : "Request Client Signature"}
@@ -652,7 +684,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     </h3>
                     <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">Hidden from Client</span>
                   </div>
-                  <textarea 
+                  <textarea
                     value={selectedReturn.internalNotes || ''}
                     onChange={(e) => handleUpdateField(selectedReturn.id, 'internalNotes', e.target.value)}
                     placeholder="Type confidential internal notes about this return case here... (e.g. 'Waiting on client to confirm spouse SSN')"
@@ -667,11 +699,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       <FileCheck size={16} className="text-emerald-500" />
                       Final Return & E-Sign Request
                     </h3>
-                    <button 
+                    <button
                       onClick={() => setIsPreparingFinalReturn(!isPreparingFinalReturn)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shadow-sm ${
-                        isPreparingFinalReturn ? 'bg-slate-200 text-slate-600' : 'bg-brand text-white hover:opacity-90'
-                      }`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shadow-sm ${isPreparingFinalReturn ? 'bg-slate-200 text-slate-600' : 'bg-brand text-white hover:opacity-90'
+                        }`}
                     >
                       {isPreparingFinalReturn ? <X size={14} /> : <Plus size={14} />}
                       {isPreparingFinalReturn ? "Cancel" : "Upload Final Return"}
@@ -718,7 +749,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                                   <p className="text-[9px] text-slate-400 leading-tight">Click on the document area to place a signature box.</p>
                                 </div>
                               </div>
-                              
+
                               <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Placed Fields</h4>
                                 <div className="space-y-1">
@@ -739,7 +770,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                             </div>
 
                             <div className="md:col-span-3">
-                              <div 
+                              <div
                                 ref={docPreviewRef}
                                 onClick={handleAddSignatureField}
                                 className="aspect-[1/1.4] bg-slate-200/50 rounded-2xl border-2 border-slate-200 relative overflow-hidden shadow-inner flex flex-col items-center justify-center group cursor-crosshair"
@@ -751,7 +782,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                                 <p className="text-[9px] text-slate-400 z-10 pointer-events-none">Click to drop signature marker</p>
 
                                 {signatureFields.map((field, idx) => (
-                                  <div 
+                                  <div
                                     key={field.id}
                                     style={{ left: `${field.x}%`, top: `${field.y}%` }}
                                     className="absolute -translate-x-1/2 -translate-y-1/2 bg-emerald-500/90 text-white px-2 py-1 rounded shadow-lg flex items-center gap-1.5 border border-white z-20 group/sig"
@@ -759,7 +790,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                                   >
                                     <Hand size={10} />
                                     <span className="text-[9px] font-black uppercase tracking-tighter">Sign Here</span>
-                                    <button 
+                                    <button
                                       onClick={() => setSignatureFields(prev => prev.filter(f => f.id !== field.id))}
                                       className="ml-1 opacity-0 group-hover/sig:opacity-100 transition-opacity"
                                     >
@@ -772,7 +803,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                           </div>
 
                           <div className="flex justify-end pt-4 border-t border-emerald-100">
-                            <button 
+                            <button
                               onClick={handleRequestFinalSignature}
                               disabled={signatureFields.length === 0}
                               className="px-8 py-3 bg-brand text-white text-sm font-black rounded-xl hover:opacity-90 transition-all shadow-lg disabled:opacity-50 disabled:grayscale flex items-center gap-2"
@@ -788,7 +819,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 </div>
               </>
             )}
-            
+
             {isStaff && (
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6 relative">
                 <h3 className="text-sm font-bold text-slate-800 border-b border-slate-50 pb-2 flex items-center gap-2">
@@ -798,7 +829,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Update Return Status</label>
-                    <select 
+                    <select
                       value={selectedReturn.status}
                       onChange={(e) => handleUpdateField(selectedReturn.id, 'status', e.target.value as TaxReturnStatus)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all"
@@ -810,7 +841,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Tax Return Type</label>
-                    <select 
+                    <select
                       value={Object.entries(TAX_RETURN_TYPES).find(([_, v]) => v.label === selectedReturn.type)?.[0] || ""}
                       onChange={(e) => {
                         const typeKey = e.target.value;
@@ -834,7 +865,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Payment Type</label>
                     <div className="relative">
                       <CreditCard size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <select 
+                      <select
                         value={selectedReturn.paymentType || "Invoice"}
                         onChange={(e) => handleUpdateField(selectedReturn.id, 'paymentType', e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all"
@@ -846,7 +877,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">AGI (Adjusted Gross Income)</label>
-                    <input 
+                    <input
                       type="text"
                       value={selectedReturn.agi}
                       onChange={(e) => handleUpdateField(selectedReturn.id, 'agi', e.target.value)}
@@ -856,7 +887,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Federal Tax Refund/Balance Due</label>
-                    <input 
+                    <input
                       type="text"
                       value={selectedReturn.federalBalance}
                       onChange={(e) => handleUpdateField(selectedReturn.id, 'federalBalance', e.target.value)}
@@ -866,7 +897,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">State Refund/Balance Due</label>
-                    <input 
+                    <input
                       type="text"
                       value={selectedReturn.stateBalance}
                       onChange={(e) => handleUpdateField(selectedReturn.id, 'stateBalance', e.target.value)}
@@ -891,7 +922,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     <div className="text-[10px] text-slate-400 font-medium">Changes auto-saved locally. Press Update to sync.</div>
                   )}
 
-                  <button 
+                  <button
                     onClick={handleSaveCase}
                     disabled={isSaving}
                     className={`flex items-center gap-2 px-8 py-3 bg-brand text-white text-sm font-bold rounded-xl hover:bg-brand/90 transition-all shadow-md disabled:opacity-70 ${isSaving ? 'cursor-wait' : 'cursor-pointer'}`}
@@ -916,7 +947,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
           <div className="space-y-6">
             <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-lg space-y-8 animate-in fade-in zoom-in-95 duration-700 overflow-hidden relative">
               <div className="absolute top-0 left-0 w-full h-1.5 bg-brand opacity-10"></div>
-              
+
               <h3 className="text-xl font-extrabold text-slate-800 text-center tracking-tight leading-tight">
                 {isClient ? "Where Is My Tax Return?" : "Return Summary & Stages"}
               </h3>
@@ -932,7 +963,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     </div>
                     <span className="text-sm font-black text-slate-800">{selectedReturn.agi}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between p-2 rounded-lg bg-white shadow-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -958,11 +989,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   </div>
                 </div>
               )}
-              
+
               <div className="px-2">
-                <StatusStepper 
-                  currentStatus={selectedReturn.status} 
-                  paymentType={selectedReturn.paymentType || 'Invoice'} 
+                <StatusStepper
+                  currentStatus={selectedReturn.status}
+                  paymentType={selectedReturn.paymentType || 'Invoice'}
                   isClientWorkspace={isClient}
                 />
               </div>
@@ -999,24 +1030,22 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 Real-time Return Stats
               </h2>
             </div>
-            
+
             <div className="flex items-center gap-3">
               {canToggleView && (
                 <div className="bg-slate-200/50 p-1 rounded-xl flex items-center shadow-inner border border-slate-200">
-                  <button 
+                  <button
                     onClick={() => setViewScope('My')}
-                    className={`flex items-center gap-2 px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
-                      viewScope === 'My' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${viewScope === 'My' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
                   >
                     <Briefcase size={14} />
                     My Returns
                   </button>
-                  <button 
+                  <button
                     onClick={() => setViewScope('Firm')}
-                    className={`flex items-center gap-2 px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
-                      viewScope === 'Firm' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${viewScope === 'Firm' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}
                   >
                     <Users size={14} />
                     Firm Count
@@ -1025,7 +1054,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
               )}
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {orderedStatuses.length > 0 ? orderedStatuses.map((status, index) => {
@@ -1033,10 +1062,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 if (!cardData) return null;
 
                 return (
-                  <StatCard 
+                  <StatCard
                     key={status}
                     title={cardData.title}
-                    value={(statusCounts[status] || 0).toString()} 
+                    value={(statusCounts[status] || 0).toString()}
                     emoji={STATUS_EMOJIS[status]}
                     color={cardData.color}
                     draggable={isFirmOwner}
@@ -1050,7 +1079,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
               }) : (
                 <div className="col-span-full py-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl">
                   <p className="text-xs font-bold text-slate-400 mb-2">Dashboard cards removed.</p>
-                  <button 
+                  <button
                     onClick={handleResetStatuses}
                     className="text-xs font-black text-brand underline"
                   >
@@ -1063,13 +1092,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
             {/* Layout Controls - Moved underneath cards on the right */}
             {isFirmOwner && (
               <div className="flex justify-end gap-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-500">
-                <button 
+                <button
                   onClick={handleResetStatuses}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-lg hover:bg-slate-200 transition-all"
                 >
                   <RotateCcw size={12} /> Reset
                 </button>
-                <button 
+                <button
                   onClick={handleSaveDashboardLayout}
                   disabled={isSavingLayout || !isLayoutDirty}
                   className="flex items-center gap-1.5 px-4 py-1.5 bg-brand text-white text-[10px] font-bold uppercase rounded-lg hover:bg-brand/90 transition-all shadow-md disabled:opacity-50"
@@ -1089,65 +1118,65 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                   <h4 className="font-bold text-slate-800">
+                  <h4 className="font-bold text-slate-800">
                     Workflow Management
-                   </h4>
-                   <p className="text-xs text-slate-500">
+                  </h4>
+                  <p className="text-xs text-slate-500">
                     Filter and manage the status of your client tax returns.
-                   </p>
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                   <div className="relative flex items-center">
-                     <Filter size={14} className="absolute left-3 text-slate-400" />
-                     <select 
-                       value={sortStatus}
-                       onChange={(e) => setSortStatus(e.target.value)}
-                       className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
-                     >
-                        <option value="Default">All Workflow Stages</option>
-                        {STATUS_ORDER.map(s => (
-                          <option key={s} value={s}>{STATUS_EMOJIS[s]} {s}</option>
-                        ))}
-                        <hr className="my-1"/>
-                        <option value="Workflow">Sort: Workflow Order</option>
-                        <option value="Client">Sort: Client Name</option>
-                     </select>
-                     <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
-                   </div>
+                  <div className="relative flex items-center">
+                    <Filter size={14} className="absolute left-3 text-slate-400" />
+                    <select
+                      value={sortStatus}
+                      onChange={(e) => setSortStatus(e.target.value)}
+                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="Default">All Workflow Stages</option>
+                      {STATUS_ORDER.map(s => (
+                        <option key={s} value={s}>{STATUS_EMOJIS[s]} {s}</option>
+                      ))}
+                      <hr className="my-1" />
+                      <option value="Workflow">Sort: Workflow Order</option>
+                      <option value="Client">Sort: Client Name</option>
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                  </div>
 
-                   <div className="relative flex items-center">
-                     <FileText size={14} className="absolute left-3 text-slate-400" />
-                     <select 
-                       value={filterType}
-                       onChange={(e) => setFilterType(e.target.value)}
-                       className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
-                     >
-                        <option value="All">All Return Types</option>
-                        {Object.entries(groupedReturnTypes).map(([category, items]) => (
-                          <optgroup key={category} label={category}>
-                            {(items as any[]).map(item => (
-                              <option key={item.key} value={item.label}>{item.label}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                     </select>
-                     <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
-                   </div>
+                  <div className="relative flex items-center">
+                    <FileText size={14} className="absolute left-3 text-slate-400" />
+                    <select
+                      value={filterType}
+                      onChange={(e) => setFilterType(e.target.value)}
+                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="All">All Return Types</option>
+                      {Object.entries(groupedReturnTypes).map(([category, items]) => (
+                        <optgroup key={category} label={category}>
+                          {(items as any[]).map(item => (
+                            <option key={item.key} value={item.label}>{item.label}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                  </div>
 
-                   <div className="relative flex items-center">
-                     <Calendar size={14} className="absolute left-3 text-slate-400" />
-                     <select 
-                       value={filterYear}
-                       onChange={(e) => setFilterYear(e.target.value)}
-                       className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
-                     >
-                        <option value="All">All Years</option>
-                        {Object.values(TAX_YEARS).map(y => (
-                          <option key={y.label} value={y.label}>{y.label}</option>
-                        ))}
-                     </select>
-                     <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
-                   </div>
+                  <div className="relative flex items-center">
+                    <Calendar size={14} className="absolute left-3 text-slate-400" />
+                    <select
+                      value={filterYear}
+                      onChange={(e) => setFilterYear(e.target.value)}
+                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="All">All Years</option>
+                      {Object.values(TAX_YEARS).map(y => (
+                        <option key={y.label} value={y.label}>{y.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                  </div>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -1179,7 +1208,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                           <p className="text-xs font-medium text-slate-600">{tr.preparer}</p>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button 
+                          <button
                             onClick={() => setSelectedReturnId(tr.id)}
                             className="text-brand hover:underline text-xs font-bold"
                           >
@@ -1203,11 +1232,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   <h4 className="font-bold text-slate-800 text-lg">Your Tax Returns</h4>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 {returns.map((tr) => (
-                  <div 
-                    key={tr.id} 
+                  <div
+                    key={tr.id}
                     onClick={() => setSelectedReturnId(tr.id)}
                     className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-brand/30 cursor-pointer transition-all flex flex-col md:flex-row md:items-center justify-between gap-6 group"
                   >
@@ -1218,26 +1247,25 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       <div>
                         <div className="flex items-center gap-2 mb-0.5">
                           <h5 className="font-bold text-slate-800">{tr.year} Tax Return</h5>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            tr.status === TaxReturnStatus.Accepted || tr.status === TaxReturnStatus.Filed
-                              ? 'bg-emerald-100 text-emerald-700' 
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${tr.status === TaxReturnStatus.Accepted || tr.status === TaxReturnStatus.Filed
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                            }`}>
                             {STATUS_EMOJIS[tr.status]} {tr.status}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 font-medium">{tr.type}</p>
                         <div className="flex items-center gap-4 mt-2">
-                           <span className="text-[10px] text-slate-400 font-medium">Prepared by {tr.preparer}</span>
-                           <span className="text-[10px] text-slate-400 font-medium">•</span>
-                           <span className="text-[10px] text-slate-400 font-medium">Updated {tr.date}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">Prepared by {tr.preparer}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">•</span>
+                          <span className="text-[10px] text-slate-400 font-medium">Updated {tr.date}</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-4 md:pt-0">
                       <div className="flex items-center gap-2">
-                        <button 
+                        <button
                           className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-brand hover:bg-brand-light font-semibold rounded-xl text-xs transition-all border border-slate-100 shadow-sm"
                         >
                           <Eye size={16} />
@@ -1259,7 +1287,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
               <h4 className="font-bold text-slate-800">Firm Announcements</h4>
             </div>
             {isFirmOwner && (
-              <button 
+              <button
                 onClick={() => setShowAnnouncementForm(!showAnnouncementForm)}
                 className="p-1.5 bg-brand-light text-brand rounded-lg hover:bg-brand hover:text-white transition-all"
               >
@@ -1274,14 +1302,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 <Type size={14} className="text-brand" /> New Announcement
               </h5>
               <div className="space-y-3">
-                <input 
+                <input
                   type="text"
                   placeholder="Subject/Title"
                   value={newAnnouncement.title}
                   onChange={(e) => setNewAnnouncement(prev => ({ ...prev, title: e.target.value }))}
                   className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none"
                 />
-                <textarea 
+                <textarea
                   placeholder="Write message to all users..."
                   rows={3}
                   value={newAnnouncement.content}
@@ -1291,7 +1319,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <label className="text-[10px] font-bold text-slate-400 uppercase">Priority:</label>
-                    <select 
+                    <select
                       value={newAnnouncement.priority}
                       onChange={(e) => setNewAnnouncement(prev => ({ ...prev, priority: e.target.value }))}
                       className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600"
@@ -1301,7 +1329,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       <option value="high">High</option>
                     </select>
                   </div>
-                  <button 
+                  <button
                     onClick={handleSaveAnnouncement}
                     disabled={isSavingAnnouncement || !newAnnouncement.title}
                     className="flex-1 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all shadow-sm flex items-center justify-center gap-2"
@@ -1321,9 +1349,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   <div className="absolute top-0 right-0 w-1 h-full bg-rose-500"></div>
                 )}
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                    item.priority === 'high' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-100 text-slate-500'
-                  }`}>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${item.priority === 'high' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-100 text-slate-500'
+                    }`}>
                     {item.priority}
                   </span>
                   <span className="text-[10px] text-slate-400">{item.date}</span>

@@ -1,14 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-// These environment variables should be configured in your deployment environment.
-const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project-url.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'your-anon-key';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase environment variables. Please check .env.local');
+}
 
-/**
- * Supabase provides equivalent functionality to Firestore and Firebase Storage:
- * - db: use supabase.from('table_name')
- * - storage: use supabase.storage.from('bucket_name')
- */
-export default supabase;
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder-key'
+);
