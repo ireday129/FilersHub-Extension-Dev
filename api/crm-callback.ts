@@ -26,7 +26,7 @@ export default async function handler(req: any, res: any) {
                 client_secret: process.env.GHL_CLIENT_SECRET || "",
                 grant_type: "authorization_code",
                 code: String(code),
-                redirect_uri: `https://${process.env.VERCEL_URL}/api/ghl-callback`, // Dynamic redirect URI
+                redirect_uri: `https://${process.env.APP_URL || process.env.VERCEL_URL}/api/crm-callback`, // Configurable redirect URI
             }),
         });
 
@@ -76,7 +76,7 @@ export default async function handler(req: any, res: any) {
 
         // 4. Redirect to Dashboard
         // Use the stored firm ID if available, or just go to dashboard
-        return res.redirect(302, `https://${process.env.VERCEL_URL}/dashboard?setup=complete`);
+        return res.redirect(302, `https://${process.env.APP_URL || process.env.VERCEL_URL}/dashboard?setup=complete`);
 
     } catch (error: any) {
         console.error("Handler Error:", error);
