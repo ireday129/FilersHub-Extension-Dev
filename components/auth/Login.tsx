@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { supabase } from '../../services/supabase';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Login: React.FC = () => {
+    const { bypassAuth } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -104,14 +106,11 @@ const Login: React.FC = () => {
                         <div className="flex justify-end mb-4">
                             <button
                                 type="button"
-                                onClick={async () => {
-                                    /* @ts-ignore */
-                                    if (window.bypassAuth) await window.bypassAuth();
-                                    // We need to access the context function here, but we are outside the provider usage?
-                                    // actually Login IS inside AuthProvider in App.tsx
-                                }}
-                                className="text-xs text-slate-400 hover:text-slate-600 font-medium"
+                                onClick={bypassAuth}
+                                className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
                             >
+                                <ShieldCheck size={12} />
+                                Skip Login (Dev Mode)
                             </button>
                         </div>
 
