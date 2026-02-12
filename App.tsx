@@ -329,6 +329,7 @@ const AuthenticatedApp: React.FC = () => {
 
 import RoleSelection from './components/RoleSelection';
 import StaffLogin from './components/StaffLogin';
+import SuperAdminLogin from './components/SuperAdminLogin';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
@@ -353,7 +354,7 @@ const AppContent: React.FC = () => {
   // Secure Super Admin Dashboard
   if (path === '/super-admin') {
     if (!user) {
-      return <StaffLogin />;
+      return <SuperAdminLogin />;
     }
 
     if (user.email === 'irene@hannahfinancial.com') {
