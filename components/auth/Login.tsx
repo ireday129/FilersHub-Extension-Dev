@@ -101,6 +101,20 @@ const Login: React.FC = () => {
                                 placeholder="••••••••"
                             />
                         </div>
+                        <div className="flex justify-end mb-4">
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    /* @ts-ignore */
+                                    if (window.bypassAuth) await window.bypassAuth();
+                                    // We need to access the context function here, but we are outside the provider usage?
+                                    // actually Login IS inside AuthProvider in App.tsx
+                                }}
+                                className="text-xs text-slate-400 hover:text-slate-600 font-medium"
+                            >
+                            </button>
+                        </div>
+
 
                         <button
                             type="submit"

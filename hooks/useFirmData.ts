@@ -19,6 +19,35 @@ export const useFirmData = () => {
         setLoading(true);
 
         try {
+            // Bypass Mode Check
+            if (user.id === 'dev-bypass-user') {
+                setFirmId('dev-firm-id');
+                setFirmSettings({
+                    name: 'Dev Mode Firm',
+                    logo: 'https://via.placeholder.com/150',
+                    color: '#ea580c'
+                });
+                // Mock Returns
+                setReturns([
+                    {
+                        id: 'dev-client-1',
+                        clientName: 'Dev Client A',
+                        year: '2024',
+                        type: '1040',
+                        status: 'Data Entry',
+                        preparer: 'Dev User',
+                        date: new Date().toLocaleDateString(),
+                        amount: '$500',
+                        agi: '$150,000',
+                        files: [],
+                        paymentStatus: 'Paid',
+                        paymentType: 'CC'
+                    }
+                ]);
+                setLoading(false);
+                return;
+            }
+
             // 1. Get Staff Member info to find firm_id
             const { data: staffData, error: staffError } = await supabase
                 .from('staff')

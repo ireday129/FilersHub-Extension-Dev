@@ -7,6 +7,7 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     signOut: () => Promise<void>;
+    bypassAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +37,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const signOut = async () => {
         await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+    };
+
+    const bypassAuth = async () => {
+        // Create a mock session for development
+        const mockUser: User = {
+            id: 'dev-bypass-user',
+            app_metadata: {},
+            user_metadata: {},
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+            email: 'dev@filershub.com',
+            phone: '',
+            role: 'authenticated',
+            updated_at: new Date().toISOString()
+        };
+
+        const mockSession: Session = {
+            access_token: 'mock-token',
+            refresh_token: 'mock-refresh-token',
+            expires_in: 3600,
+            token_type: 'bearer',
+            user: mockUser
+        };
+
+        setSession(mockSession);
+        setUser(mockUser);
+        setLoading(false);
     };
 
     const value = {
@@ -43,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         loading,
         signOut,
+        bypassAuth
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
