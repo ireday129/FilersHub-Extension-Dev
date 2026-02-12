@@ -350,6 +350,15 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Bypass auth for Super Admin Dashboard (Temporary per user request)
+  if (path === '/super-admin') {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50 p-8">
+        <SuperAdminDashboard />
+      </div>
+    );
+  }
+
   if (!user) {
     if (path === '/staff-access') {
       return <StaffLogin />;

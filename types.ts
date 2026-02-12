@@ -41,6 +41,7 @@ export interface Firm {
   staffCount: number;
   installDate: string;
   status: 'Active' | 'Suspended';
+  ghlIntegrated?: boolean;
 }
 
 export const TAX_YEARS: Record<string, { label: string; isOpen: boolean }> = {
@@ -212,10 +213,10 @@ export interface TaxReturn {
   stateBalance: string;
   paymentType: string;
   internalNotes?: string;
-  files: { 
-    name: string; 
-    size: string; 
-    type: string; 
+  files: {
+    name: string;
+    size: string;
+    type: string;
     status?: DocStatus;
     signatureStatus?: 'Pending' | 'Signed' | 'None';
   }[];

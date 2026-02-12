@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { 
-  Building2, 
-  Users, 
-  ShieldCheck, 
-  Calendar, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Zap, 
+import {
+  Building2,
+  Users,
+  ShieldCheck,
+  Calendar,
+  Search,
+  Filter,
+  MoreVertical,
+  Zap,
   CheckCircle,
   TrendingUp,
   Mail,
@@ -25,7 +25,8 @@ const mockFirms: Firm[] = [
     tier: 'Pro',
     staffCount: 12,
     installDate: 'Oct 12, 2023',
-    status: 'Active'
+    status: 'Active',
+    ghlIntegrated: true
   },
   {
     id: 'f2',
@@ -35,7 +36,8 @@ const mockFirms: Firm[] = [
     tier: 'Core',
     staffCount: 3,
     installDate: 'Jan 05, 2024',
-    status: 'Active'
+    status: 'Active',
+    ghlIntegrated: false
   },
   {
     id: 'f3',
@@ -45,7 +47,8 @@ const mockFirms: Firm[] = [
     tier: 'Pro',
     staffCount: 8,
     installDate: 'Mar 15, 2024',
-    status: 'Active'
+    status: 'Active',
+    ghlIntegrated: true
   },
   {
     id: 'f4',
@@ -55,18 +58,20 @@ const mockFirms: Firm[] = [
     tier: 'Core',
     staffCount: 2,
     installDate: 'May 20, 2024',
-    status: 'Active'
+    status: 'Active',
+    ghlIntegrated: false
   }
 ];
 
 const SuperAdminDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<'All' | 'Core' | 'Pro'>('All');
+  const logoUrl = "https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png";
 
   const filteredFirms = useMemo(() => {
     return mockFirms.filter(f => {
-      const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           f.ownerName.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        f.ownerName.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTier = tierFilter === 'All' || f.tier === tierFilter;
       return matchesSearch && matchesTier;
     });
@@ -82,7 +87,14 @@ const SuperAdminDashboard: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
+      <div className="flex flex-col items-center justify-center mb-8">
+        <img src={logoUrl} alt="FilersHub" className="h-12 w-auto mb-4" />
+        <h1 className="text-2xl font-bold text-slate-900">Platform Administration</h1>
+        <p className="text-slate-500 text-sm">Manage firms, monitor installations, and track growth.</p>
+      </div>
+
       {/* Platform Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -128,9 +140,9 @@ const SuperAdminDashboard: React.FC = () => {
         <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search firms or owners..." 
+            <input
+              type="text"
+              placeholder="Search firms or owners..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
@@ -142,9 +154,8 @@ const SuperAdminDashboard: React.FC = () => {
                 <button
                   key={t}
                   onClick={() => setTierFilter(t)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    tierFilter === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${tierFilter === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'
+                    }`}
                 >
                   {t}
                 </button>
@@ -161,6 +172,7 @@ const SuperAdminDashboard: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Owner Info</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Tier & Scale</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Install Date</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">CRM Sync?</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
@@ -189,9 +201,8 @@ const SuperAdminDashboard: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
-                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
-                        firm.tier === 'Pro' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-600 border-slate-200'
-                      }`}>
+                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${firm.tier === 'Pro' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-600 border-slate-200'
+                        }`}>
                         {firm.tier}
                       </span>
                       <div className="flex items-center gap-1 text-slate-500">
@@ -205,6 +216,17 @@ const SuperAdminDashboard: React.FC = () => {
                       <Calendar size={14} />
                       <span className="text-xs font-medium">{firm.installDate}</span>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {firm.ghlIntegrated ? (
+                      <div className="inline-flex items-center justify-center w-6 h-6 bg-emerald-50 text-emerald-600 rounded-full">
+                        <CheckCircle size={14} strokeWidth={3} />
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center justify-center w-6 h-6 bg-slate-100 text-slate-300 rounded-full">
+                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -221,7 +243,7 @@ const SuperAdminDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
-        
+
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Platform Infrastructure Monitoring v1.0</p>
           <div className="flex items-center gap-2">
