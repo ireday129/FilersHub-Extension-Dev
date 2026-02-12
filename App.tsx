@@ -105,7 +105,7 @@ const App: React.FC = () => {
 
   // Global Firm Settings
   const [firmSettings, setFirmSettings] = useState({
-    name: 'FilersHub',
+    name: 'FilersHub-Extension-Dev',
     logo: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png',
     color: '#4aa936'
   });
