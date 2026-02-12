@@ -121,21 +121,22 @@ const AuthenticatedApp: React.FC = () => {
     }
   }, [user, selectedRole]);
 
-  // Handle Hash Routing
+  // Handle URL Path Routing (No hashes allowed per project rules)
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      if (hash === '#super-admin') {
+    const handlePathChange = () => {
+      const path = window.location.pathname;
+      if (path === '/super-admin') {
         setSelectedRole(UserRole.SuperAdmin);
-      } else if (hash === '') {
-        // Only reset if we were specifically in super admin mode via hash
+      } else if (path === '/' || path === '/index.html') {
+        // Only reset if we were specifically in super admin mode via path
         setSelectedRole(prev => prev === UserRole.SuperAdmin ? UserRole.FirmOwner : prev);
       }
     };
 
-    handleHashChange();
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    handlePathChange();
+    // Listen for popstate (browser back/forward)
+    window.addEventListener('popstate', handlePathChange);
+    return () => window.removeEventListener('popstate', handlePathChange);
   }, []);
 
   // Dynamic Theme Injection
@@ -327,9 +328,19 @@ const AuthenticatedApp: React.FC = () => {
 };
 
 import RoleSelection from './components/RoleSelection';
+import StaffLogin from './components/StaffLogin';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
+  const [path, setPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handlePathChange = () => {
+      setPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePathChange);
+    return () => window.removeEventListener('popstate', handlePathChange);
+  }, []);
 
   if (loading) {
     return (
@@ -340,6 +351,9 @@ const AppContent: React.FC = () => {
   }
 
   if (!user) {
+    if (path === '/staff-access') {
+      return <StaffLogin />;
+    }
     return <RoleSelection />;
   }
 
