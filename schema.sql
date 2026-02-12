@@ -7,10 +7,11 @@ CREATE TABLE firms (
   logo_url TEXT,
   brand_color TEXT DEFAULT '#4a90e2', -- hex color
   
-  -- GHL Integration
+  -- GHL Integration (OAuth)
   ghl_location_id TEXT,
-  ghl_api_key TEXT, -- encrypted
-  ghl_webhook_url TEXT,
+  ghl_access_token TEXT, -- OAuth Access Token
+  ghl_refresh_token TEXT, -- OAuth Refresh Token
+  ghl_token_expires_at TIMESTAMP WITH TIME ZONE, -- Token Expiry
   ghl_custom_field_group TEXT DEFAULT 'FilersHub',
   ghl_custom_field_name TEXT DEFAULT 'Return Status',
   
