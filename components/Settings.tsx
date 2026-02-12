@@ -39,6 +39,16 @@ interface SettingsProps {
   firmId: string | null;
 }
 
+interface GHLUser {
+  id: string;
+  name: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  role: string;
+  type: string;
+}
+
 const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firmId }) => {
   const [localSettings, setLocalSettings] = useState(firmSettings);
   const [staff, setStaff] = useState<StaffMember[]>([
@@ -46,6 +56,63 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     { id: '2', name: 'David Smith', email: 'david@filershub.com', role: UserRole.TaxPro, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David' },
     { id: '3', name: 'Angela Martin', email: 'angela@filershub.com', role: UserRole.TaxPro, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Angela' },
   ]);
+
+  const [showGHLModal, setShowGHLModal] = useState(false);
+  const [ghlUsers, setGhlUsers] = useState<GHLUser[]>([]);
+  const [isLoadingGHL, setIsLoadingGHL] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({});
+
+  const fetchGHLUsers = async () => {
+    setIsLoadingGHL(true);
+    setShowGHLModal(true);
+    try {
+      // We use a query parameter in the invoke URL
+      const { data, error } = await supabase.functions.invoke('ghl-users?action=list', {
+        method: 'GET'
+      });
+
+      if (error) throw error;
+      setGhlUsers(data.users || []);
+    } catch (error) {
+      console.error('Error fetching GHL users:', error);
+      alert('Failed to load users from CRM.');
+    } finally {
+      setIsLoadingGHL(false);
+    }
+  };
+
+  const inviteUser = async (user: GHLUser) => {
+    setInviteStatus(prev => ({ ...prev, [user.id]: 'sending' }));
+    try {
+      const { error } = await supabase.functions.invoke('ghl-users?action=invite', {
+        method: 'POST',
+        body: {
+          ghlUserId: user.id,
+          email: user.email,
+          name: user.name || `${user.firstName} ${user.lastName}`,
+          role: 'Tax Pro' // Default role
+        }
+      });
+
+      if (error) throw error;
+
+      setInviteStatus(prev => ({ ...prev, [user.id]: 'sent' }));
+
+      // Add to local staff list for immediate feedback
+      setStaff(prev => [...prev, {
+        id: `temp-${user.id}`,
+        name: user.name || `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        role: UserRole.TaxPro,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`
+      }]);
+
+    } catch (error) {
+      console.error('Error inviting user:', error);
+      setInviteStatus(prev => ({ ...prev, [user.id]: 'error' }));
+      alert('Failed to invite user.');
+    }
+  };
 
   const colors = ['#4aa936', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#334155'];
 
@@ -101,6 +168,100 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+      {/* GHL Users Modal */}
+      {showGHLModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                  <span className="font-bold text-lg">CRM</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Import from CRM</h3>
+                  <p className="text-xs text-slate-500 font-medium">Select users to invite to FilersHub</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowGHLModal(false)}
+                className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-500"
+              >
+                <Shield size={20} className="rotate-45" /> {/* Using Shield as X icon proxy or just X */}
+                {/* Actually let's use a real close button or text */}
+                <span className="text-2xl leading-none">&times;</span>
+              </button>
+            </div>
+
+            <div className="p-0 overflow-y-auto flex-1">
+              {isLoadingGHL ? (
+                <div className="p-12 flex flex-col items-center justify-center space-y-4 text-slate-400">
+                  <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm font-medium">Fetching users from CRM...</p>
+                </div>
+              ) : ghlUsers.length > 0 ? (
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Name</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Role</th>
+                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {ghlUsers.map(user => {
+                      const status = inviteStatus[user.id] || 'idle';
+                      const isInvited = status === 'sent';
+
+                      return (
+                        <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 border border-slate-200">
+                                {(user.name?.[0] || user.firstName?.[0] || '?').toUpperCase()}
+                              </div>
+                              <span className="text-sm font-semibold text-slate-700">{user.name || `${user.firstName} ${user.lastName}`}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-500">{user.email}</td>
+                          <td className="px-6 py-4 text-xs font-medium text-slate-400 capitalize">{user.role}</td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => inviteUser(user)}
+                              disabled={isInvited || status === 'sending'}
+                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${isInvited
+                                ? 'bg-emerald-100 text-emerald-700 cursor-default'
+                                : 'bg-brand text-white hover:bg-brand/90 hover:shadow-md active:scale-95'
+                                } disabled:opacity-70 disabled:active:scale-100`}
+                            >
+                              {status === 'sending' ? 'Sending...' : isInvited ? 'Invited' : 'Invite'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-12 text-center text-slate-500">
+                  <p>No users found in this CRM location.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setShowGHLModal(false)}
+                className="px-6 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Firm Profile & Branding Section */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -228,7 +389,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
       {/* Staff Management Section */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
               <Users size={20} />
@@ -238,6 +399,13 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               <p className="text-xs text-slate-500">Manage your staff accounts and app access levels.</p>
             </div>
           </div>
+          <button
+            onClick={fetchGHLUsers}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Users size={16} />
+            Manage CRM Staff
+          </button>
         </div>
 
         <div className="overflow-x-auto">

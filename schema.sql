@@ -47,6 +47,15 @@ CREATE TABLE staff (
   -- Auth
   auth_user_id UUID, -- Supabase auth.users.id
   
+  -- GHL Integration
+  ghl_user_id TEXT,
+  ghl_location_id TEXT,
+  
+  -- Invitation System
+  invite_status TEXT DEFAULT 'pending' CHECK (invite_status IN ('pending', 'accepted', 'expired')),
+  invite_sent_at TIMESTAMP WITH TIME ZONE,
+  invite_accepted_at TIMESTAMP WITH TIME ZONE,
+  
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   last_login TIMESTAMP WITH TIME ZONE,
@@ -56,6 +65,8 @@ CREATE TABLE staff (
 CREATE INDEX idx_staff_firm ON staff(firm_id);
 CREATE INDEX idx_staff_email ON staff(email);
 CREATE INDEX idx_staff_auth_user ON staff(auth_user_id);
+CREATE INDEX idx_staff_ghl_user ON staff(ghl_user_id);
+CREATE INDEX idx_staff_invite_status ON staff(firm_id, invite_status);
 
 -- =====================================================
 -- CLIENTS
