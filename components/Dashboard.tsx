@@ -103,7 +103,7 @@ const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOv
     onDragOver={onDragOver}
     onDrop={onDrop}
     onDragEnd={onDragEnd}
-    className={`bg-white p-4 rounded-2xl border-[5px] border-white shadow-sm transition-all hover:border-brand hover:shadow-[0_20px_50px_-12px_rgba(74,169,54,0.4)] group relative flex flex-col justify-center min-h-[100px] ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+    className={`bg-white p-4 rounded-2xl border-[5px] border-white shadow-sm transition-all hover:border-brand hover:shadow-md group relative flex flex-col justify-center min-h-[100px] ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
   >
     {draggable && (
       <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">

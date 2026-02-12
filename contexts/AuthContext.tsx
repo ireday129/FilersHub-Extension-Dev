@@ -7,7 +7,7 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     signOut: () => Promise<void>;
-    bypassAuth: () => Promise<void>;
+    bypassAuth: (role?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,15 +41,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
     };
 
-    const bypassAuth = async () => {
+    const bypassAuth = async (role: string = 'authenticated') => {
         // Create a mock session for development
         const mockUser: User = {
             id: 'dev-bypass-user',
             app_metadata: {},
-            user_metadata: {},
+            user_metadata: {
+                role,
+                full_name: 'Dev User'
+            }, // Store selected role and name here
             aud: 'authenticated',
             created_at: new Date().toISOString(),
-            email: 'dev@filershub.com',
+            email: `dev-${role.toLowerCase()}@filershub.com`,
             phone: '',
             role: 'authenticated',
             updated_at: new Date().toISOString()

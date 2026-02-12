@@ -24,8 +24,8 @@ export const useFirmData = () => {
                 setFirmId('dev-firm-id');
                 setFirmSettings({
                     name: 'Dev Mode Firm',
-                    logo: 'https://via.placeholder.com/150',
-                    color: '#ea580c'
+                    logo: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png',
+                    color: '#42ab31'
                 });
                 // Mock Returns
                 setReturns([
@@ -34,7 +34,7 @@ export const useFirmData = () => {
                         clientName: 'Dev Client A',
                         year: '2024',
                         type: '1040',
-                        status: 'Data Entry',
+                        status: TaxReturnStatus.InPreparation,
                         preparer: 'Dev User',
                         date: new Date().toLocaleDateString(),
                         amount: '$500',

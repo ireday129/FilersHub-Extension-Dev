@@ -56,7 +56,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-  const portalUrl = `access.filershub.com/${firmSlug || 'portal'}`;
+  const portalUrl = `app.filershub.com/${firmSlug || 'portal'}`;
 
   const handleRoleChange = (id: string, newRole: UserRole) => {
     setStaff(prev => prev.map(member =>

@@ -2,9 +2,7 @@ import React from 'react';
 import { UserRole } from '../types';
 import { ShieldCheck, Users, Briefcase, UserCircle } from 'lucide-react';
 
-interface RoleSelectionProps {
-  onSelectRole: (role: UserRole) => void;
-}
+
 
 const RoleCard = ({ role, description, icon: Icon, onSelect }: any) => (
   <button
@@ -24,7 +22,13 @@ const RoleCard = ({ role, description, icon: Icon, onSelect }: any) => (
   </button>
 );
 
-const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole }) => {
+import { useAuth } from '../contexts/AuthContext';
+
+const RoleSelection: React.FC = () => {
+  const { bypassAuth } = useAuth();
+  const onSelectRole = async (role: UserRole) => {
+    await bypassAuth(role);
+  };
   const logoUrl = "https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png";
 
   const roles = [
@@ -60,7 +64,7 @@ const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole }) => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl w-full mb-16">
         {roles.map((item) => (
-          <RoleCard 
+          <RoleCard
             key={item.role}
             role={item.role}
             description={item.description}

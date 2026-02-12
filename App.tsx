@@ -7,7 +7,6 @@ import Documents from './components/Documents';
 import Tasks from './components/Tasks';
 import Settings from './components/Settings';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
-import Login from './components/auth/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LogOut, ChevronDown, Loader2 } from 'lucide-react';
 import { useFirmData } from './hooks/useFirmData';
@@ -112,13 +111,15 @@ const AuthenticatedApp: React.FC = () => {
   // Global Firm Settings - now fetched from useFirmData
 
 
-  // Temporary: force role for now since we haven't implemented profile fetching yet
+  // Fetch role from user profile (metadata)
   useEffect(() => {
-    if (!selectedRole) {
+    if (user?.user_metadata?.role) {
+      setSelectedRole(user.user_metadata.role as UserRole);
+    } else if (!selectedRole) {
       // Logic to determine role would go here. For now default to FirmOwner for dev
       setSelectedRole(UserRole.FirmOwner);
     }
-  }, [selectedRole]);
+  }, [user, selectedRole]);
 
   // Handle Hash Routing
   useEffect(() => {
@@ -155,6 +156,7 @@ const AuthenticatedApp: React.FC = () => {
       .text-brand { color: var(--firm-brand) !important; }
       .border-brand { border-color: var(--firm-brand) !important; }
       .bg-brand-light { background-color: var(--firm-brand-light) !important; }
+      .hover\\:border-brand:hover { border-color: var(--firm-brand) !important; }
       .focus-within\\:ring-brand:focus-within { --tw-ring-color: var(--firm-brand); }
       .focus\\:ring-brand:focus { --tw-ring-color: var(--firm-brand); }
     `;
@@ -310,7 +312,7 @@ const AuthenticatedApp: React.FC = () => {
               )}
 
               <ProfileBubble
-                name={user?.email || "User"}
+                name={user?.user_metadata?.full_name || "User"}
                 subtext={isSuperAdmin ? "FilersHub HQ" : isClient ? "Applewood LLC" : (selectedRole === UserRole.FirmOwner ? "Owner & CEO" : "Tax Professional")}
                 avatarSeed={user?.email || "User"}
               />
@@ -324,6 +326,8 @@ const AuthenticatedApp: React.FC = () => {
   );
 };
 
+import RoleSelection from './components/RoleSelection';
+
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
 
@@ -336,7 +340,7 @@ const AppContent: React.FC = () => {
   }
 
   if (!user) {
-    return <Login />;
+    return <RoleSelection />;
   }
 
   return <AuthenticatedApp />;
