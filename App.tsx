@@ -350,11 +350,30 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Bypass auth for Super Admin Dashboard (Temporary per user request)
+  // Secure Super Admin Dashboard
   if (path === '/super-admin') {
+    if (!user) {
+      return <StaffLogin />;
+    }
+
+    if (user.email === 'irene@hannahfinancial.com') {
+      return (
+        <div className="flex flex-col min-h-screen bg-slate-50 p-8">
+          <SuperAdminDashboard />
+        </div>
+      );
+    }
+
     return (
-      <div className="flex flex-col min-h-screen bg-slate-50 p-8">
-        <SuperAdminDashboard />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4 text-center">
+        <h1 className="text-2xl font-bold text-slate-800 mb-2">Access Denied</h1>
+        <p className="text-slate-500 mb-6">You do not have permission to view the Super Admin Dashboard.</p>
+        <button
+          onClick={() => window.location.href = '/'}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          Return to Dashboard
+        </button>
       </div>
     );
   }
