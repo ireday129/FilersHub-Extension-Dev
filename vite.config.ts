@@ -4,8 +4,11 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  // Use '/' base for Vercel (web) to support client-side routing, './' for extension (local)
+  const isVercel = process.env.VERCEL === '1';
+
   return {
-    base: './',
+    base: isVercel ? '/' : './',
     server: {
       port: 3000,
       host: '0.0.0.0',
