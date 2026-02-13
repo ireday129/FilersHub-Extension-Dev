@@ -1155,9 +1155,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     </p>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
+                <div className={`flex flex-wrap items-center gap-3 ${isExtension ? 'ml-auto' : ''}`}>
                   {isExtension ? (
-                    /* Extension mode: Tax Year filter only (status driven by toggle above) */
+                    /* Extension mode: Tax Year filter only, right-aligned */
                     <div className="relative flex items-center">
                       <Calendar size={14} className="absolute left-3 text-slate-400" />
                       <select
@@ -1230,51 +1230,70 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 </div>
               </div>
               <div className={isExtension ? 'overflow-hidden' : 'overflow-x-auto'}>
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50/50">
-                    <tr>
-                      <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider`}>Client & Return</th>
-                      <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider`}>Status Stage</th>
-                      {!isExtension && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Assignee</th>}
-                      <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider text-right`}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
+                {isExtension ? (
+                  /* Extension: single-column clickable client list */
+                  <div className="divide-y divide-slate-100">
                     {displayedReturns.length > 0 ? displayedReturns.map(tr => (
-                      <tr key={tr.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
-                          <div className="min-w-0">
-                            <p className={`${isExtension ? 'text-xs' : 'text-sm'} font-bold text-slate-800 truncate`}>{tr.clientName}</p>
-                            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter truncate">{tr.year} • {tr.type}</p>
-                          </div>
-                        </td>
-                        <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-brand-light text-brand border border-brand/10 shadow-sm ${isExtension ? 'max-w-full truncate' : ''}`}>
-                            <span className="text-xs shrink-0">{STATUS_EMOJIS[tr.status]}</span>
-                            <span className={isExtension ? 'truncate' : ''}>{tr.status}</span>
-                          </span>
-                        </td>
-                        {!isExtension && (
+                      <button
+                        key={tr.id}
+                        onClick={() => setSelectedReturnId(tr.id)}
+                        className="w-full flex items-center justify-between px-3 py-3 hover:bg-slate-50 transition-colors text-left group"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-slate-800 truncate group-hover:text-brand transition-colors">{tr.clientName}</p>
+                          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter truncate">{tr.year} • {tr.type}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-slate-300 group-hover:text-brand shrink-0 ml-2 transition-colors" />
+                      </button>
+                    )) : (
+                      <div className="px-3 py-8 text-center text-slate-400 text-sm">No returns found matching filters.</div>
+                    )}
+                  </div>
+                ) : (
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50/50">
+                      <tr>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Client & Return</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status Stage</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Assignee</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {displayedReturns.length > 0 ? displayedReturns.map(tr => (
+                        <tr key={tr.id} className="hover:bg-slate-50 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-800 truncate">{tr.clientName}</p>
+                              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter truncate">{tr.year} • {tr.type}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-brand-light text-brand border border-brand/10 shadow-sm">
+                              <span className="text-xs">{STATUS_EMOJIS[tr.status]}</span>
+                              {tr.status}
+                            </span>
+                          </td>
                           <td className="px-6 py-4">
                             <p className="text-xs font-medium text-slate-600">{tr.preparer}</p>
                           </td>
-                        )}
-                        <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-right`}>
-                          <button
-                            onClick={() => setSelectedReturnId(tr.id)}
-                            className="text-brand hover:underline text-xs font-bold"
-                          >
-                            Manage
-                          </button>
-                        </td>
-                      </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan={isExtension ? 3 : 4} className={`${isExtension ? 'px-3 py-8' : 'px-6 py-12'} text-center text-slate-400 text-sm`}>No returns found matching filters.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => setSelectedReturnId(tr.id)}
+                              className="text-brand hover:underline text-xs font-bold"
+                            >
+                              Manage
+                            </button>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-12 text-center text-slate-400 text-sm">No returns found matching filters.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           ) : (
