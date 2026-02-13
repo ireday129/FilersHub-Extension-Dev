@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "FilersHub Extension Dev",
+    "name": "FilersHub",
     "version": "1.0.0",
     "description": "FilersHub Application Extension",
     "action": {
