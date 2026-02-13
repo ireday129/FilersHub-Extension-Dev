@@ -64,8 +64,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
                   onClick={() => setActiveTab(item.name)}
                   title={item.name}
                   className={`p-2 rounded-lg transition-all ${activeTab === item.name
-                      ? 'bg-brand text-white shadow-sm shadow-brand/20'
-                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                    ? 'bg-brand text-white shadow-sm shadow-brand/20'
+                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
                     }`}
                 >
                   <item.icon size={18} />
@@ -82,8 +82,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
                     key={item.name}
                     onClick={() => setActiveTab(item.name)}
                     className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === item.name
-                        ? 'bg-brand text-white shadow-md shadow-brand/20'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                      ? 'bg-brand text-white shadow-md shadow-brand/20'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
                       }`}
                   >
                     <item.icon size={18} />
@@ -97,8 +97,21 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
 
         {/* Right Section: Brand Logo and Name (Always Visible) */}
         <div className="flex-1 flex items-center justify-end gap-3">
-          <span className={`text-xl font-bold text-slate-800 tracking-tight hidden sm:block ${compact ? 'text-base' : ''}`}>{firmName}</span>
-          <img src={firmLogo} alt={`${firmName} Logo`} className={`${compact ? 'h-7' : 'h-9'} w-auto object-contain`} />
+          {compact ? (
+            <button
+              onClick={() => setActiveTab(NavItem.Profile)}
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+              title="My Profile"
+            >
+              <span className="text-base font-bold text-slate-800 tracking-tight hidden sm:block">{firmName}</span>
+              <img src={firmLogo} alt={`${firmName} Logo`} className="h-7 w-auto object-contain" />
+            </button>
+          ) : (
+            <>
+              <span className="text-xl font-bold text-slate-800 tracking-tight hidden sm:block">{firmName}</span>
+              <img src={firmLogo} alt={`${firmName} Logo`} className="h-9 w-auto object-contain" />
+            </>
+          )}
         </div>
       </div>
 
@@ -113,8 +126,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
                 setIsMobileMenuOpen(false);
               }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.name
-                  ? 'bg-brand text-white font-bold shadow-lg shadow-brand/20'
-                  : 'text-slate-500 hover:bg-slate-50'
+                ? 'bg-brand text-white font-bold shadow-lg shadow-brand/20'
+                : 'text-slate-500 hover:bg-slate-50'
                 }`}
             >
               <item.icon size={20} />

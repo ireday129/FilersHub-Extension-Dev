@@ -6,11 +6,11 @@ import Clients from './components/Clients';
 import Documents from './components/Documents';
 import Tasks from './components/Tasks';
 import Settings from './components/Settings';
+import Profile from './components/Profile';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LogOut, ChevronDown, Loader2 } from 'lucide-react';
 import { useFirmData } from './hooks/useFirmData';
-
 const initialTaxReturns: TaxReturn[] = [
   {
     id: 'tr1',
@@ -218,6 +218,8 @@ const AuthenticatedApp: React.FC = () => {
             firmId={firmId}
           />
         );
+      case NavItem.Profile:
+        return <Profile role={currentRole} />;
       default:
         return (
           <Dashboard
@@ -325,12 +327,14 @@ const AuthenticatedApp: React.FC = () => {
                 </div>
               )}
 
-              <ProfileBubble
-                name={user?.user_metadata?.full_name || "User"}
-                subtext={isSuperAdmin ? "FilersHub HQ" : isClient ? "Applewood LLC" : (selectedRole === UserRole.FirmOwner ? "Owner & CEO" : "Tax Professional")}
-                avatarSeed={user?.email || "User"}
-                avatarUrl={userAvatar}
-              />
+              {!isExtension && (
+                <ProfileBubble
+                  name={user?.user_metadata?.full_name || "User"}
+                  subtext={isSuperAdmin ? "FilersHub HQ" : isClient ? "Applewood LLC" : (selectedRole === UserRole.FirmOwner ? "Owner & CEO" : "Tax Professional")}
+                  avatarSeed={user?.email || "User"}
+                  avatarUrl={userAvatar}
+                />
+              )}
               {isExtension && (
                 <button
                   onClick={handleExitSession}
