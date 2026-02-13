@@ -227,7 +227,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', priority: 'medium' });
-  const [extensionStatsOpen, setExtensionStatsOpen] = useState(false);
+  const [extensionStatusFilter, setExtensionStatusFilter] = useState<TaxReturnStatus>(TaxReturnStatus.IntakeReceived);
 
   const groupedFileUploadTypes = useMemo(() => {
     const groups: Record<string, { key: string; label: string; category: string }[]> = {};
@@ -275,7 +275,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
       base = base.filter(tr => tr.type === filterType);
     }
 
-    if (STATUS_ORDER.includes(sortStatus as TaxReturnStatus)) {
+    // Extension mode: filter by the status toggle selection
+    if (isExtension) {
+      base = base.filter(tr => tr.status === extensionStatusFilter);
+    } else if (STATUS_ORDER.includes(sortStatus as TaxReturnStatus)) {
       base = base.filter(tr => tr.status === sortStatus);
     } else if (sortStatus === 'Workflow') {
       base.sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
@@ -284,7 +287,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     }
 
     return base;
-  }, [returns, role, filterYear, filterType, sortStatus, isTaxPro, canToggleView, viewScope, staffName]);
+  }, [returns, role, filterYear, filterType, sortStatus, isTaxPro, canToggleView, viewScope, staffName, isExtension, extensionStatusFilter]);
 
   const statusCounts = useMemo(() => {
     const scopeReturns = (isTaxPro || (canToggleView && viewScope === 'My'))
@@ -1115,36 +1118,25 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
       )}
 
       {isStaff && isExtension && (
-        // Collapsible stats toggle for extension
-        <div className="mb-4">
-          <button
-            onClick={() => setExtensionStatsOpen(!extensionStatsOpen)}
-            className="w-full flex items-center justify-between px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+        // Status toggle for extension — each status is a selectable option
+        <div className="relative flex items-center mb-4">
+          <Filter size={14} className="absolute left-3 text-brand pointer-events-none" />
+          <select
+            value={extensionStatusFilter}
+            onChange={(e) => setExtensionStatusFilter(e.target.value as TaxReturnStatus)}
+            className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer shadow-sm"
           >
-            <span className="flex items-center gap-2">
-              <TrendingUp size={14} className="text-brand" />
-              Status Overview
-            </span>
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${extensionStatsOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {extensionStatsOpen && (
-            <div className="grid grid-cols-2 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200">
-              {orderedStatuses.slice(0, 4).map((status, index) => {
-                const cardData = getStatCardProps(status);
-                if (!cardData) return null;
-                return (
-                  <StatCard
-                    key={status}
-                    title={cardData.title}
-                    value={(statusCounts[status] || 0).toString()}
-                    emoji={STATUS_EMOJIS[status]}
-                    color={cardData.color}
-                    compact={true}
-                  />
-                );
-              })}
-            </div>
-          )}
+            {orderedStatuses.map((status) => {
+              const cardData = getStatCardProps(status);
+              if (!cardData) return null;
+              return (
+                <option key={status} value={status}>
+                  {STATUS_EMOJIS[status]} {cardData.title} ({statusCounts[status] || 0})
+                </option>
+              );
+            })}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
         </div>
       )}
 
@@ -1162,26 +1154,42 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="relative flex items-center">
-                    <Filter size={14} className="absolute left-3 text-slate-400" />
-                    <select
-                      value={sortStatus}
-                      onChange={(e) => setSortStatus(e.target.value)}
-                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="Default">All Workflow Stages</option>
-                      {STATUS_ORDER.map(s => (
-                        <option key={s} value={s}>{STATUS_EMOJIS[s]} {s}</option>
-                      ))}
-                      <hr className="my-1" />
-                      <option value="Workflow">Sort: Workflow Order</option>
-                      <option value="Client">Sort: Client Name</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
-                  </div>
-
-                  {!isExtension && (
+                  {isExtension ? (
+                    /* Extension mode: Tax Year filter only (status driven by toggle above) */
+                    <div className="relative flex items-center">
+                      <Calendar size={14} className="absolute left-3 text-slate-400" />
+                      <select
+                        value={filterYear}
+                        onChange={(e) => setFilterYear(e.target.value)}
+                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="All">All Years</option>
+                        {Object.values(TAX_YEARS).map(y => (
+                          <option key={y.label} value={y.label}>{y.label}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                    </div>
+                  ) : (
                     <>
+                      <div className="relative flex items-center">
+                        <Filter size={14} className="absolute left-3 text-slate-400" />
+                        <select
+                          value={sortStatus}
+                          onChange={(e) => setSortStatus(e.target.value)}
+                          className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="Default">All Workflow Stages</option>
+                          {STATUS_ORDER.map(s => (
+                            <option key={s} value={s}>{STATUS_EMOJIS[s]} {s}</option>
+                          ))}
+                          <hr className="my-1" />
+                          <option value="Workflow">Sort: Workflow Order</option>
+                          <option value="Client">Sort: Client Name</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                      </div>
+
                       <div className="relative flex items-center">
                         <FileText size={14} className="absolute left-3 text-slate-400" />
                         <select
