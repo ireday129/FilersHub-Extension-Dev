@@ -63,6 +63,9 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
     let docs: any[] = [];
     returns.forEach(ret => {
       ret.files.forEach(file => {
+        // For staff, hide Approved documents from the list entirely
+        if (isStaff && (file as any).status === 'Approved') return;
+
         docs.push({
           ...file,
           returnId: ret.id,
@@ -256,7 +259,7 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
                 <option value="All">All Statuses</option>
                 <option value="Uploaded">Uploaded</option>
                 <option value="Under Review">Under Review</option>
-                <option value="Approved">Approved</option>
+                {!isStaff && <option value="Approved">Approved</option>}
                 <option value="Rejected">Rejected</option>
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -271,10 +274,10 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
             >
               All <span className="text-[10px] opacity-60 font-medium">({stats.all})</span>
             </button>
-            {(['Uploaded', 'Under Review', 'Approved', 'Rejected'] as DocStatus[]).map(status => (
+            {(isStaff ? ['Uploaded', 'Under Review', 'Rejected'] : ['Uploaded', 'Under Review', 'Approved', 'Rejected'] as DocStatus[]).map(status => (
               <button
                 key={status}
-                onClick={() => setFilterStatus(status)}
+                onClick={() => setFilterStatus(status as DocStatus)}
                 className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${filterStatus === status ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
                   }`}
               >
