@@ -100,6 +100,8 @@ const initialTaxReturns: TaxReturn[] = [
 
 
 
+import { useExtensionMode } from './hooks/useExtensionMode';
+
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
   const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, userAvatar } = useFirmData();
@@ -107,6 +109,8 @@ const AuthenticatedApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavItem>(NavItem.Dashboard);
   // const [returns, setReturns] = useState<TaxReturn[]>(initialTaxReturns);
   const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
+
+  const { isExtension } = useExtensionMode();
 
   // Global Firm Settings - now fetched from useFirmData
 
@@ -190,6 +194,7 @@ const AuthenticatedApp: React.FC = () => {
             setSelectedReturnId={setSelectedReturnId}
             refreshData={refresh}
             firmId={firmId}
+            isExtension={isExtension}
           />
         );
       case NavItem.Clients:
@@ -223,6 +228,7 @@ const AuthenticatedApp: React.FC = () => {
             setSelectedReturnId={setSelectedReturnId}
             refreshData={refresh}
             firmId={firmId}
+            isExtension={isExtension}
           />
         );
     }
@@ -247,16 +253,18 @@ const AuthenticatedApp: React.FC = () => {
           className="w-full h-full object-cover"
         />
       </div>
-      <div className="text-left">
-        <p className="text-[11px] font-bold text-slate-800 leading-tight">{name}</p>
-        <p className="text-[9px] text-slate-500 font-medium">{subtext}</p>
-      </div>
+      {!isExtension && (
+        <div className="text-left">
+          <p className="text-[11px] font-bold text-slate-800 leading-tight">{name}</p>
+          <p className="text-[9px] text-slate-500 font-medium">{subtext}</p>
+        </div>
+      )}
       <ChevronDown size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
     </button>
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
+    <div className={`flex flex-col min-h-screen bg-slate-50 ${isExtension ? 'text-sm' : ''}`}>
       {!isSuperAdmin && (
         <Navbar
           activeTab={activeTab}
@@ -264,12 +272,13 @@ const AuthenticatedApp: React.FC = () => {
           role={selectedRole || UserRole.FirmOwner}
           firmName={firmSettings.name}
           firmLogo={firmSettings.logo}
+          compact={isExtension}
         />
       )}
 
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
+      <main className={`flex-1 overflow-y-auto ${isExtension ? 'p-3' : 'p-4 md:p-8'}`}>
         <div className="max-w-7xl mx-auto">
-          <header className="mb-8 flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <header className={`mb-8 flex flex-col ${isExtension ? 'gap-4' : 'md:flex-row md:items-start justify-between gap-4'}`}>
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1">
                 <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border shadow-sm ${isSuperAdmin
@@ -278,30 +287,34 @@ const AuthenticatedApp: React.FC = () => {
                     ? 'text-indigo-600 bg-indigo-50 border-indigo-100'
                     : 'text-brand bg-brand-light border-brand/20'
                   }`}>
-                  {isSuperAdmin ? 'Platform SuperAdmin' : isStaff ? 'Staff Workspace' : 'Client Workspace'} • {selectedRole}
+                  {isSuperAdmin ? 'Platform SuperAdmin' : isStaff ? (isExtension ? 'Staff' : 'Staff Workspace') : (isExtension ? 'Client' : 'Client Workspace')} • {selectedRole}
                 </span>
-                <button
-                  onClick={handleExitSession}
-                  className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded border border-slate-100"
-                >
-                  <LogOut size={10} /> Sign Out
-                </button>
+                {!isExtension && (
+                  <button
+                    onClick={handleExitSession}
+                    className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded border border-slate-100"
+                  >
+                    <LogOut size={10} /> Sign Out
+                  </button>
+                )}
               </div>
-              <h1 className="text-2xl font-bold text-slate-800">
+              <h1 className={`${isExtension ? 'text-xl' : 'text-2xl'} font-bold text-slate-800`}>
                 {isSuperAdmin ? "Platform Overview" : isClient ? `Hello, ${user?.email}` : activeTab}
               </h1>
-              <p className="text-slate-500 text-sm mt-1">
-                {isSuperAdmin
-                  ? "Monitoring firms and platform infrastructure usage."
-                  : isClient ? `Welcome to the ${firmSettings.name} Portal` : `Manage firm operations as a ${selectedRole}.`}
-              </p>
+              {!isExtension && (
+                <p className="text-slate-500 text-sm mt-1">
+                  {isSuperAdmin
+                    ? "Monitoring firms and platform infrastructure usage."
+                    : isClient ? `Welcome to the ${firmSettings.name} Portal` : `Manage firm operations as a ${selectedRole}.`}
+                </p>
+              )}
             </div>
 
-            <div className="flex flex-col items-end gap-2">
+            <div className={`flex ${isExtension ? 'flex-row justify-between w-full' : 'flex-col items-end'} gap-2`}>
               {!isSuperAdmin && isStaff && (
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm">
                   <span className="w-1.5 h-1.5 bg-brand rounded-full animate-pulse"></span>
-                  Firm CRM Sync Active
+                  {isExtension ? 'CRM Sync' : 'Firm CRM Sync Active'}
                 </div>
               )}
 
@@ -318,6 +331,14 @@ const AuthenticatedApp: React.FC = () => {
                 avatarSeed={user?.email || "User"}
                 avatarUrl={userAvatar}
               />
+              {isExtension && (
+                <button
+                  onClick={handleExitSession}
+                  className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded border border-slate-100 ml-auto"
+                >
+                  <LogOut size={10} />
+                </button>
+              )}
             </div>
           </header>
 

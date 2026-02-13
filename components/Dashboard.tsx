@@ -51,6 +51,7 @@ interface DashboardProps {
   setSelectedReturnId: (id: string | null) => void;
   refreshData: () => Promise<void>;
   firmId: string | null;
+  isExtension?: boolean;
 }
 
 const STATUS_EMOJIS: Record<TaxReturnStatus, string> = {
@@ -96,14 +97,14 @@ const initialAnnouncements = [
   { id: '3', title: 'New Secure Messaging', content: 'We have updated our messaging system for better security.', date: '2 weeks ago', priority: 'low' },
 ];
 
-const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOver, onDrop, onDragEnd, onDelete }: any) => (
+const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOver, onDrop, onDragEnd, onDelete, compact }: any) => (
   <div
     draggable={draggable}
     onDragStart={onDragStart}
     onDragOver={onDragOver}
     onDrop={onDrop}
     onDragEnd={onDragEnd}
-    className={`bg-white p-4 rounded-2xl border-[5px] border-white shadow-sm transition-all hover:border-brand hover:shadow-md group relative flex flex-col justify-center min-h-[100px] ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+    className={`bg-white rounded-2xl border-white shadow-sm transition-all hover:border-brand hover:shadow-md group relative flex flex-col justify-center ${compact ? 'p-3 min-h-[80px] border-2' : 'p-4 border-[5px] min-h-[100px]'} ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
   >
     {draggable && (
       <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
@@ -121,14 +122,14 @@ const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOv
       </div>
     )}
     <div className="flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center text-xl shadow-inner group-hover:scale-110 transition-transform shrink-0`}>
+      <div className={`${compact ? 'w-8 h-8 text-lg' : 'w-10 h-10 text-xl'} rounded-xl ${color} flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform shrink-0`}>
         {emoji}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight break-words mb-1 transition-colors" title={title}>
+        <p className={`${compact ? 'text-[9px]' : 'text-[10px]'} font-bold text-slate-400 uppercase tracking-widest leading-tight break-words mb-1 transition-colors`} title={title}>
           {title}
         </p>
-        <h3 className="text-xl font-black text-slate-800 leading-none transition-colors">{value}</h3>
+        <h3 className={`${compact ? 'text-lg' : 'text-xl'} font-black text-slate-800 leading-none transition-colors`}>{value}</h3>
       </div>
     </div>
   </div>
@@ -188,7 +189,7 @@ const StatusStepper = ({ currentStatus, paymentType, isClientWorkspace }: { curr
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, selectedReturnId, setSelectedReturnId, refreshData, firmId }) => {
+const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, selectedReturnId, setSelectedReturnId, refreshData, firmId, isExtension }) => {
   const isFirmOwner = role === UserRole.FirmOwner;
   const isManager = role === UserRole.Manager;
   const isTaxPro = role === UserRole.TaxPro;
@@ -553,8 +554,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
+        <div className={`grid grid-cols-1 ${isExtension ? '' : 'lg:grid-cols-3'} gap-6`}>
+          <div className={`${isExtension ? 'col-span-1' : 'lg:col-span-2'} space-y-4`}>
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-700">Return Documents</h3>
@@ -737,8 +738,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                             </button>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="md:col-span-1 space-y-4">
+                          <div className={`grid grid-cols-1 ${isExtension ? 'gap-4' : 'md:grid-cols-4 gap-4'}`}>
+                            <div className={`${isExtension ? 'col-span-1' : 'md:col-span-1'} space-y-4`}>
                               <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">E-Sign Fields</h4>
                                 <div className="space-y-2">
@@ -769,7 +770,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                               </div>
                             </div>
 
-                            <div className="md:col-span-3">
+                            <div className={`${isExtension ? 'col-span-1' : 'md:col-span-3'}`}>
                               <div
                                 ref={docPreviewRef}
                                 onClick={handleAddSignatureField}
@@ -1021,7 +1022,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
 
   return (
     <div className="space-y-6 pb-12">
-      {isStaff && (
+      {isStaff && !isExtension && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -1112,8 +1113,28 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+      {isStaff && isExtension && (
+        // Minimal stats for extension
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {orderedStatuses.slice(0, 4).map((status, index) => {
+            const cardData = getStatCardProps(status);
+            if (!cardData) return null;
+            return (
+              <StatCard
+                key={status}
+                title={cardData.title}
+                value={(statusCounts[status] || 0).toString()}
+                emoji={STATUS_EMOJIS[status]}
+                color={cardData.color}
+                compact={true}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      <div className={`grid grid-cols-1 ${isExtension ? '' : 'lg:grid-cols-3'} gap-8`}>
+        <div className={`${isExtension ? 'col-span-1' : 'lg:col-span-2'} space-y-6`}>
           {isStaff ? (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1125,59 +1146,61 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     Filter and manage the status of your client tax returns.
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="relative flex items-center">
-                    <Filter size={14} className="absolute left-3 text-slate-400" />
-                    <select
-                      value={sortStatus}
-                      onChange={(e) => setSortStatus(e.target.value)}
-                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="Default">All Workflow Stages</option>
-                      {STATUS_ORDER.map(s => (
-                        <option key={s} value={s}>{STATUS_EMOJIS[s]} {s}</option>
-                      ))}
-                      <hr className="my-1" />
-                      <option value="Workflow">Sort: Workflow Order</option>
-                      <option value="Client">Sort: Client Name</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
-                  </div>
+                {!isExtension && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative flex items-center">
+                      <Filter size={14} className="absolute left-3 text-slate-400" />
+                      <select
+                        value={sortStatus}
+                        onChange={(e) => setSortStatus(e.target.value)}
+                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="Default">All Workflow Stages</option>
+                        {STATUS_ORDER.map(s => (
+                          <option key={s} value={s}>{STATUS_EMOJIS[s]} {s}</option>
+                        ))}
+                        <hr className="my-1" />
+                        <option value="Workflow">Sort: Workflow Order</option>
+                        <option value="Client">Sort: Client Name</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                    </div>
 
-                  <div className="relative flex items-center">
-                    <FileText size={14} className="absolute left-3 text-slate-400" />
-                    <select
-                      value={filterType}
-                      onChange={(e) => setFilterType(e.target.value)}
-                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="All">All Return Types</option>
-                      {Object.entries(groupedReturnTypes).map(([category, items]) => (
-                        <optgroup key={category} label={category}>
-                          {(items as any[]).map(item => (
-                            <option key={item.key} value={item.label}>{item.label}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
-                  </div>
+                    <div className="relative flex items-center">
+                      <FileText size={14} className="absolute left-3 text-slate-400" />
+                      <select
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value)}
+                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="All">All Return Types</option>
+                        {Object.entries(groupedReturnTypes).map(([category, items]) => (
+                          <optgroup key={category} label={category}>
+                            {(items as any[]).map(item => (
+                              <option key={item.key} value={item.label}>{item.label}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                    </div>
 
-                  <div className="relative flex items-center">
-                    <Calendar size={14} className="absolute left-3 text-slate-400" />
-                    <select
-                      value={filterYear}
-                      onChange={(e) => setFilterYear(e.target.value)}
-                      className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
-                    >
-                      <option value="All">All Years</option>
-                      {Object.values(TAX_YEARS).map(y => (
-                        <option key={y.label} value={y.label}>{y.label}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                    <div className="relative flex items-center">
+                      <Calendar size={14} className="absolute left-3 text-slate-400" />
+                      <select
+                        value={filterYear}
+                        onChange={(e) => setFilterYear(e.target.value)}
+                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                      >
+                        <option value="All">All Years</option>
+                        {Object.values(TAX_YEARS).map(y => (
+                          <option key={y.label} value={y.label}>{y.label}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -1212,7 +1235,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                             onClick={() => setSelectedReturnId(tr.id)}
                             className="text-brand hover:underline text-xs font-bold"
                           >
-                            Manage Return
+                            Manage
                           </button>
                         </td>
                       </tr>
@@ -1280,94 +1303,97 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
           )}
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Megaphone size={18} className="text-brand" />
-              <h4 className="font-bold text-slate-800">Firm Announcements</h4>
+        {!isExtension && (
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Megaphone size={18} className="text-brand" />
+                <h4 className="font-bold text-slate-800">Firm Announcements</h4>
+              </div>
+              {isFirmOwner && (
+                <button
+                  onClick={() => setShowAnnouncementForm(!showAnnouncementForm)}
+                  className="p-1.5 bg-brand-light text-brand rounded-lg hover:bg-brand hover:text-white transition-all"
+                >
+                  {showAnnouncementForm ? <X size={16} /> : <BellPlus size={16} />}
+                </button>
+              )}
             </div>
-            {isFirmOwner && (
-              <button
-                onClick={() => setShowAnnouncementForm(!showAnnouncementForm)}
-                className="p-1.5 bg-brand-light text-brand rounded-lg hover:bg-brand hover:text-white transition-all"
-              >
-                {showAnnouncementForm ? <X size={16} /> : <BellPlus size={16} />}
-              </button>
-            )}
-          </div>
 
-          {isFirmOwner && showAnnouncementForm && (
-            <div className="mb-6 p-4 bg-brand-light/30 border border-brand/10 rounded-xl space-y-4 animate-in slide-in-from-top-2 duration-300">
-              <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                <Type size={14} className="text-brand" /> New Announcement
-              </h5>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Subject/Title"
-                  value={newAnnouncement.title}
-                  onChange={(e) => setNewAnnouncement(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none"
-                />
-                <textarea
-                  placeholder="Write message to all users..."
-                  rows={3}
-                  value={newAnnouncement.content}
-                  onChange={(e) => setNewAnnouncement(prev => ({ ...prev, content: e.target.value }))}
-                  className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-brand outline-none resize-none"
-                />
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Priority:</label>
-                    <select
-                      value={newAnnouncement.priority}
-                      onChange={(e) => setNewAnnouncement(prev => ({ ...prev, priority: e.target.value }))}
-                      className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600"
+            {isFirmOwner && showAnnouncementForm && (
+              <div className="mb-6 p-4 bg-brand-light/30 border border-brand/10 rounded-xl space-y-4 animate-in slide-in-from-top-2 duration-300">
+                <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                  <Type size={14} className="text-brand" /> New Announcement
+                </h5>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Subject/Title"
+                    value={newAnnouncement.title}
+                    onChange={(e) => setNewAnnouncement(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none"
+                  />
+                  <textarea
+                    placeholder="Write message to all users..."
+                    rows={3}
+                    value={newAnnouncement.content}
+                    onChange={(e) => setNewAnnouncement(prev => ({ ...prev, content: e.target.value }))}
+                    className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-brand outline-none resize-none"
+                  />
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Priority:</label>
+                      <select
+                        value={newAnnouncement.priority}
+                        onChange={(e) => setNewAnnouncement(prev => ({ ...prev, priority: e.target.value }))}
+                        className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={handleSaveAnnouncement}
+                      disabled={isSavingAnnouncement || !newAnnouncement.title}
+                      className="flex-1 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all shadow-sm flex items-center justify-center gap-2"
                     >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
+                      {isSavingAnnouncement ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      Post to Firm
+                    </button>
                   </div>
-                  <button
-                    onClick={handleSaveAnnouncement}
-                    disabled={isSavingAnnouncement || !newAnnouncement.title}
-                    className="flex-1 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all shadow-sm flex items-center justify-center gap-2"
-                  >
-                    {isSavingAnnouncement ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                    Post to Firm
-                  </button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="space-y-4 flex-1 overflow-y-auto max-h-[600px] pr-1">
-            {announcements.map((item) => (
-              <div key={item.id} className="p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:border-brand/30 transition-all group relative overflow-hidden">
-                {item.priority === 'high' && (
-                  <div className="absolute top-0 right-0 w-1 h-full bg-rose-500"></div>
-                )}
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${item.priority === 'high' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                    {item.priority}
-                  </span>
-                  <span className="text-[10px] text-slate-400">{item.date}</span>
+            <div className="space-y-4 flex-1 overflow-y-auto max-h-[600px] pr-1">
+              {announcements.map((item) => (
+                <div key={item.id} className="p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:border-brand/30 transition-all group relative overflow-hidden">
+                  {item.priority === 'high' && (
+                    <div className="absolute top-0 right-0 w-1 h-full bg-rose-500"></div>
+                  )}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${item.priority === 'high' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                      {item.priority}
+                    </span>
+                    <span className="text-[10px] text-slate-400">{item.date}</span>
+                  </div>
+                  <h5 className="text-sm font-bold text-slate-700 mb-1">{item.title}</h5>
+                  <p className="text-xs text-slate-500 leading-relaxed">{item.content}</p>
                 </div>
-                <h5 className="text-sm font-bold text-slate-700 mb-1">{item.title}</h5>
-                <p className="text-xs text-slate-500 leading-relaxed">{item.content}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+            <button className="w-full mt-6 py-3 text-sm font-bold text-brand hover:bg-brand-light rounded-xl transition-colors flex items-center justify-center gap-2 border border-brand/10">
+              View All Updates
+              <ChevronRight size={14} />
+            </button>
           </div>
-          <button className="w-full mt-6 py-3 text-sm font-bold text-brand hover:bg-brand-light rounded-xl transition-colors flex items-center justify-center gap-2 border border-brand/10">
-            View All Updates
-            <ChevronRight size={14} />
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );
 };
+
 
 export default Dashboard;
