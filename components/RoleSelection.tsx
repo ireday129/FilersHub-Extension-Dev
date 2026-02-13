@@ -23,15 +23,17 @@ const RoleCard = ({ role, description, icon: Icon, onSelect }: any) => (
 );
 
 import { useAuth } from '../contexts/AuthContext';
+import { useExtensionMode } from '../hooks/useExtensionMode';
 
 const RoleSelection: React.FC = () => {
   const { bypassAuth } = useAuth();
+  const { isExtension } = useExtensionMode();
   const onSelectRole = async (role: UserRole) => {
     await bypassAuth(role);
   };
   const logoUrl = "https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png";
 
-  const roles = [
+  const allRoles = [
     {
       role: UserRole.FirmOwner,
       description: "Complete authority over the firm, analytics, and high-level billing.",
@@ -54,6 +56,11 @@ const RoleSelection: React.FC = () => {
     }
   ];
 
+  // Extension is staff-only — exclude Client role
+  const roles = isExtension
+    ? allRoles.filter(r => r.role !== UserRole.Client)
+    : allRoles;
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 sm:p-12">
       <div className="mb-12 text-center flex flex-col items-center">
@@ -62,7 +69,7 @@ const RoleSelection: React.FC = () => {
         <p className="text-slate-500 max-w-md">Please select your role to access your dedicated workspace and manage your tax journey.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl w-full mb-16">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isExtension ? 'lg:grid-cols-3 max-w-4xl' : 'lg:grid-cols-4 max-w-7xl'} gap-6 w-full mb-16`}>
         {roles.map((item) => (
           <RoleCard
             key={item.role}

@@ -40,20 +40,42 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
       <div className={`flex items-center mx-auto ${compact ? 'px-4 h-14' : 'px-4 md:px-8 h-16 max-w-7xl'}`}>
 
-        {/* Left Section: Mobile Toggle (Hidden if no items) */}
+        {/* Left Section: Navigation */}
         <div className="flex-1 flex items-center">
-          {navItems.length > 0 && (
-            <button
-              className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle Navigation"
-            >
-              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
+          {compact ? (
+            /* Extension mode: icon-only nav buttons inline */
+            navItems.length > 0 && (
+              <div className="flex items-center gap-1">
+                {navItems.map((item) => (
+                  <button
+                    key={item.name}
+                    onClick={() => setActiveTab(item.name)}
+                    title={item.name}
+                    className={`p-2 rounded-lg transition-all ${activeTab === item.name
+                        ? 'bg-brand text-white shadow-sm shadow-brand/20'
+                        : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                      }`}
+                  >
+                    <item.icon size={18} />
+                  </button>
+                ))}
+              </div>
+            )
+          ) : (
+            /* Non-extension: hamburger toggle for mobile */
+            navItems.length > 0 && (
+              <button
+                className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label="Toggle Navigation"
+              >
+                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+            )
           )}
         </div>
 
-        {/* Center Section: Navigation Tabs (Desktop - Hidden if no items) */}
+        {/* Center Section: Navigation Tabs (Desktop - Hidden if no items or compact) */}
         {!compact && (
           <div className="hidden lg:flex justify-center h-full">
             {navItems.length > 0 && (
@@ -83,8 +105,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
-      {isMobileMenuOpen && navItems.length > 0 && (
+      {/* Mobile Menu Dropdown (non-extension only) */}
+      {!compact && isMobileMenuOpen && navItems.length > 0 && (
         <div className="lg:hidden bg-white border-t border-slate-100 py-4 px-4 space-y-2 shadow-2xl animate-in slide-in-from-top duration-300">
           {navItems.map((item) => (
             <button
