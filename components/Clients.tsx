@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { UserRole, TaxReturn, TaxReturnStatus, NavItem } from '../types';
 import { useExtensionMode } from '../hooks/useExtensionMode';
-import { 
-  Users, 
-  Search, 
-  ArrowRight, 
-  CheckCircle, 
-  Clock, 
+import {
+  Users,
+  Search,
+  ArrowRight,
+  CheckCircle,
+  Clock,
   Filter,
   UserCheck,
   LayoutGrid,
@@ -22,7 +22,7 @@ interface ClientsProps {
   setActiveTab: (tab: NavItem) => void;
 }
 
-type ClientView = 'My Clients' | 'Active Returns' | 'Completed Returns';
+type ClientView = 'My Clients' | 'Active Returns' | 'Completed Returns' | 'Firm Clients';
 
 const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab }) => {
   const { isExtension } = useExtensionMode();
@@ -68,12 +68,15 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       if (role === UserRole.TaxPro) {
         base = base.filter(r => r.preparer === staffName);
       }
+    } else if (activeView === 'Firm Clients') {
+      // Show all clients, no filtering
+      base = base;
     }
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      base = base.filter(r => 
-        r.clientName.toLowerCase().includes(q) || 
+      base = base.filter(r =>
+        r.clientName.toLowerCase().includes(q) ||
         r.type.toLowerCase().includes(q)
       );
     }
@@ -102,9 +105,8 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
             <button
               key={view}
               onClick={() => setActiveView(view)}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
-                activeView === view ? 'bg-white text-[#4aa936] shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-[#4aa936] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
             >
               {view}
             </button>
@@ -113,6 +115,28 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       );
     }
     if (role === UserRole.Manager) {
+      if (isExtension) {
+        return (
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setActiveView('My Clients')}
+              className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1.5 ${activeView === 'My Clients' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <UserCheck size={12} />
+              My Clients
+            </button>
+            <button
+              onClick={() => setActiveView('Firm Clients')}
+              className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1.5 ${activeView === 'Firm Clients' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+            >
+              <Users size={12} />
+              Firm Clients
+            </button>
+          </div>
+        );
+      }
       return (
         <div className="flex items-center gap-2">
           <span className="px-4 py-2 bg-[#f0f9ed] text-[#4aa936] text-xs font-bold rounded-lg border border-[#e1f2dc] flex items-center gap-2">
@@ -126,16 +150,15 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       return (
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase tracking-widest mb-1">
-             <UserCheck size={14} className="text-brand" /> My Assigned Returns
+            <UserCheck size={14} className="text-brand" /> My Assigned Returns
           </div>
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
             {(['Active Returns', 'Completed Returns'] as ClientView[]).map(view => (
               <button
                 key={view}
                 onClick={() => setActiveView(view)}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
-                  activeView === view ? 'bg-white text-[#4aa936] shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-[#4aa936] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
               >
                 {view}
               </button>
@@ -165,8 +188,8 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Search Clients</label>
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Name or type..."
@@ -195,16 +218,16 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
               </div>
             </div>
           </div>
-          
+
           <div className="bg-[#1e293b] p-6 rounded-2xl text-white relative overflow-hidden group">
-             <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-               <Users size={120} />
-             </div>
-             <h4 className="text-sm font-bold mb-2">Need to invite a new client?</h4>
-             <p className="text-xs text-slate-400 mb-4 leading-relaxed">Send a secure link to start their tax intake process immediately.</p>
-             <button className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors">
-               Create Invite Link
-             </button>
+            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+              <Users size={120} />
+            </div>
+            <h4 className="text-sm font-bold mb-2">Need to invite a new client?</h4>
+            <p className="text-xs text-slate-400 mb-4 leading-relaxed">Send a secure link to start their tax intake process immediately.</p>
+            <button className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors">
+              Create Invite Link
+            </button>
           </div>
         </div>
 
@@ -212,11 +235,11 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
         <div className={isExtension ? 'col-span-1' : 'lg:col-span-3'}>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-               <div className="flex items-center gap-4">
-                  <button className="p-1.5 text-[#4aa936] bg-white rounded shadow-sm"><LayoutGrid size={16} /></button>
-                  <button className="p-1.5 text-slate-400 hover:text-slate-600"><List size={16} /></button>
-               </div>
-               <span className="text-xs font-bold text-slate-400 uppercase">Viewing {activeView}</span>
+              <div className="flex items-center gap-4">
+                <button className="p-1.5 text-[#4aa936] bg-white rounded shadow-sm"><LayoutGrid size={16} /></button>
+                <button className="p-1.5 text-slate-400 hover:text-slate-600"><List size={16} /></button>
+              </div>
+              <span className="text-xs font-bold text-slate-400 uppercase">Viewing {activeView}</span>
             </div>
 
             <div className="divide-y divide-slate-100">
@@ -225,19 +248,18 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`${isExtension ? 'w-8 h-8' : 'w-12 h-12'} rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0`}>
-                        <img 
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${client.clientName}`} 
-                          alt={client.clientName} 
+                        <img
+                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${client.clientName}`}
+                          alt={client.clientName}
                         />
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-0.5">
                           <h4 className="font-bold text-slate-800">{client.clientName}</h4>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            client.status === TaxReturnStatus.Accepted || client.status === TaxReturnStatus.Filed 
-                              ? 'bg-emerald-100 text-emerald-700' 
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${client.status === TaxReturnStatus.Accepted || client.status === TaxReturnStatus.Filed
+                              ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-amber-100 text-amber-700'
-                          }`}>
+                            }`}>
                             {client.status}
                           </span>
                         </div>
@@ -247,15 +269,15 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
 
                     <div className="flex items-center gap-3">
                       <div className="text-right hidden sm:block">
-                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assigned Pro</p>
-                         <p className="text-xs font-bold text-slate-700">{client.preparer}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assigned Pro</p>
+                        <p className="text-xs font-bold text-slate-700">{client.preparer}</p>
                       </div>
                       <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden sm:block"></div>
                       <div className="flex items-center gap-2">
                         <button className="p-2 text-slate-400 hover:text-brand hover:bg-brand-light rounded-lg transition-all" title="Message Client">
                           <Mail size={18} />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleManageReturn(client.id)}
                           className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-[#4aa936] text-xs font-bold rounded-xl hover:bg-[#f0f9ed] transition-all shadow-sm"
                         >
@@ -281,7 +303,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                 </div>
               )}
             </div>
-            
+
             <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
               <button className="text-xs font-bold text-slate-400 hover:text-brand transition-colors">Show more results</button>
             </div>
