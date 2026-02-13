@@ -17,6 +17,12 @@
         .border-brand { border-color: #4aa936; }
         .bg-brand-light { background-color: #f0f9ed; }
         .hover-bg-brand:hover { background-color: #40922e; }
+        /* Extension mode: prevent any horizontal scrolling */
+        body.extension-mode,
+        body.extension-mode #root {
+            overflow-x: hidden;
+            max-width: 100vw;
+        }
     </style>
 
 <script type="importmap">

@@ -17,6 +17,7 @@ import {
 import { UserRole } from '../types';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useExtensionMode } from '../hooks/useExtensionMode';
 
 interface StaffMember {
   id: string;
@@ -52,6 +53,7 @@ interface GHLUser {
 
 const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firmId }) => {
   const { user } = useAuth();
+  const { isExtension } = useExtensionMode();
   const [localSettings, setLocalSettings] = useState(firmSettings);
   const [staff, setStaff] = useState<StaffMember[]>([
     { id: '1', name: 'Marcus Aurelius', email: 'marcus@filershub.com', role: UserRole.Manager, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus' },
@@ -253,7 +255,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       {/* GHL Users Modal */}
       {showGHLModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
+          <div className={`bg-white rounded-2xl shadow-xl w-full ${isExtension ? 'max-w-full mx-2' : 'max-w-2xl'} overflow-hidden flex flex-col max-h-[80vh]`}>
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
@@ -284,10 +286,10 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-slate-50 sticky top-0 z-10">
                     <tr>
-                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Role</th>
-                      <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Action</th>
+                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>Name</th>
+                      {!isExtension && <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</th>}
+                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>Role</th>
+                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right`}>Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -297,17 +299,17 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
                       return (
                         <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 border border-slate-200">
+                          <td className={`${isExtension ? 'px-3' : 'px-6'} py-4`}>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 border border-slate-200 shrink-0">
                                 {(user.name?.[0] || user.firstName?.[0] || '?').toUpperCase()}
                               </div>
-                              <span className="text-sm font-semibold text-slate-700">{user.name || `${user.firstName} ${user.lastName}`}</span>
+                              <span className="text-sm font-semibold text-slate-700 truncate">{user.name || `${user.firstName} ${user.lastName}`}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-sm text-slate-500">{user.email}</td>
-                          <td className="px-6 py-4 text-xs font-medium text-slate-400 capitalize">{user.role}</td>
-                          <td className="px-6 py-4 text-right">
+                          {!isExtension && <td className="px-6 py-4 text-sm text-slate-500">{user.email}</td>}
+                          <td className={`${isExtension ? 'px-3' : 'px-6'} py-4 text-xs font-medium text-slate-400 capitalize`}>{user.role}</td>
+                          <td className={`${isExtension ? 'px-3' : 'px-6'} py-4 text-right`}>
                             <button
                               onClick={() => inviteUser(user)}
                               disabled={isInvited || status === 'sending'}
@@ -415,8 +417,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           </button>
         </div>
 
-        <div className="p-8 space-y-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <div className={`${isExtension ? 'p-4 space-y-6' : 'p-8 space-y-10'}`}>
+          <div className={`grid grid-cols-1 ${isExtension ? 'gap-6' : 'lg:grid-cols-2 gap-12'}`}>
             {/* Firm Identity */}
             <div className="space-y-6">
               <div>
@@ -553,31 +555,33 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className={isExtension ? 'overflow-hidden' : 'overflow-x-auto'}>
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50/50">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Member</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Access Role</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider`}>Member</th>
+                {!isExtension && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>}
+                <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider`}>Role</th>
+                <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider text-right`}>Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {staff.map((member) => (
                 <tr key={member.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <img src={member.avatar} alt={member.name} className="w-8 h-8 rounded-full border border-slate-200 group-hover:border-brand/40 transition-colors" />
-                      <span className="text-sm font-semibold text-slate-700">{member.name}</span>
+                  <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <img src={member.avatar} alt={member.name} className={`${isExtension ? 'w-6 h-6' : 'w-8 h-8'} rounded-full border border-slate-200 group-hover:border-brand/40 transition-colors shrink-0`} />
+                      <span className="text-sm font-semibold text-slate-700 truncate">{member.name}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-slate-500">{member.email}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <Shield size={14} className="text-brand" />
+                  {!isExtension && (
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-slate-500">{member.email}</span>
+                    </td>
+                  )}
+                  <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
+                    <div className="flex items-center gap-1">
+                      <Shield size={14} className="text-brand shrink-0" />
                       <select
                         value={member.role}
                         onChange={(e) => handleRoleChange(member.id, e.target.value as UserRole)}
@@ -588,8 +592,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                       </select>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all">Revoke Access</button>
+                  <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-right`}>
+                    <button className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all">{isExtension ? 'Revoke' : 'Revoke Access'}</button>
                   </td>
                 </tr>
               ))}

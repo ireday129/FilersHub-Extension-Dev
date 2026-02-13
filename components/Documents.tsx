@@ -21,6 +21,7 @@ import {
 import { TaxDocument, UserRole, isStaffRole, DocStatus, TaxReturn, FILE_UPLOAD_TYPES } from '../types';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useExtensionMode } from '../hooks/useExtensionMode';
 
 interface DocumentsProps {
   role: UserRole;
@@ -31,6 +32,7 @@ interface DocumentsProps {
 
 const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId }) => {
   const { user } = useAuth();
+  const { isExtension } = useExtensionMode();
   const isStaff = isStaffRole(role);
 
   // States
@@ -192,12 +194,12 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Top Header: Target Case Selection */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-        <div className="flex-1">
+      <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white ${isExtension ? 'p-3' : 'p-6'} rounded-2xl border border-slate-100 shadow-sm`}>
+        <div className="flex-1 min-w-0">
           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
             Current Tax Case Context
           </label>
-          <div className="relative max-w-md group">
+          <div className={`relative ${isExtension ? 'w-full' : 'max-w-md'} group`}>
             <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-brand group-focus-within:scale-110 transition-transform" size={18} />
             <select
               value={selectedReturnId}
@@ -268,8 +270,8 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
 
         {/* Inline Upload Form */}
         {isUploading && (
-          <div className="p-8 bg-brand-light/40 border-b border-brand/10 animate-in slide-in-from-top-2 duration-300">
-            <div className="max-w-2xl mx-auto space-y-6">
+          <div className={`${isExtension ? 'p-3' : 'p-8'} bg-brand-light/40 border-b border-brand/10 animate-in slide-in-from-top-2 duration-300`}>
+            <div className={`${isExtension ? 'w-full' : 'max-w-2xl'} mx-auto space-y-6`}>
               <div className="text-center mb-4">
                 <h4 className="font-black text-slate-800">Add to Case: {selectedReturn?.clientName}</h4>
                 <p className="text-xs text-slate-500">{selectedReturn?.year} {selectedReturn?.type}</p>
@@ -328,44 +330,48 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
           </div>
         )}
 
-        <div className="flex-1 overflow-x-auto">
+        <div className={`flex-1 ${isExtension ? 'overflow-hidden' : 'overflow-x-auto'}`}>
           <table className="w-full text-left">
             <thead className="sticky top-0 bg-slate-50/90 backdrop-blur-sm z-10 shadow-sm">
               <tr>
-                <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Document & Case</th>
-                <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Status Workflow</th>
-                <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Metadata</th>
-                <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-right">Action</th>
+                <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-black text-slate-500 uppercase tracking-widest`}>Document & Case</th>
+                <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-black text-slate-500 uppercase tracking-widest`}>Status</th>
+                {!isExtension && <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Metadata</th>}
+                <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-black text-slate-500 uppercase tracking-widest text-right`}>Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredDocs.length > 0 ? filteredDocs.map((doc, idx) => (
                 <tr key={`${doc.returnId}-${idx}`} className="hover:bg-slate-50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-brand-light text-brand rounded-xl group-hover:scale-110 transition-transform shadow-inner">
-                        <FileText size={20} />
-                      </div>
+                  <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
+                    <div className="flex items-center gap-2">
+                      {!isExtension && (
+                        <div className="p-2.5 bg-brand-light text-brand rounded-xl group-hover:scale-110 transition-transform shadow-inner shrink-0">
+                          <FileText size={20} />
+                        </div>
+                      )}
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-700 truncate">{doc.name}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[9px] font-black bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-tighter">
-                            Case: {doc.returnName}
+                        <p className={`${isExtension ? 'text-xs' : 'text-sm'} font-bold text-slate-700 truncate`}>{doc.name}</p>
+                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                          <span className="text-[9px] font-black bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-tighter truncate">
+                            {isExtension ? doc.returnName : `Case: ${doc.returnName}`}
                           </span>
-                          <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-tighter">
-                            {doc.clientName}
-                          </span>
+                          {!isExtension && (
+                            <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                              {doc.clientName}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
+                  <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
                     {isStaff ? (
-                      <div className="relative inline-block w-40">
+                      <div className={`relative inline-block ${isExtension ? 'w-28' : 'w-40'}`}>
                         <select
                           value={doc.status}
                           onChange={(e) => handleStatusChange(doc.returnId, doc.name, e.target.value as DocStatus)}
-                          className={`w-full appearance-none pl-3 pr-8 py-2 rounded-xl text-xs font-black border transition-all cursor-pointer outline-none focus:ring-4 focus:ring-brand/10 ${getStatusColor(doc.status)}`}
+                          className={`w-full appearance-none pl-2 pr-6 py-2 rounded-xl text-xs font-black border transition-all cursor-pointer outline-none focus:ring-4 focus:ring-brand/10 ${getStatusColor(doc.status)}`}
                         >
                           <option value="Uploaded">Uploaded</option>
                           <option value="Under Review">Under Review</option>
@@ -383,29 +389,33 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="text-xs text-slate-600 font-bold">{doc.uploadDate || 'Mar 15, 2024'}</p>
-                      <p className="text-[10px] text-slate-400 font-medium uppercase">{doc.size} • {doc.type}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-2 text-slate-400 hover:text-brand hover:bg-brand-light rounded-lg transition-all" title="View">
-                        <Eye size={18} />
+                  {!isExtension && (
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-xs text-slate-600 font-bold">{doc.uploadDate || 'Mar 15, 2024'}</p>
+                        <p className="text-[10px] text-slate-400 font-medium uppercase">{doc.size} • {doc.type}</p>
+                      </div>
+                    </td>
+                  )}
+                  <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
+                    <div className={`flex items-center justify-end gap-1 ${isExtension ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+                      <button className={`${isExtension ? 'p-1.5' : 'p-2'} text-slate-400 hover:text-brand hover:bg-brand-light rounded-lg transition-all`} title="View">
+                        <Eye size={isExtension ? 14 : 18} />
                       </button>
-                      <button className="p-2 text-slate-400 hover:text-brand hover:bg-brand-light rounded-lg transition-all" title="Download">
-                        <Download size={18} />
+                      <button className={`${isExtension ? 'p-1.5' : 'p-2'} text-slate-400 hover:text-brand hover:bg-brand-light rounded-lg transition-all`} title="Download">
+                        <Download size={isExtension ? 14 : 18} />
                       </button>
-                      <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
-                        <MoreVertical size={18} />
-                      </button>
+                      {!isExtension && (
+                        <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                          <MoreVertical size={18} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={4} className="py-32 text-center">
+                  <td colSpan={isExtension ? 3 : 4} className={`${isExtension ? 'py-16' : 'py-32'} text-center`}>
                     <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200 mb-6 border-4 border-white shadow-inner">
                       <FileText size={40} />
                     </div>

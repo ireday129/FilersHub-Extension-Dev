@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { UserRole, TaxReturn, TaxReturnStatus, NavItem } from '../types';
+import { useExtensionMode } from '../hooks/useExtensionMode';
 import { 
   Users, 
   Search, 
@@ -24,6 +25,7 @@ interface ClientsProps {
 type ClientView = 'My Clients' | 'Active Returns' | 'Completed Returns';
 
 const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab }) => {
+  const { isExtension } = useExtensionMode();
   const [activeView, setActiveView] = useState<ClientView>(() => {
     if (role === UserRole.TaxPro) return 'Active Returns';
     return 'My Clients';
@@ -155,9 +157,9 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
         {renderTabs()}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Left Sidebar: Filters & Quick Search */}
-        <div className="lg:col-span-1 space-y-6">
+      <div className={`grid grid-cols-1 ${isExtension ? '' : 'lg:grid-cols-4'} gap-6`}>
+        {/* Left Sidebar: Filters & Quick Search (hidden in extension) */}
+        <div className={`${isExtension ? 'hidden' : 'lg:col-span-1'} space-y-6`}>
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Search Clients</label>
@@ -207,7 +209,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
         </div>
 
         {/* Main List Area */}
-        <div className="lg:col-span-3">
+        <div className={isExtension ? 'col-span-1' : 'lg:col-span-3'}>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                <div className="flex items-center gap-4">
@@ -219,10 +221,10 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
 
             <div className="divide-y divide-slate-100">
               {filteredReturns.length > 0 ? filteredReturns.map((client) => (
-                <div key={client.id} className="p-6 hover:bg-slate-50 transition-colors group">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0">
+                <div key={client.id} className={`${isExtension ? 'p-3' : 'p-6'} hover:bg-slate-50 transition-colors group`}>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`${isExtension ? 'w-8 h-8' : 'w-12 h-12'} rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0`}>
                         <img 
                           src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${client.clientName}`} 
                           alt={client.clientName} 

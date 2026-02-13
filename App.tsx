@@ -264,7 +264,7 @@ const AuthenticatedApp: React.FC = () => {
   );
 
   return (
-    <div className={`flex flex-col min-h-screen bg-slate-50 ${isExtension ? 'text-sm' : ''}`}>
+    <div className={`flex flex-col min-h-screen bg-slate-50 ${isExtension ? 'text-sm overflow-x-hidden max-w-[100vw]' : ''}`}>
       {!isSuperAdmin && (
         <Navbar
           activeTab={activeTab}
@@ -278,9 +278,9 @@ const AuthenticatedApp: React.FC = () => {
 
       <main className={`flex-1 overflow-y-auto ${isExtension ? 'p-3' : 'p-4 md:p-8'}`}>
         <div className="max-w-7xl mx-auto">
-          <header className={`mb-8 flex flex-col ${isExtension ? 'gap-4' : 'md:flex-row md:items-start justify-between gap-4'}`}>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
+          <header className={`${isExtension ? 'mb-4' : 'mb-8'} flex flex-col ${isExtension ? 'gap-3' : 'md:flex-row md:items-start justify-between gap-4'}`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border shadow-sm ${isSuperAdmin
                   ? 'text-purple-600 bg-purple-50 border-purple-100'
                   : isStaff
@@ -310,7 +310,7 @@ const AuthenticatedApp: React.FC = () => {
               )}
             </div>
 
-            <div className={`flex ${isExtension ? 'flex-row justify-between w-full' : 'flex-col items-end'} gap-2`}>
+            <div className={`flex ${isExtension ? 'flex-row flex-wrap items-center w-full' : 'flex-col items-end'} gap-2`}>
               {!isSuperAdmin && isStaff && (
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm">
                   <span className="w-1.5 h-1.5 bg-brand rounded-full animate-pulse"></span>

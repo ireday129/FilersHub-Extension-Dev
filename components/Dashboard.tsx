@@ -578,8 +578,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
               </div>
 
               {(isClient || isStaff) && isUploading && (
-                <div className="p-6 bg-brand-light/40 border-b border-brand/10 animate-in slide-in-from-top-2 duration-300">
-                  <div className="max-w-xl mx-auto space-y-4">
+                <div className={`${isExtension ? 'p-3' : 'p-6'} bg-brand-light/40 border-b border-brand/10 animate-in slide-in-from-top-2 duration-300`}>
+                  <div className={`${isExtension ? 'w-full' : 'max-w-xl'} mx-auto space-y-4`}>
                     <div className="grid grid-cols-1 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Categorize Document</label>
@@ -1144,14 +1144,16 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
         <div className={`${isExtension ? 'col-span-1' : 'lg:col-span-2'} space-y-6`}>
           {isStaff ? (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h4 className="font-bold text-slate-800">
+              <div className={`${isExtension ? 'p-3' : 'p-6'} border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
+                <div className="min-w-0">
+                  <h4 className={`font-bold text-slate-800 ${isExtension ? 'text-sm' : ''}`}>
                     Workflow Management
                   </h4>
-                  <p className="text-xs text-slate-500">
-                    Filter and manage the status of your client tax returns.
-                  </p>
+                  {!isExtension && (
+                    <p className="text-xs text-slate-500">
+                      Filter and manage the status of your client tax returns.
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   {isExtension ? (
@@ -1227,29 +1229,29 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   )}
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className={isExtension ? 'overflow-hidden' : 'overflow-x-auto'}>
                 <table className="w-full text-left">
                   <thead className="bg-slate-50/50">
                     <tr>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Client & Return</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status Stage</th>
+                      <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider`}>Client & Return</th>
+                      <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider`}>Status Stage</th>
                       {!isExtension && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Assignee</th>}
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                      <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider text-right`}>Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {displayedReturns.length > 0 ? displayedReturns.map(tr => (
                       <tr key={tr.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-6 py-4">
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">{tr.clientName}</p>
-                            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">{tr.year} • {tr.type}</p>
+                        <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
+                          <div className="min-w-0">
+                            <p className={`${isExtension ? 'text-xs' : 'text-sm'} font-bold text-slate-800 truncate`}>{tr.clientName}</p>
+                            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter truncate">{tr.year} • {tr.type}</p>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-brand-light text-brand border border-brand/10 shadow-sm">
-                            <span className="text-xs">{STATUS_EMOJIS[tr.status]}</span>
-                            {tr.status}
+                        <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-brand-light text-brand border border-brand/10 shadow-sm ${isExtension ? 'max-w-full truncate' : ''}`}>
+                            <span className="text-xs shrink-0">{STATUS_EMOJIS[tr.status]}</span>
+                            <span className={isExtension ? 'truncate' : ''}>{tr.status}</span>
                           </span>
                         </td>
                         {!isExtension && (
@@ -1257,7 +1259,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                             <p className="text-xs font-medium text-slate-600">{tr.preparer}</p>
                           </td>
                         )}
-                        <td className="px-6 py-4 text-right">
+                        <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-right`}>
                           <button
                             onClick={() => setSelectedReturnId(tr.id)}
                             className="text-brand hover:underline text-xs font-bold"
@@ -1268,7 +1270,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={isExtension ? 3 : 4} className="px-6 py-12 text-center text-slate-400 text-sm">No returns found matching filters.</td>
+                        <td colSpan={isExtension ? 3 : 4} className={`${isExtension ? 'px-3 py-8' : 'px-6 py-12'} text-center text-slate-400 text-sm`}>No returns found matching filters.</td>
                       </tr>
                     )}
                   </tbody>
