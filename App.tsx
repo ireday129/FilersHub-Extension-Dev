@@ -280,7 +280,7 @@ const AuthenticatedApp: React.FC = () => {
 
       <main className={`flex-1 overflow-y-auto ${isExtension ? 'p-3' : 'p-4 md:p-8'}`}>
         <div className="max-w-7xl mx-auto">
-          <header className={`${isExtension ? 'mb-4' : 'mb-8'} flex flex-col ${isExtension ? 'gap-3' : 'md:flex-row md:items-start justify-between gap-4'}`}>
+          <header className={`${isExtension ? 'mb-4' : 'mb-8'} flex ${isExtension ? 'flex-row items-start justify-between gap-4' : 'flex-col md:flex-row md:items-start justify-between gap-4'}`}>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border shadow-sm ${isSuperAdmin
@@ -312,7 +312,7 @@ const AuthenticatedApp: React.FC = () => {
               )}
             </div>
 
-            <div className={`flex ${isExtension ? 'flex-row flex-wrap items-center w-full' : 'flex-col items-end'} gap-2`}>
+            <div className={`flex ${isExtension ? 'items-center shrink-0' : 'flex-col items-end'} gap-2`}>
               {!isSuperAdmin && isStaff && (
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-white px-3 py-1.5 rounded-lg border border-slate-100 shadow-sm">
                   <span className="w-1.5 h-1.5 bg-brand rounded-full animate-pulse"></span>
@@ -338,7 +338,7 @@ const AuthenticatedApp: React.FC = () => {
               {isExtension && (
                 <button
                   onClick={handleExitSession}
-                  className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded border border-slate-100 ml-auto"
+                  className="text-[10px] font-bold text-slate-400 hover:text-rose-500 flex items-center gap-1 transition-colors bg-white px-2 py-1 rounded border border-slate-100"
                 >
                   <LogOut size={10} />
                 </button>
