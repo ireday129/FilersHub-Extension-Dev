@@ -1,17 +1,4 @@
 {
-<<<<<<< HEAD
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Frame-Options",
-          "value": "ALLOWALL"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' chrome-extension://*"
-=======
     "headers": [
         {
             "source": "/(.*)",
@@ -25,9 +12,6 @@
                     "value": "frame-ancestors 'self' chrome-extension://* https://*.chrome-extension.invalid"
                 }
             ]
->>>>>>> 5adeca5 (Update vercel.json with CSP headers)
         }
-      ]
-    }
-  ]
+    ]
 }

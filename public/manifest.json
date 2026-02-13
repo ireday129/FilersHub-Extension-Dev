@@ -1,0 +1,19 @@
+{
+    "manifest_version": 3,
+    "name": "FilersHub Extension Dev",
+    "version": "1.0.0",
+    "description": "FilersHub Application Extension",
+    "action": {
+        "default_popup": "index.html"
+    },
+    "permissions": [
+        "storage",
+        "activeTab"
+    ],
+    "host_permissions": [
+        "https://*.supabase.co/*"
+    ],
+    "background": {
+        "service_worker": "service-worker.js"
+    }
+}
