@@ -35,8 +35,16 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
   const { isExtension } = useExtensionMode();
   const isStaff = isStaffRole(role);
 
+  const staffName = useMemo(() => {
+    if (role === UserRole.FirmOwner) return "Sarah Johnson";
+    if (role === UserRole.Manager) return "Marcus Aurelius";
+    if (role === UserRole.TaxPro) return "David Smith";
+    return "";
+  }, [role]);
+
   // States
   const [filterStatus, setFilterStatus] = useState<DocStatus | 'All'>(isStaff ? 'Uploaded' : 'All');
+  const [viewScope, setViewScope] = useState<'My' | 'Firm'>('My');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedReturnId, setSelectedReturnId] = useState<string | 'All'>(isStaff ? 'All' : (returns[0]?.id || ''));
   const [isUploading, setIsUploading] = useState(false);
@@ -60,7 +68,8 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
           returnId: ret.id,
           returnName: `${ret.year} ${ret.type}`,
           clientName: ret.clientName,
-          status: (file as any).status || 'Uploaded' // Ensure status exists, default to Uploaded if missing
+          status: (file as any).status || 'Uploaded', // Ensure status exists, default to Uploaded if missing
+          preparer: ret.preparer
         });
       });
     });
@@ -76,9 +85,11 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
     return base.filter(doc => {
       const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = filterStatus === 'All' || doc.status === filterStatus;
-      return matchesSearch && matchesStatus;
+      const matchesScope = viewScope === 'Firm' || !staffName || doc.preparer === staffName;
+
+      return matchesSearch && matchesStatus && matchesScope;
     });
-  }, [allDocuments, searchQuery, filterStatus, selectedReturnId]);
+  }, [allDocuments, searchQuery, filterStatus, selectedReturnId, viewScope, staffName]);
 
   const stats = useMemo(() => {
     const base = selectedReturnId === 'All' ? allDocuments : allDocuments.filter(d => d.returnId === selectedReturnId);
@@ -220,25 +231,58 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
           </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
-          <button
-            onClick={() => setFilterStatus('All')}
-            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filterStatus === 'All' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            All <span className="text-[10px] opacity-60 font-medium">({stats.all})</span>
-          </button>
-          {(['Uploaded', 'Under Review', 'Approved', 'Rejected'] as DocStatus[]).map(status => (
+        {isExtension ? (
+          <div className="flex gap-2 w-full md:w-auto">
+            <div className="relative flex-1">
+              <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <select
+                value={viewScope}
+                onChange={(e) => setViewScope(e.target.value as 'My' | 'Firm')}
+                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+              >
+                <option value="My">My Active Returns</option>
+                <option value="Firm">All Firm Returns</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            <div className="relative flex-1">
+              <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as DocStatus | 'All')}
+                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+              >
+                <option value="All">All Statuses</option>
+                <option value="Uploaded">Uploaded</option>
+                <option value="Under Review">Under Review</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
             <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${filterStatus === status ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              onClick={() => setFilterStatus('All')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filterStatus === 'All' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
             >
-              {status} <span className="text-[10px] opacity-60 font-medium">({status === 'Uploaded' ? stats.uploaded : status === 'Under Review' ? stats.review : status === 'Approved' ? stats.approved : stats.rejected})</span>
+              All <span className="text-[10px] opacity-60 font-medium">({stats.all})</span>
             </button>
-          ))}
-        </div>
+            {(['Uploaded', 'Under Review', 'Approved', 'Rejected'] as DocStatus[]).map(status => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${filterStatus === status ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+              >
+                {status} <span className="text-[10px] opacity-60 font-medium">({status === 'Uploaded' ? stats.uploaded : status === 'Under Review' ? stats.review : status === 'Approved' ? stats.approved : stats.rejected})</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
