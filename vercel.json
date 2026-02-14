@@ -11,7 +11,7 @@
             "headers": [
                 {
                     "key": "Content-Security-Policy",
-                    "value": "frame-ancestors 'self' chrome-extension://* https://*.chrome-extension.invalid https://*.leadconnectorhq.com https://*.gohighlevel.com https://*.filershub.com"
+                    "value": "frame-ancestors 'self' chrome-extension://* https://*.chrome-extension.invalid https://*.leadconnectorhq.com https://*.gohighlevel.com https://*.filershub.com https://pro.filershub.com"
                 }
             ]
         }
