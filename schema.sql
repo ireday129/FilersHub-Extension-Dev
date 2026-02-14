@@ -7,6 +7,8 @@ CREATE TABLE firms (
   logo_url TEXT,
   brand_color TEXT DEFAULT '#4a90e2', -- hex color
   
+  slug TEXT,
+
   -- GHL Integration (OAuth)
   ghl_location_id TEXT,
   ghl_access_token TEXT, -- OAuth Access Token
@@ -45,9 +47,11 @@ CREATE TABLE staff (
   -- Permissions (JSON for flexibility)
   permissions JSONB DEFAULT '{}',
   
+  avatar_url TEXT,
+
   -- Auth
   auth_user_id UUID, -- Supabase auth.users.id
-  
+
   -- GHL Integration
   ghl_user_id TEXT,
   ghl_location_id TEXT,
@@ -283,6 +287,39 @@ ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE signatures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- =====================================================
+-- FIRMS POLICIES
+-- =====================================================
+
+-- Staff can see firms they belong to
+CREATE POLICY firms_select_staff ON firms
+  FOR SELECT
+  USING (
+    firm_id IN (
+      SELECT firm_id FROM staff WHERE auth_user_id = auth.uid()
+    )
+  );
+
+-- Clients can see firms they belong to
+CREATE POLICY firms_select_client ON firms
+  FOR SELECT
+  USING (
+    firm_id IN (
+      SELECT firm_id FROM clients WHERE auth_user_id = auth.uid()
+    )
+  );
+
+-- Firm Owner can update their firm settings
+CREATE POLICY firms_update_owner ON firms
+  FOR UPDATE
+  USING (
+    firm_id IN (
+      SELECT firm_id FROM staff
+      WHERE auth_user_id = auth.uid()
+      AND role = 'Firm Owner'
+    )
+  );
 
 -- =====================================================
 -- STAFF POLICIES

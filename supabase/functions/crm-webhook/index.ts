@@ -327,7 +327,7 @@ Deno.serve(async (req) => {
             }
 
             // 4. Upsert Staff
-            const appRole = (role === 'admin' || role === 'owner') ? 'Firm Owner' : 'Tax Professional';
+            const appRole = (role === 'admin' || role === 'owner') ? 'Firm Owner' : 'Tax Pro';
             // Default to TaxProfessional if just 'user'. Or map permissions?
             // Simple mapping for now.
 

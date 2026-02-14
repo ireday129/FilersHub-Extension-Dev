@@ -56,8 +56,12 @@ export const useFirmData = () => {
             // 1. Get ALL Staff Member entries for this user
             const { data: staffEntries, error: staffError } = await supabase
                 .from('staff')
-                .select('firm_id, role, full_name, avatar_url')
+                .select('firm_id, role, full_name')
                 .eq('auth_user_id', user.id);
+
+            if (staffError) {
+                console.error("Staff query error:", staffError);
+            }
 
             // 1b. Get ALL Client entries for this user
             const { data: clientEntries, error: clientError } = await supabase
@@ -80,8 +84,7 @@ export const useFirmData = () => {
                             slug: '',
                             isStaff: true
                         });
-                        // Set avatar from first staff entry found
-                        if (entry.avatar_url && !userAvatar) setUserAvatar(entry.avatar_url);
+                        // Avatar handled separately if column exists
                     }
                 }
             }
@@ -112,10 +115,14 @@ export const useFirmData = () => {
 
             // Fetch details for all found firms
             const firmIds = Array.from(allFirmsMap.keys());
-            const { data: firmsDetails } = await supabase
+            const { data: firmsDetails, error: firmsError } = await supabase
                 .from('firms')
-                .select('firm_id, firm_name, logo_url, brand_color, slug')
+                .select('firm_id, firm_name, logo_url, brand_color')
                 .in('firm_id', firmIds);
+
+            if (firmsError) {
+                console.error("Firms query error:", firmsError);
+            }
 
             if (firmsDetails) {
                 firmsDetails.forEach(f => {
@@ -124,7 +131,7 @@ export const useFirmData = () => {
                         existing.name = f.firm_name;
                         existing.logo = f.logo_url;
                         existing.brandColor = f.brand_color;
-                        existing.slug = f.slug;
+                        existing.slug = f.slug || '';
                     }
                 });
             }
