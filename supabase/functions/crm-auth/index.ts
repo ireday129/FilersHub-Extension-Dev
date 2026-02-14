@@ -142,9 +142,71 @@ serve(async (req) => {
 
             const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${redirectUri}&client_id=${clientId}&scope=${scopes}&state=${state}`
 
-            // If SSO action, we should redirect to Auth URL directly (browser navigation)
+            // If SSO action, return Launchpad HTML instead of auto-redirect (prevents loops)
             if (action === 'sso') {
-                return Response.redirect(authUrl, 302);
+                const html = `
+                 <!DOCTYPE html>
+                 <html>
+                 <head>
+                   <title>Connect CRM</title>
+                   <style>
+                     body { 
+                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+                        display: flex; 
+                        justify-content: center; 
+                        align-items: center; 
+                        height: 100vh; 
+                        background: #f8fafc; 
+                        margin: 0; 
+                        color: #0f172a;
+                     }
+                     .card { 
+                        background: white; 
+                        padding: 2.5rem; 
+                        border-radius: 12px; 
+                        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); 
+                        text-align: center; 
+                        max-width: 400px; 
+                        width: 90%;
+                     }
+                     h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 1rem; color: #1e293b; }
+                     p { color: #64748b; margin-bottom: 2rem; line-height: 1.6; font-size: 0.95rem; }
+                     .btn { 
+                        display: inline-block; 
+                        background: #2563eb; 
+                        color: white; 
+                        padding: 0.875rem 1.5rem; 
+                        border-radius: 8px; 
+                        text-decoration: none; 
+                        font-weight: 600; 
+                        transition: all 0.2s; 
+                        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+                     }
+                     .btn:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+                     .refresh-link {
+                        display: block;
+                        margin-top: 1.5rem;
+                        color: #64748b;
+                        text-decoration: none;
+                        font-size: 0.875rem;
+                     }
+                     .refresh-link:hover { text-decoration: underline; color: #475569; }
+                   </style>
+                 </head>
+                 <body>
+                   <div class="card">
+                     <h1>Connection Required</h1>
+                     <p>To securely access FilersHub within your CRM, please authorize the connection once.</p>
+                     <a href="${authUrl}" target="_blank" class="btn">Connect to CRM</a>
+                     <a href="javascript:location.reload()" class="refresh-link">Start Over / Refresh</a>
+                   </div>
+                 </body>
+                 </html>
+                 `;
+
+                return new Response(html, {
+                    headers: { "Content-Type": "text/html" }
+                });
             }
 
             return new Response(JSON.stringify({ url: authUrl }), {
