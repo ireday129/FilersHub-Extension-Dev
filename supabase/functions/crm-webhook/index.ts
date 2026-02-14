@@ -225,10 +225,7 @@ Deno.serve(async (req) => {
                     email: email,
                     full_name: name,
                     role: 'Firm Owner',
-                    auth_user_id: userRecord.id, // Link to Supabase Auth
-                    ghl_user_id: userId,
-                    ghl_location_id: locationId,
-                    invite_status: 'accepted',
+                    auth_user_id: userRecord.id,
                     is_active: true
                 }, { onConflict: 'email' });
 
@@ -339,9 +336,6 @@ Deno.serve(async (req) => {
                     full_name: name,
                     role: appRole,
                     auth_user_id: userRecord.id,
-                    ghl_user_id: userId,
-                    ghl_location_id: locationId,
-                    invite_status: 'accepted',
                     is_active: true
                 }, { onConflict: 'email' });
 

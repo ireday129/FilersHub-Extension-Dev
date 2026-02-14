@@ -111,7 +111,31 @@ serve(async (req) => {
                             }
 
                             if (userRecord) {
-                                // 2. Generate Magic Link & Verify Server-Side
+                                // 2. Ensure Staff Record Exists (Critical for RLS)
+                                const { data: existingStaff } = await supabaseAdmin
+                                    .from('staff')
+                                    .select('staff_id')
+                                    .eq('email', email)
+                                    .maybeSingle();
+
+                                if (!existingStaff) {
+                                    const { error: staffErr } = await supabaseAdmin.from('staff').insert({
+                                        firm_id: integ.firm_id,
+                                        email: email,
+                                        full_name: name,
+                                        role: 'Firm Owner',
+                                        auth_user_id: userRecord.id,
+                                        is_active: true
+                                    });
+                                    if (staffErr) console.error("Silent SSO: Failed to create staff record:", staffErr);
+                                } else {
+                                    // Ensure auth_user_id is linked
+                                    await supabaseAdmin.from('staff').update({
+                                        auth_user_id: userRecord.id,
+                                    }).eq('staff_id', existingStaff.staff_id);
+                                }
+
+                                // 3. Generate Magic Link & Verify Server-Side
                                 const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
                                 const { data: ssoLink, error: ssoLinkErr } = await supabaseAdmin.auth.admin.generateLink({
                                     type: 'magiclink',
@@ -384,15 +408,12 @@ serve(async (req) => {
                 }
 
                 // 3. Ensure Staff Record Exists
-                const params = {
+                const staffParams = {
                     firm_id: firmId,
                     email: email,
                     full_name: name,
-                    role: 'Firm Owner', // Default to Owner for simplicity in V1/SSO? 
+                    role: 'Firm Owner',
                     auth_user_id: userRecord.id,
-                    ghl_user_id: userId,
-                    ghl_location_id: locationId,
-                    invite_status: 'accepted',
                     is_active: true
                 };
 
@@ -400,12 +421,11 @@ serve(async (req) => {
                 const { data: existingStaff } = await supabaseAdmin.from('staff').select('staff_id').eq('email', email).maybeSingle();
 
                 if (!existingStaff) {
-                    await supabaseAdmin.from('staff').insert(params);
+                    const { error: staffInsertErr } = await supabaseAdmin.from('staff').insert(staffParams);
+                    if (staffInsertErr) console.error("Callback: Failed to create staff:", staffInsertErr);
                 } else {
-                    // Ensure GHL IDs are linked
+                    // Ensure auth_user_id is linked
                     await supabaseAdmin.from('staff').update({
-                        ghl_user_id: userId,
-                        ghl_location_id: locationId,
                         auth_user_id: userRecord.id
                     }).eq('staff_id', existingStaff.staff_id);
                 }
