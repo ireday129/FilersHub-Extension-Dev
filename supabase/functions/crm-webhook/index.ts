@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
         // GHL Marketplace apps receive ALL events. We must filter for what we care about.
         // Returning 200 OK is crucial for ignored events so GHL doesn't disable the webhook.
 
-        const INTERESTING_EVENTS = ['ContactCreate', 'ContactUpdate', 'INSTALL'];
+        const INTERESTING_EVENTS = ['ContactCreate', 'ContactUpdate', 'INSTALL', 'UserCreate', 'UserUpdate', 'UserDelete'];
 
         if (!INTERESTING_EVENTS.includes(type)) {
             console.log(`Ignoring event type: ${type}`);
@@ -231,7 +231,88 @@ Deno.serve(async (req) => {
                 }).eq('record_id', webhookLogId);
             }
 
-            return new Response(JSON.stringify({ message: "Install processed: Owner created" }), {
+            return new Response(JSON.stringify({ message: "Install processed: User checked/created" }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
+        // Handle USER Sync
+        if (type === 'UserCreate' || type === 'UserUpdate') {
+            // 1. Extract User Info
+            const userId = payload.id || payload.user_id;
+            const email = payload.email;
+            const firstName = payload.firstName || payload.first_name;
+            const lastName = payload.lastName || payload.last_name;
+            const name = `${firstName} ${lastName}`;
+            const role = payload.role; // 'admin' or 'user' usually
+
+            if (!email) {
+                return new Response(JSON.stringify({ message: "User event without email" }), { status: 200 });
+            }
+
+            // 2. Resolve Firm
+            // Firm lookup handled earlier (lines 95-107) -> `firm` object
+            if (!firm) {
+                console.warn("User sync failed: Firm not found for location", locationId);
+                return new Response(JSON.stringify({ message: "Firm not found" }), { status: 200 });
+            }
+
+            // 3. Create/Get Auth User
+            let userRecord;
+            const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
+            const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
+                email: email,
+                password: tempPassword,
+                email_confirm: true,
+                user_metadata: { full_name: name }
+            });
+
+            if (createError) {
+                // Check duplicate
+                const { data: linkData } = await supabaseClient.auth.admin.generateLink({
+                    type: 'magiclink',
+                    email: email
+                });
+                if (linkData?.user) userRecord = linkData.user;
+            } else {
+                userRecord = newUser.user;
+            }
+
+            if (!userRecord) {
+                throw new Error("Failed to resolve auth user for staff sync");
+            }
+
+            // 4. Upsert Staff
+            const appRole = (role === 'admin' || role === 'owner') ? 'Firm Owner' : 'Tax Professional';
+            // Default to TaxProfessional if just 'user'. Or map permissions?
+            // Simple mapping for now.
+
+            const { error: staffError } = await supabaseClient
+                .from('staff')
+                .upsert({
+                    firm_id: firm.firm_id,
+                    email: email,
+                    full_name: name,
+                    role: appRole,
+                    auth_user_id: userRecord.id,
+                    ghl_user_id: userId,
+                    ghl_location_id: locationId,
+                    invite_status: 'accepted',
+                    is_active: true
+                }, { onConflict: 'email' });
+
+            if (staffError) throw staffError;
+
+            // Update Log
+            if (webhookLogId) {
+                await supabaseClient.from('ghl_webhooks').update({
+                    processed: true,
+                    firm_id: firm.firm_id
+                }).eq('record_id', webhookLogId);
+            }
+
+            return new Response(JSON.stringify({ message: "Staff synced successfully" }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });
