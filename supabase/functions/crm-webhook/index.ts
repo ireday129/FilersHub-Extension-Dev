@@ -381,75 +381,98 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 2. Extract Contact Info (for standard events)
-        const contactId = payload.id;
-        const email = payload.email || payload.contact_email;
-        const firstName = payload.firstName || payload.first_name;
-        const lastName = payload.lastName || payload.last_name;
-        const phone = payload.phone || payload.contact_phone;
+        // Handle CONTACT Sync (ContactCreate, ContactUpdate)
+        if (type === 'ContactCreate' || type === 'ContactUpdate') {
+            const contactId = payload.id;
+            const email = payload.email || payload.contact_email;
+            const firstName = payload.firstName || payload.first_name;
+            const lastName = payload.lastName || payload.last_name;
+            const phone = payload.phone || payload.contact_phone;
 
-        if (!email) {
-            console.error("No email in payload, skipping");
-            return new Response(JSON.stringify({ message: "No email provided" }), {
+            // For now, minimal validation. If no email, we might skip or use phone?
+            // Let's require email for Clients in FilersHub.
+            if (!email) {
+                console.warn("Contact sync skipped: No email provided in payload.");
+                return new Response(JSON.stringify({ message: "Skipped: No email" }), { status: 200 });
+            }
+
+            const fullName = `${firstName || ''} ${lastName || ''}`.trim() || email;
+
+            // 1. Try to find existing client by GHL ID first
+            let { data: existingClient } = await supabaseClient
+                .from('clients')
+                .select('client_id, ghl_contact_id')
+                .eq('firm_id', firm.firm_id)
+                .eq('ghl_contact_id', contactId)
+                .maybeSingle();
+
+            // 2. Fallback: Find by Email
+            if (!existingClient) {
+                const { data: clientByEmail } = await supabaseClient
+                    .from('clients')
+                    .select('client_id, ghl_contact_id')
+                    .eq('firm_id', firm.firm_id)
+                    .eq('email', email)
+                    .maybeSingle();
+
+                if (clientByEmail) existingClient = clientByEmail;
+            }
+
+            let result;
+            const timestamp = new Date().toISOString();
+
+            if (existingClient) {
+                // Update
+                result = await supabaseClient
+                    .from('clients')
+                    .update({
+                        ghl_contact_id: contactId, // Ensure ID is linked
+                        // active: true, // Maybe reactivate?
+                        full_name: fullName,
+                        phone: phone,
+                        last_synced_at: timestamp,
+                        updated_at: timestamp
+                    })
+                    .eq('client_id', existingClient.client_id);
+            } else {
+                // Insert New Client
+                result = await supabaseClient
+                    .from('clients')
+                    .insert({
+                        firm_id: firm.firm_id,
+                        email: email,
+                        full_name: fullName,
+                        phone: phone,
+                        ghl_contact_id: contactId,
+                        tax_return_status: 'Waiting on Documents', // Default status?
+                        last_synced_at: timestamp,
+                        created_at: timestamp,
+                        updated_at: timestamp
+                    });
+            }
+
+            if (result.error) {
+                console.error("Error upserting client:", result.error);
+                throw result.error;
+            }
+
+            // Update Webhook Log
+            if (webhookLogId) {
+                await supabaseClient.from('ghl_webhooks').update({
+                    firm_id: firm.firm_id,
+                    processed: true,
+                    processed_at: timestamp
+                }).eq('record_id', webhookLogId);
+            }
+
+            return new Response(JSON.stringify({ message: "Client processed successfully" }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });
         }
 
-        const fullName = `${firstName || ''} ${lastName || ''}`.trim() || email;
-
-        // 3. Upsert Client (Standard Logic)
-        const { data: existingClient } = await supabaseClient
-            .from('clients')
-            .select('client_id')
-            .eq('firm_id', firm.firm_id)
-            .eq('email', email)
-            .single();
-
-        let result;
-        if (existingClient) {
-            // Update
-            result = await supabaseClient
-                .from('clients')
-                .update({
-                    ghl_contact_id: contactId,
-                    full_name: fullName,
-                    phone: phone,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('client_id', existingClient.client_id);
-        } else {
-            // Insert
-            result = await supabaseClient
-                .from('clients')
-                .insert({
-                    firm_id: firm.firm_id,
-                    email: email,
-                    full_name: fullName,
-                    phone: phone,
-                    ghl_contact_id: contactId,
-                    tax_return_status: 'Waiting on Documents'
-                });
-        }
-
-        if (result.error) {
-            console.error("Error upserting client:", result.error);
-            throw result.error;
-        }
-
-        // 4. Update Webhook Log
-        if (webhookLogId) {
-            await supabaseClient.from('ghl_webhooks').update({
-                firm_id: firm.firm_id,
-                processed: true,
-                processed_at: new Date().toISOString()
-            }).eq('record_id', webhookLogId);
-        }
-
-        return new Response(JSON.stringify({ message: "Client processed successfully" }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-        });
+        // Catch-all for other unhandled types
+        return new Response(JSON.stringify({ message: "Event type ignored by handler" }), { status: 200 });
 
     } catch (error) {
         console.error("Error processing webhook:", error);
