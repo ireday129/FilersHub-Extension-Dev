@@ -19,7 +19,8 @@ Deno.serve(async (req) => {
         );
 
         const payload = await req.json();
-        const { locationId, type } = payload;
+        const { locationId: rawLocationId, location_id, type } = payload;
+        const locationId = rawLocationId || location_id;
 
         console.log(`Received Webhook: Type=${type}, Location=${locationId}`);
 
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
 
         // Handle INSTALL event separately
         if (type === 'INSTALL') {
-            const userId = payload.userId;
+            const userId = payload.userId || payload.user_id;
 
             // 1. Get Access Token (Check both firms and integrations_ghl)
             let accessToken = null;
@@ -105,9 +106,10 @@ Deno.serve(async (req) => {
             }
 
             if (!accessToken || !firmId) {
-                console.error("No access token found for location:", locationId);
-                // Return 500 to trigger retry (as token exchange might be pending)
-                return new Response(JSON.stringify({ error: "Access token not found yet. Retrying." }), { status: 500 });
+                console.warn("No access token found for location (Install race condition):", locationId);
+                // Return 200 to prevent GHL from retrying endlessly if token never appears.
+                // The user will be created via SSO when they first login.
+                return new Response(JSON.stringify({ message: "Access token not found yet. Retrying via SSO." }), { status: 200 });
             }
 
             // 2. Fetch User Details from GHL
@@ -194,6 +196,15 @@ Deno.serve(async (req) => {
                 }, { onConflict: 'email' });
 
             if (staffError) throw staffError;
+
+            // Log Webhook (INSTALL)
+            await supabaseClient.from('ghl_webhooks').insert({
+                firm_id: firmId,
+                event_type: type,
+                payload: payload,
+                processed: true,
+                processed_at: new Date().toISOString()
+            });
 
             return new Response(JSON.stringify({ message: "Install processed: Owner created" }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
