@@ -134,7 +134,7 @@ export const useFirmData = () => {
 
             // Auto-select if only one firm
             if (firmsList.length === 1) {
-                await selectFirm(firmsList[0].id); // Call selectFirm logic
+                await selectFirm(firmsList[0].id, firmsList); // Pass list directly (state not yet updated)
             } else {
                 // If multiple, we stop here and let the UI prompt selection.
                 // firmId remains null, so App.tsx can show selection screen.
@@ -147,10 +147,11 @@ export const useFirmData = () => {
         }
     }, [user]); // Removed userAvatar dependency to avoid loops
 
-    const selectFirm = async (selectedId: string) => {
+    const selectFirm = async (selectedId: string, firmList?: any[]) => {
         setLoading(true);
         try {
-            const selectedFirm = availableFirms.find(f => f.id === selectedId);
+            const list = firmList || availableFirms;
+            const selectedFirm = list.find(f => f.id === selectedId);
             if (!selectedFirm) throw new Error("Invalid firm selection");
 
             setFirmId(selectedId);
@@ -233,8 +234,7 @@ export const useFirmData = () => {
     };
 
     useEffect(() => {
-        // Only fetch on mount if no firm selected and not loading
-        if (user && !firmId && !loading && availableFirms.length === 0) {
+        if (user && !firmId && availableFirms.length === 0) {
             fetchData();
         }
     }, [user]);
