@@ -89,8 +89,8 @@ serve(async (req) => {
             // We need Service Role Key to bypass RLS for writing tokens (if strict)
             // or to ensure we can write to the integrations table securely
             const supabaseAdmin = createClient(
-                Deno.env.get('SUPABASE_URL') ?? '',
-                Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+                Deno.env.get('URL') ?? Deno.env.get('SUPABASE_URL') ?? '',
+                Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
             )
 
             // Calculate expiry

@@ -14,31 +14,60 @@ Deno.serve(async (req) => {
 
     try {
         const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+            Deno.env.get('URL') ?? Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
         const payload = await req.json();
-        console.log("Received GHL Webhook:", JSON.stringify(payload));
-
         const { locationId, type } = payload;
 
-        // Only process ContactCreate or ContactUpdate for now
-        // GHL payloads can vary, but usually have 'type' or implied by structure
-        // We assume standard Contact Create/Update webhook
+        console.log(`Received Webhook: Type=${type}, Location=${locationId}`);
+
+        // MARKETPLACE SAFETY:
+        // GHL Marketplace apps receive ALL events. We must filter for what we care about.
+        // Returning 200 OK is crucial for ignored events so GHL doesn't disable the webhook.
+
+        const INTERESTING_EVENTS = ['ContactCreate', 'ContactUpdate'];
+
+        if (!INTERESTING_EVENTS.includes(type)) {
+            console.log(`Ignoring event type: ${type}`);
+            return new Response(JSON.stringify({ message: "Event ignored" }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
+        if (!locationId) {
+            console.log("No locationId in payload, ignoring.");
+            return new Response(JSON.stringify({ message: "No locationId" }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
 
         // 1. Find the firm corresponding to this GHL Location ID
         const { data: firm, error: firmError } = await supabaseClient
             .from('firms')
             .select('firm_id')
             .eq('ghl_location_id', locationId)
-            .single();
+            .maybeSingle(); // Use maybeSingle to avoid error on 0 rows
 
-        if (firmError || !firm) {
-            console.error("Firm not found for location:", locationId);
-            return new Response(JSON.stringify({ error: "Firm not found" }), {
+        if (firmError) {
+            console.error("Database error looking up firm:", firmError);
+            return new Response(JSON.stringify({ error: "Database error" }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 404,
+                status: 500,
+            });
+        }
+
+        if (!firm) {
+            // MARKETPLACE SAFETY:
+            // If we don't know this location, it might be an install we haven't onboarded yet,
+            // or a disconnect. We should log it but return 200 to keep the webhook alive.
+            console.warn(`Unknown location ID: ${locationId}. Skipping.`);
+            return new Response(JSON.stringify({ message: "Location not registered" }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
             });
         }
 
@@ -53,14 +82,13 @@ Deno.serve(async (req) => {
             console.error("No email in payload, skipping");
             return new Response(JSON.stringify({ message: "No email provided" }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200, // Return 200 to acknowledge receipt even if skipped
+                status: 200,
             });
         }
 
         const fullName = `${firstName || ''} ${lastName || ''}`.trim() || email;
 
         // 3. Upsert Client
-        // We try to find existing client by email + firm_id
         const { data: existingClient } = await supabaseClient
             .from('clients')
             .select('client_id')
@@ -95,13 +123,15 @@ Deno.serve(async (req) => {
         }
 
         if (result.error) {
+            console.error("Error upserting client:", result.error);
             throw result.error;
         }
 
         // 4. Log Webhook in ghl_webhooks table for audit
+        // We log valuable events only to save space/noise
         await supabaseClient.from('ghl_webhooks').insert({
             firm_id: firm.firm_id,
-            event_type: type || 'ContactWebHook',
+            event_type: type,
             payload: payload,
             processed: true,
             processed_at: new Date().toISOString()
