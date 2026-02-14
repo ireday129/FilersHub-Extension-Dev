@@ -34,15 +34,18 @@ serve(async (req) => {
             const firmId = url.searchParams.get('firmId') || body.firmId;
             const locationId = url.searchParams.get('locationId') || body.locationId;
             const userId = url.searchParams.get('userId') || body.userId;
+            const userEmail = url.searchParams.get('userEmail') || body.userEmail;
 
-            // For SSO, we need locationId AND userId
+            // For SSO, we need locationId AND (userId OR userEmail)
             let state = '';
-            if (action === 'sso' && locationId && userId) {
-                state = `sso:${locationId}:${userId}`;
+            if (action === 'sso' && locationId && (userId || userEmail)) {
+                // state format: sso:locationId:userId:userEmail
+                // Use 'null' placeholder if missing
+                state = `sso:${locationId}:${userId || 'null'}:${userEmail || 'null'}`;
             } else if (firmId) {
                 state = firmId;
             } else {
-                return new Response(JSON.stringify({ error: 'Missing firmId or (locationId + userId) for SSO' }), { status: 400, headers: corsHeaders });
+                return new Response(JSON.stringify({ error: 'Missing firmId or (locationId + user) for SSO' }), { status: 400, headers: corsHeaders });
             }
 
             const clientId = Deno.env.get('GHL_CLIENT_ID')
@@ -68,11 +71,12 @@ serve(async (req) => {
                 return new Response("Missing code or state", { status: 400 })
             }
 
-            // Parse State
+            // Parse State: sso:locationId:userId:userEmail
             const isSso = state.startsWith('sso:');
             const parts = state.split(':');
             const locationId = isSso ? parts[1] : null;
-            const userId = isSso ? parts[2] : null;
+            const userId = isSso && parts[2] !== 'null' ? parts[2] : null;
+            const userEmail = isSso && parts[3] && parts[3] !== 'null' ? parts[3] : null;
             const firmIdParam = isSso ? null : state;
 
             // Exchange Code for Token
@@ -187,26 +191,34 @@ serve(async (req) => {
             const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
 
             if (isSso) {
-                // 1. Fetch User
-                const userResp = await fetch(`https://services.leadconnectorhq.com/users/${userId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${tokenData.access_token}`,
-                        'Version': '2021-07-28'
-                    }
-                });
+                // 1. Resolve User (via Email in Params OR Fetch by ID)
+                let email = userEmail;
+                let name = 'Firm Owner';
 
-                if (!userResp.ok) {
-                    console.error("Failed to fetch user:", await userResp.text());
-                    return new Response("Failed to fetch user from GHL", { status: 500 });
+                if (!email && userId) {
+                    // Fetch User by ID if email missing
+                    const userResp = await fetch(`https://services.leadconnectorhq.com/users/${userId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${tokenData.access_token}`,
+                            'Version': '2021-07-28'
+                        }
+                    });
+
+                    if (!userResp.ok) {
+                        console.error("Failed to fetch user:", await userResp.text());
+                        return new Response("Failed to fetch user from GHL", { status: 500 });
+                    }
+
+                    const userData = await userResp.json();
+                    const ghlUser = userData.user || userData;
+                    email = ghlUser.email;
+                    name = `${ghlUser.firstName} ${ghlUser.lastName}`;
                 }
 
-                const userData = await userResp.json();
-                const ghlUser = userData.user || userData; // Handle GHL wrapper variation
-                const email = ghlUser.email;
-                const name = `${ghlUser.firstName} ${ghlUser.lastName}`;
-
                 if (!email) {
-                    return new Response("User has no email", { status: 400 });
+                    // Try fetch /users/me as last resort?
+                    // Or just fail.
+                    return new Response("User has no email (and could not fetch)", { status: 400 });
                 }
 
                 // 2. Find/Create Auth User
