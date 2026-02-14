@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
                     zip: ghlUser.zip,
                     address: ghlUser.address,
                     locationId: locationId,
-                    roles: ghlUser.roles,
+                    roles: { type: 'firmowner' }, // Force Firm Owner Role for Installer
                     permissions: ghlUser.permissions,
                     companyId: ghlUser.companyId
                 };
