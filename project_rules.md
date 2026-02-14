@@ -1,7 +1,7 @@
 # Project Rules & Guidelines
 
 ## Terminology
-- **CRM:** Always use "CRM" instead of "GoHighLevel" or "GHL" in any user-facing UI, notifications, or documentation. The brand "GoHighLevel" should be invisible to the end user.
+- **Strict GHL Payload Types:** When handling data from GHL (users, contacts, locations), use the *exact* property names from the GHL payload as variable names and database column names where possible (e.g., `userId`, `locationId`, `contactId`). Do NOT convert to snake_case (e.g., avoid `ghl_user_id`) unless strictly necessary for an existing schema constraint. This ensures consistency and simplifies debugging.
 
 ## Code Style
 - **React/TypeScript:** Use functional components and hooks.

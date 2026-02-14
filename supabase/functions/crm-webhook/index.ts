@@ -398,19 +398,19 @@ Deno.serve(async (req) => {
 
             const fullName = `${firstName || ''} ${lastName || ''}`.trim() || email;
 
-            // 1. Try to find existing client by GHL ID first
+            // 1. Try to find existing client by GHL ID first (using camelCase column "contactId")
             let { data: existingClient } = await supabaseClient
                 .from('clients')
-                .select('client_id, ghl_contact_id')
+                .select('client_id, "contactId"')
                 .eq('firm_id', firm.firm_id)
-                .eq('ghl_contact_id', contactId)
+                .eq('"contactId"', contactId)
                 .maybeSingle();
 
             // 2. Fallback: Find by Email
             if (!existingClient) {
                 const { data: clientByEmail } = await supabaseClient
                     .from('clients')
-                    .select('client_id, ghl_contact_id')
+                    .select('client_id, "contactId"')
                     .eq('firm_id', firm.firm_id)
                     .eq('email', email)
                     .maybeSingle();
@@ -426,11 +426,12 @@ Deno.serve(async (req) => {
                 result = await supabaseClient
                     .from('clients')
                     .update({
-                        ghl_contact_id: contactId, // Ensure ID is linked
+                        "contactId": contactId, // Ensure ID is linked
+                        "locationId": locationId,
                         // active: true, // Maybe reactivate?
                         full_name: fullName,
                         phone: phone,
-                        last_synced_at: timestamp,
+                        "lastSyncedAt": timestamp,
                         updated_at: timestamp
                     })
                     .eq('client_id', existingClient.client_id);
@@ -443,9 +444,10 @@ Deno.serve(async (req) => {
                         email: email,
                         full_name: fullName,
                         phone: phone,
-                        ghl_contact_id: contactId,
+                        "contactId": contactId,
+                        "locationId": locationId,
                         tax_return_status: 'Waiting on Documents', // Default status?
-                        last_synced_at: timestamp,
+                        "lastSyncedAt": timestamp,
                         created_at: timestamp,
                         updated_at: timestamp
                     });
