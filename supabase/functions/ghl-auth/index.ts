@@ -38,7 +38,7 @@ serve(async (req) => {
 
             // Scopes: contacts.readonly, locations.readonly is a good start
             // Note: GHL scopes are space-separated
-            const scopes = 'contacts.readonly contacts.write locations.readonly'
+            const scopes = 'contacts.readonly contacts.write locations.readonly users.readonly'
 
             // State = firmId (to know who is connecting)
             const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${redirectUri}&client_id=${clientId}&scope=${scopes}&state=${firmId}`
