@@ -13,6 +13,9 @@
     "host_permissions": [
         "https://*.supabase.co/*"
     ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co; img-src 'self' https: data:; object-src 'self'"
+    },
     "background": {
         "service_worker": "service-worker.js"
     }

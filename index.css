@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/* Google Fonts - Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8fafc;
+}
+
+/* Custom brand color utilities used throughout the app */
+.bg-brand {
+  background-color: #4aa936;
+}
+
+.text-brand {
+  color: #4aa936;
+}
+
+.border-brand {
+  border-color: #4aa936;
+}
+
+.bg-brand-light {
+  background-color: #f0f9ed;
+}
+
+.hover-bg-brand:hover {
+  background-color: #40922e;
+}
+
+/* Extension mode: prevent any horizontal scrolling */
+body.extension-mode,
+body.extension-mode #root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
