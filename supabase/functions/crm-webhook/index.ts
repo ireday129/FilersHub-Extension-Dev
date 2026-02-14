@@ -22,44 +22,19 @@ Deno.serve(async (req) => {
         const { locationId: rawLocationId, location_id, type } = payload;
         const locationId = rawLocationId || location_id;
 
-        // RAW AUDIT LOGGING (Log everything immediately)
-        // We use a separate try/catch to ensure logging failure doesn't crash the webhook processing if mostly harmless
+        // DYNAMIC AUDIT LOGGING (via RPC)
+        // Automatically creates columns for new payload fields
         let webhookLogId = null;
         let loggingError = null;
         try {
-            const { data: logData, error: logError } = await supabaseClient.from('ghl_webhooks').insert({
-                // Payload Mapping
-                type: type,
-                location_id: locationId,
-                version_id: payload.versionId || payload.version_id,
-                app_id: payload.appId || payload.app_id,
-
-                install_type: payload.installType,
-                company_id: payload.companyId || payload.company_id,
-                user_id: payload.userId || payload.user_id,
-                company_name: payload.companyName,
-                is_whitelabel_company: payload.isWhitelabelCompany,
-
-                contact_id: payload.id || payload.contact_id,
-                first_name: payload.firstName || payload.first_name,
-                last_name: payload.lastName || payload.last_name,
-                email: payload.email || payload.contact_email,
-                phone: payload.phone || payload.contact_phone,
-                tags: payload.tags,
-                country: payload.country,
-                date_added: payload.dateAdded,
-
-                payload_timestamp: payload.timestamp,
-                webhook_id: payload.webhookId || payload.webhook_id,
-
-                // System
+            const { data: logId, error: logError } = await supabaseClient.rpc('ingest_ghl_webhook', {
                 payload: payload,
-                processed: false
-            }).select('id').single();
+                firm_id: null
+            });
 
-            if (logData) webhookLogId = logData.id;
+            if (logId) webhookLogId = logId;
             if (logError) {
-                console.error("Failed to log webhook:", logError);
+                console.error("Failed to log webhook (RPC):", logError);
                 loggingError = logError.message;
             }
         } catch (logErr) {
@@ -253,7 +228,7 @@ Deno.serve(async (req) => {
                 await supabaseClient.from('ghl_webhooks').update({
                     processed: true,
                     firm_id: firmId
-                }).eq('id', webhookLogId);
+                }).eq('record_id', webhookLogId);
             }
 
             return new Response(JSON.stringify({ message: "Install processed: Owner created" }), {
@@ -324,7 +299,7 @@ Deno.serve(async (req) => {
                 firm_id: firm.firm_id,
                 processed: true,
                 processed_at: new Date().toISOString()
-            }).eq('id', webhookLogId);
+            }).eq('record_id', webhookLogId);
         }
 
         return new Response(JSON.stringify({ message: "Client processed successfully" }), {
