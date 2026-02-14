@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
         // RAW AUDIT LOGGING (Log everything immediately)
         // We use a separate try/catch to ensure logging failure doesn't crash the webhook processing if mostly harmless
         let webhookLogId = null;
+        let loggingError = null;
         try {
             const { data: logData, error: logError } = await supabaseClient.from('ghl_webhooks').insert({
                 event_type: type,
@@ -37,9 +38,13 @@ Deno.serve(async (req) => {
             }).select('id').single();
 
             if (logData) webhookLogId = logData.id;
-            if (logError) console.error("Failed to log webhook:", logError);
+            if (logError) {
+                console.error("Failed to log webhook:", logError);
+                loggingError = logError.message;
+            }
         } catch (logErr) {
             console.error("Webhook logging exception:", logErr);
+            loggingError = logErr.message;
         }
 
         console.log(`Received Webhook: Type=${type}, Location=${locationId}, LogID=${webhookLogId}`);
@@ -129,7 +134,10 @@ Deno.serve(async (req) => {
                 console.warn("No access token found for location (Install race condition):", locationId);
                 // Return 200 to prevent GHL from retrying endlessly if token never appears.
                 // The user will be created via SSO when they first login.
-                return new Response(JSON.stringify({ message: "Access token not found yet. Retrying via SSO." }), { status: 200 });
+                return new Response(JSON.stringify({
+                    message: "Access token not found yet. Retrying via SSO.",
+                    debug_log_error: loggingError
+                }), { status: 200 });
             }
 
             // 2. Fetch User Details from GHL
@@ -153,7 +161,10 @@ Deno.serve(async (req) => {
             const name = `${ghlUser.firstName} ${ghlUser.lastName}`;
 
             if (!email) {
-                return new Response(JSON.stringify({ message: "No email for user, skipping." }), {
+                return new Response(JSON.stringify({
+                    message: "No email for user, skipping.",
+                    debug_log_error: loggingError
+                }), {
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                     status: 200,
                 });
