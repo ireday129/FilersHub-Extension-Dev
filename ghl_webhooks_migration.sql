@@ -69,6 +69,7 @@ ALTER TABLE public.ghl_webhooks ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.ghl_webhooks TO service_role;
 
 -- Allow Staff to view logs for their firm (if firm_id is linked)
+DROP POLICY IF EXISTS "Staff can view firm webhooks" ON public.ghl_webhooks;
 CREATE POLICY "Staff can view firm webhooks" ON public.ghl_webhooks
     FOR SELECT
     USING (
