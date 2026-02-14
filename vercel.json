@@ -19,5 +19,15 @@
                 }
             ]
         }
+    ],
+    "crons": [
+        {
+            "path": "/api/sync-ghl-docs",
+            "schedule": "0 3 * * *"
+        },
+        {
+            "path": "/api/embed-ghl-docs",
+            "schedule": "30 3 * * *"
+        }
     ]
 }
