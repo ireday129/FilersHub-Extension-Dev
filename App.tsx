@@ -372,9 +372,14 @@ import RoleSelection from './components/RoleSelection';
 import StaffLogin from './components/StaffLogin';
 import SuperAdminLogin from './components/SuperAdminLogin';
 
+import { getFirmBySlug, PublicFirmData } from './services/firms';
+import Login from './components/auth/Login';
+
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const [path, setPath] = useState(window.location.pathname);
+  const [firmBranding, setFirmBranding] = useState<PublicFirmData['firm_name' | 'logo_url' | 'brand_color'] | null>(null);
+  const [isFirmLoading, setIsFirmLoading] = useState(false);
 
   useEffect(() => {
     const handlePathChange = () => {
@@ -384,7 +389,39 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePathChange);
   }, []);
 
-  if (loading) {
+  // Handle Portal Logic
+  useEffect(() => {
+    const checkPortalPath = async () => {
+      // Check if path is /portal/:slug
+      const match = path.match(/^\/portal\/([^/]+)/);
+      if (match) {
+        const slug = match[1];
+        setIsFirmLoading(true);
+        try {
+          // Fetch firm details by slug
+          const firmData = await getFirmBySlug(slug);
+          if (firmData) {
+            setFirmBranding({
+              name: firmData.firm_name,
+              logo: firmData.logo_url,
+              color: firmData.brand_color
+            });
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setIsFirmLoading(false);
+        }
+      } else {
+        setFirmBranding(null);
+      }
+    };
+
+    checkPortalPath();
+  }, [path]);
+
+
+  if (loading || isFirmLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -424,6 +461,21 @@ const AppContent: React.FC = () => {
     if (path === '/staff-access') {
       return <StaffLogin />;
     }
+
+    // Portal Login with Branding
+    if (path.startsWith('/portal/') && firmBranding) {
+      return <Login firmBranding={{
+        name: firmBranding.name,
+        logo: firmBranding.logo,
+        color: firmBranding.brand_color
+      }} />;
+    }
+
+    // Default Login (branded generically) or Role Selection as landing
+    if (path === '/login') {
+      return <Login />;
+    }
+
     return <RoleSelection />;
   }
 

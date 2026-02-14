@@ -14,7 +14,8 @@ export const useFirmData = () => {
     const [firmSettings, setFirmSettings] = useState({
         name: '',
         logo: '',
-        color: ''
+        color: '',
+        slug: ''
     });
 
     const fetchData = useCallback(async () => {
@@ -28,7 +29,8 @@ export const useFirmData = () => {
                 setFirmSettings({
                     name: 'Dev Mode Firm',
                     logo: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png',
-                    color: '#42ab31'
+                    color: '#42ab31',
+                    slug: 'dev-firm'
                 });
                 // Mock Returns
                 setReturns([
@@ -75,6 +77,7 @@ export const useFirmData = () => {
                             name: '', // Will fetch below
                             logo: '',
                             brandColor: '',
+                            slug: '',
                             isStaff: true
                         });
                         // Set avatar from first staff entry found
@@ -93,6 +96,7 @@ export const useFirmData = () => {
                             name: '',
                             logo: '',
                             brandColor: '',
+                            slug: '',
                             isStaff: false
                         });
                     }
@@ -110,7 +114,7 @@ export const useFirmData = () => {
             const firmIds = Array.from(allFirmsMap.keys());
             const { data: firmsDetails } = await supabase
                 .from('firms')
-                .select('firm_id, firm_name, logo_url, brand_color')
+                .select('firm_id, firm_name, logo_url, brand_color, slug')
                 .in('firm_id', firmIds);
 
             if (firmsDetails) {
@@ -120,6 +124,7 @@ export const useFirmData = () => {
                         existing.name = f.firm_name;
                         existing.logo = f.logo_url;
                         existing.brandColor = f.brand_color;
+                        existing.slug = f.slug;
                     }
                 });
             }
@@ -152,7 +157,8 @@ export const useFirmData = () => {
             setFirmSettings({
                 name: selectedFirm.name,
                 logo: selectedFirm.logo || '',
-                color: selectedFirm.brandColor || '#3b82f6'
+                color: selectedFirm.brandColor || '#3b82f6',
+                slug: selectedFirm.slug || ''
             });
 
             // Now load data SPECIFIC to this firm and role

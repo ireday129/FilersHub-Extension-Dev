@@ -34,14 +34,22 @@ interface SettingsProps {
     name: string;
     logo: string;
     color: string;
+    slug?: string;
   };
   setFirmSettings: React.Dispatch<React.SetStateAction<{
     name: string;
     logo: string;
     color: string;
+    slug?: string;
   }>>;
   firmId: string | null;
 }
+
+// ... (omitted)
+
+// In Settings component body:
+
+
 
 interface GHLUser {
   id: string;
@@ -125,14 +133,16 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
   const colors = ['#4aa936', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#334155'];
 
-  const firmSlug = localSettings.name
+  const computedSlug = localSettings.name
     .toLowerCase()
     .trim()
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-  const portalUrl = `app.filershub.com/${firmSlug || 'portal'}`;
+  const firmSlug = localSettings.slug || computedSlug;
+
+  const portalUrl = `app.filershub.com/portal/${firmSlug || ''}`;
 
   const handleRoleChange = (id: string, newRole: UserRole) => {
     setStaff(prev => prev.map(member =>
@@ -229,6 +239,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           firm_name: localSettings.name,
           logo_url: localSettings.logo,
           brand_color: localSettings.color,
+          slug: firmSlug,
           updated_at: new Date().toISOString()
         })
         .eq('firm_id', firmId);

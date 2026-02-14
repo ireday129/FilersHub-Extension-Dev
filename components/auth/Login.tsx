@@ -3,7 +3,15 @@ import { supabase } from '../../services/supabase';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
-const Login: React.FC = () => {
+interface LoginProps {
+    firmBranding?: {
+        name: string;
+        logo: string;
+        color: string;
+    };
+}
+
+const Login: React.FC<LoginProps> = ({ firmBranding }) => {
     const { bypassAuth } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -11,6 +19,10 @@ const Login: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isSignUp, setIsSignUp] = useState(false);
     const [magicLinkSent, setMagicLinkSent] = useState(false);
+
+    const brandColor = firmBranding?.color || '#2563eb'; // Default blue-600
+    // Helper for hover state - simple approach, or just use opacity
+    const brandName = firmBranding?.name || 'FilersHub';
 
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -56,9 +68,16 @@ const Login: React.FC = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
             <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-slate-100">
-                <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-slate-800">FilersHub</h1>
-                    <p className="text-slate-500 mt-2">Sign in to your account</p>
+                <div className="text-center mb-8 flex flex-col items-center">
+                    {firmBranding?.logo ? (
+                        <div className="w-24 h-24 mb-4 flex items-center justify-center">
+                            <img src={firmBranding.logo} alt={brandName} className="max-w-full max-h-full object-contain" />
+                        </div>
+                    ) : (
+                        <h1 className="text-2xl font-bold text-slate-800 mb-2">{brandName}</h1>
+                    )}
+                    {!firmBranding?.logo && <p className="text-slate-500 mt-0">Sign in to your account</p>}
+                    {firmBranding?.logo && <h1 className="text-xl font-bold text-slate-800">{brandName} Portal</h1>}
                 </div>
 
                 {error && (
@@ -118,7 +137,8 @@ const Login: React.FC = () => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                            style={{ backgroundColor: brandColor }}
+                            className="w-full text-white font-medium py-2.5 rounded-lg transition-all hover:opacity-90 flex items-center justify-center gap-2 shadow-sm"
                         >
                             {loading && <Loader2 size={18} className="animate-spin" />}
                             {isSignUp ? 'Create Account' : 'Sign In'}
@@ -146,7 +166,8 @@ const Login: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setIsSignUp(!isSignUp)}
-                                className="text-blue-600 hover:text-blue-800 font-medium"
+                                style={{ color: brandColor }}
+                                className="font-medium hover:underline"
                             >
                                 {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
                             </button>
