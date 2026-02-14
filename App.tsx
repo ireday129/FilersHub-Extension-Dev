@@ -436,9 +436,9 @@ const AppContent: React.FC = () => {
 
     // 4. Trigger SSO if we have enough info
     if (locationId && userId) {
-      console.log("GHL Context Detected: Initiating SSO...");
+      console.log("CRM Context Detected: Initiating SSO...");
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const ssoUrl = `${supabaseUrl}/functions/v1/ghl-auth/init?action=sso&locationId=${locationId}&userId=${userId}`;
+      const ssoUrl = `${supabaseUrl}/functions/v1/crm-auth/init?action=sso&locationId=${locationId}&userId=${userId}`;
       window.location.href = ssoUrl;
     }
   }, [loading, user]);

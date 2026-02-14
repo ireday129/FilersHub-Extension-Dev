@@ -46,7 +46,7 @@ serve(async (req) => {
             }
 
             const clientId = Deno.env.get('GHL_CLIENT_ID')
-            const redirectUri = `${url.origin}/functions/v1/ghl-auth/callback`
+            const redirectUri = `${url.origin}/functions/v1/crm-auth/callback`
 
             // Scopes: contacts.readonly, locations.readonly is a good start
             // Note: GHL scopes are space-separated
@@ -78,7 +78,7 @@ serve(async (req) => {
             // Exchange Code for Token
             const clientId = Deno.env.get('GHL_CLIENT_ID')
             const clientSecret = Deno.env.get('GHL_CLIENT_SECRET')
-            const redirectUri = `${url.origin}/functions/v1/ghl-auth/callback`
+            const redirectUri = `${url.origin}/functions/v1/crm-auth/callback`
 
             const tokenResponse = await fetch('https://services.leadconnectorhq.com/oauth/token', {
                 method: 'POST',
@@ -255,9 +255,6 @@ serve(async (req) => {
                     email: email,
                     full_name: name,
                     role: 'Firm Owner', // Default to Owner for simplicity in V1/SSO? 
-                    // Ideally check GHL role: 'admin' | 'user'
-                    // ghlUser.roles.type is sometimes available.
-                    // For now default to Owner if creating new.
                     auth_user_id: userRecord.id,
                     ghl_user_id: userId,
                     ghl_location_id: locationId,
