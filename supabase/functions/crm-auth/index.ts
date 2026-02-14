@@ -308,10 +308,11 @@ serve(async (req) => {
                     return new Response("User has no email (and could not fetch)", { status: 400 });
                 }
 
-                // 2. Find/Create Auth User
+                // 2. Find/Create Auth User (Robust Pattern)
                 let userRecord;
-                // Try creating user first
                 const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
+
+                // Try create first
                 const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
                     email: email,
                     password: tempPassword,
@@ -320,32 +321,47 @@ serve(async (req) => {
                 });
 
                 if (createError) {
-                    // If user exists, find them via generateLink
-                    const isDuplicate = createError.message?.toLowerCase().includes("already registered") ||
-                        createError.message?.toLowerCase().includes("unique constraint") ||
-                        createError.status === 400;
+                    console.log("Create user failed, attempting to find existing via generateLink...", createError.message);
 
-                    if (isDuplicate) {
-                        // We found them. We'll get references by generating the link later.
-                        // Actually, generateLink returns the user object too.
-                        // But we need the ID to link Staff.
-                        // We'll trust the email link step to handle the login.
-                        // But we need to ensure the STAFF record exists before redirecting?
-                        // Yes.
-                        // "getUserByEmail" via generateLink:
-                        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-                            type: 'magiclink',
-                            email: email
-                        });
-                        if (linkError || !linkData.user) {
-                            return new Response("User exists but could not resolve", { status: 500 });
-                        }
+                    // Always try to find existing user if create fails, regardless of specific error message
+                    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+                        type: 'magiclink',
+                        email: email
+                    });
+
+                    if (linkData?.user) {
                         userRecord = linkData.user;
                     } else {
+                        // If both create and find fail, return the original create error (it's likely the root cause)
                         throw createError;
                     }
                 } else {
                     userRecord = newUser.user;
+                }
+
+                if (!userRecord) throw new Error("Failed to resolve auth user record.");
+
+                // 2b. Sync to "users" Table (Robustness for Install/SSO Race Conditions)
+                // Ensure the user exists in 'users' table with Firm Owner role, even if webhook failed
+                if (userId && locationId) {
+                    const firstName = name.split(' ')[0] || name;
+                    const lastName = name.split(' ').slice(1).join(' ') || '';
+
+                    const userPayload = {
+                        id: userId,
+                        email: email,
+                        firstName: firstName,
+                        lastName: lastName,
+                        name: name,
+                        locationId: locationId,
+                        roles: { type: 'firmowner' } // SSO user treated as owner for initial access
+                    };
+
+                    const { error: usersError } = await supabaseAdmin
+                        .from('users')
+                        .upsert(userPayload, { onConflict: 'id' });
+
+                    if (usersError) console.error("Failed to sync SSO user to 'users' table:", usersError);
                 }
 
                 // 3. Ensure Staff Record Exists
