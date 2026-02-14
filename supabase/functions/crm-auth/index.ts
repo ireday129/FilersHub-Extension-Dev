@@ -46,7 +46,7 @@ serve(async (req) => {
             }
 
             const clientId = Deno.env.get('GHL_CLIENT_ID')
-            const redirectUri = `${url.origin}/functions/v1/crm-auth/callback`
+            const redirectUri = `https://sb.filershub.com/functions/v1/crm-auth/callback`
 
             // Scopes: contacts.readonly, locations.readonly is a good start
             // Note: GHL scopes are space-separated
@@ -78,7 +78,7 @@ serve(async (req) => {
             // Exchange Code for Token
             const clientId = Deno.env.get('GHL_CLIENT_ID')
             const clientSecret = Deno.env.get('GHL_CLIENT_SECRET')
-            const redirectUri = `${url.origin}/functions/v1/crm-auth/callback`
+            const redirectUri = `https://sb.filershub.com/functions/v1/crm-auth/callback`
 
             const tokenResponse = await fetch('https://services.leadconnectorhq.com/oauth/token', {
                 method: 'POST',
@@ -184,7 +184,7 @@ serve(async (req) => {
             }
 
             // HANDLE SSO LOGIC
-            const appUrl = Deno.env.get('APP_URL') || 'http://localhost:5173';
+            const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
 
             if (isSso) {
                 // 1. Fetch User
