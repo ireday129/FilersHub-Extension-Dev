@@ -223,6 +223,38 @@ Deno.serve(async (req) => {
 
             if (staffError) throw staffError;
 
+            // 5. UPDATE "users" Table (Exact GHL Mapping for Install User)
+            if (typeof ghlUser !== 'undefined') {
+                const installUserPayload = {
+                    id: userId,
+                    email: ghlUser.email,
+                    firstName: ghlUser.firstName,
+                    lastName: ghlUser.lastName,
+                    name: ghlUser.name || `${ghlUser.firstName} ${ghlUser.lastName}`,
+                    phone: ghlUser.phone,
+                    extension: ghlUser.extension,
+                    dob: ghlUser.dob,
+                    city: ghlUser.city,
+                    state: ghlUser.state,
+                    country: ghlUser.country,
+                    zip: ghlUser.zip,
+                    address: ghlUser.address,
+                    locationId: locationId,
+                    roles: ghlUser.roles,
+                    permissions: ghlUser.permissions,
+                    companyId: ghlUser.companyId
+                };
+
+                // Remove undefined keys
+                Object.keys(installUserPayload).forEach(key => installUserPayload[key] === undefined && delete installUserPayload[key]);
+
+                const { error: userTableError } = await supabaseClient
+                    .from('users')
+                    .upsert(installUserPayload);
+
+                if (userTableError) console.error("Failed to sync Install User to 'users':", userTableError);
+            }
+
             // Update Log to Processed
             if (webhookLogId) {
                 await supabaseClient.from('ghl_webhooks').update({
@@ -304,6 +336,37 @@ Deno.serve(async (req) => {
 
             if (staffError) throw staffError;
 
+            // 5. UPDATE "users" Table (Exact GHL Mapping)
+            const userPayload = {
+                id: userId,
+                email: email,
+                firstName: firstName,
+                lastName: lastName,
+                name: name,
+                phone: payload.phone,
+                extension: payload.extension,
+                dob: payload.dob,
+                city: payload.city,
+                state: payload.state,
+                country: payload.country,
+                zip: payload.zip,
+                address: payload.address,
+                locationId: locationId,
+                roles: payload.roles,
+                permissions: payload.permissions,
+                companyId: payload.companyId
+            };
+
+            Object.keys(userPayload).forEach(key => userPayload[key] === undefined && delete userPayload[key]);
+
+            const { error: userTableError } = await supabaseClient
+                .from('users')
+                .upsert(userPayload);
+
+            if (userTableError) {
+                console.error("Failed to sync GHL User to 'users' table:", userTableError);
+            }
+
             // Update Log
             if (webhookLogId) {
                 await supabaseClient.from('ghl_webhooks').update({
@@ -312,7 +375,7 @@ Deno.serve(async (req) => {
                 }).eq('record_id', webhookLogId);
             }
 
-            return new Response(JSON.stringify({ message: "Staff synced successfully" }), {
+            return new Response(JSON.stringify({ message: "Staff & User synced successfully" }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200,
             });
