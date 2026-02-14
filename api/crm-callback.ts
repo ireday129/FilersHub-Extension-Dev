@@ -76,7 +76,7 @@ export default async function handler(req: any, res: any) {
 
         // 4. Redirect to Dashboard
         // Use the stored firm ID if available, or just go to dashboard
-        return res.redirect(302, `https://${process.env.APP_URL || process.env.VERCEL_URL}/dashboard?setup=complete`);
+        return res.redirect(302, `https://${process.env.APP_URL || process.env.VERCEL_URL}/staff-access`);
 
     } catch (error: any) {
         console.error("Handler Error:", error);
