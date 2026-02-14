@@ -391,7 +391,8 @@ serve(async (req) => {
                     }).eq('staff_id', existingStaff.staff_id);
                 }
 
-                // 4. Generate Magic Link & Redirect
+                // 4. Generate Magic Link
+                const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
                 const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
                     type: 'magiclink',
                     email: email,
@@ -401,13 +402,20 @@ serve(async (req) => {
                 });
 
                 if (linkErr) {
+                    console.error("Failed to generate login link:", linkErr);
                     return new Response("Failed to generate login link", { status: 500 });
+                }
+
+                if (!link || !link.action_link) {
+                    console.error("No action_link returned from generateLink");
+                    return new Response("Failed to generate login link (no URL returned)", { status: 500 });
                 }
 
                 return Response.redirect(link.action_link, 302);
             }
 
             // Standard Flow Redirect
+            const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
             return Response.redirect(`${appUrl}/?ghl_connected=true`, 302)
         }
 
