@@ -75,9 +75,9 @@ Deno.serve(async (req) => {
 
         if (firmError) {
             console.error("Database error looking up firm:", firmError);
-            return new Response(JSON.stringify({ error: "Database error" }), {
+            return new Response(JSON.stringify({ error: "Database error", detail: firmError.message }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500,
+                status: 200, // Always 200 to prevent GHL from disabling webhook
             });
         }
 
@@ -136,6 +136,14 @@ Deno.serve(async (req) => {
             }
 
             // 2. Fetch User Details from GHL
+            if (!userId) {
+                console.warn("INSTALL: No userId in webhook payload");
+                return new Response(JSON.stringify({ message: "No userId in INSTALL payload (will resolve via SSO)" }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200,
+                });
+            }
+
             const userResp = await fetch(`https://services.leadconnectorhq.com/users/${userId}`, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
@@ -145,8 +153,11 @@ Deno.serve(async (req) => {
 
             if (!userResp.ok) {
                 const errText = await userResp.text();
-                console.error("Failed to fetch user:", errText);
-                return new Response(JSON.stringify({ error: "Failed to fetch user from GHL" }), { status: 500 });
+                console.error("INSTALL: Failed to fetch user from GHL:", userResp.status, errText);
+                return new Response(JSON.stringify({ message: "Failed to fetch user from GHL (will retry via SSO)" }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200,
+                });
             }
 
             const userData = await userResp.json();
@@ -386,10 +397,12 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ message: "Event ignored (Users only)" }), { status: 200 });
 
     } catch (error) {
-        console.error("Error processing webhook:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
+        // MARKETPLACE SAFETY: Always return 200 to prevent GHL from disabling webhook.
+        // Errors are logged for debugging but the webhook endpoint must stay healthy.
+        console.error("Error processing webhook:", error?.message || error);
+        return new Response(JSON.stringify({ error: error?.message || "Unknown error", status: "logged" }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500,
+            status: 200,
         });
     }
 });
