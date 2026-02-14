@@ -420,6 +420,29 @@ const AppContent: React.FC = () => {
     checkPortalPath();
   }, [path]);
 
+  // GHL SSO Trigger
+  useEffect(() => {
+    // 1. Check if we're not logged in and not loading
+    if (loading || user) return;
+
+    // 2. Check if we are inside an iframe (GHL context)
+    const inIframe = window.self !== window.top;
+    if (!inIframe) return;
+
+    // 3. Extract GHL Params
+    const params = new URLSearchParams(window.location.search);
+    const locationId = params.get('location_id') || params.get('locationId'); // Handle both cases
+    const userId = params.get('user_id') || params.get('userId'); // Handle both cases for robustness
+
+    // 4. Trigger SSO if we have enough info
+    if (locationId && userId) {
+      console.log("GHL Context Detected: Initiating SSO...");
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const ssoUrl = `${supabaseUrl}/functions/v1/ghl-auth/init?action=sso&locationId=${locationId}&userId=${userId}`;
+      window.location.href = ssoUrl;
+    }
+  }, [loading, user]);
+
 
   if (loading || isFirmLoading) {
     return (
