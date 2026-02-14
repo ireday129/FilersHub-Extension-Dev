@@ -34,6 +34,8 @@ Deno.serve(async (req) => {
                 company_id: payload.companyId || payload.company_id,
                 user_id: payload.userId || payload.user_id,
                 app_id: payload.appId || payload.app_id,
+                contact_id: payload.id || payload.contact_id,
+                email: payload.email || payload.contact_email,
                 processed: false
             }).select('id').single();
 
