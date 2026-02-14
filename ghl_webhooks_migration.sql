@@ -40,6 +40,21 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ghl_webhooks' AND column_name='app_id') THEN
         ALTER TABLE public.ghl_webhooks ADD COLUMN app_id TEXT;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ghl_webhooks' AND column_name='location_id') THEN
+        ALTER TABLE public.ghl_webhooks ADD COLUMN location_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ghl_webhooks' AND column_name='processing_error') THEN
+        ALTER TABLE public.ghl_webhooks ADD COLUMN processing_error TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ghl_webhooks' AND column_name='created_at') THEN
+        ALTER TABLE public.ghl_webhooks ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ghl_webhooks' AND column_name='received_at') THEN
+        ALTER TABLE public.ghl_webhooks ADD COLUMN received_at TIMESTAMPTZ DEFAULT NOW();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ghl_webhooks' AND column_name='processed') THEN
+        ALTER TABLE public.ghl_webhooks ADD COLUMN processed BOOLEAN DEFAULT false;
+    END IF;
 END $$;
 
 -- 4. Indexes
