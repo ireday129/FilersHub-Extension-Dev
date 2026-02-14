@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { supabase } from '../services/supabase';
-import { useAuth } from '../contexts/AuthContext';
 import { useExtensionMode } from '../hooks/useExtensionMode';
 
 interface StaffMember {
@@ -62,7 +61,6 @@ interface GHLUser {
 }
 
 const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firmId }) => {
-  const { user } = useAuth();
   const { isExtension } = useExtensionMode();
   const [localSettings, setLocalSettings] = useState(firmSettings);
   const [staff, setStaff] = useState<StaffMember[]>([
@@ -76,8 +74,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const [isLoadingGHL, setIsLoadingGHL] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({});
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [myAvatar, setMyAvatar] = useState<string | null>(user?.user_metadata?.avatar_url || null);
 
   const fetchGHLUsers = async () => {
     setIsLoadingGHL(true);
@@ -181,50 +177,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     }
   };
 
-  // Avatar Upload Handler
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    setIsUploadingAvatar(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${user.id}/avatar.png`; // Consistent path for user
-
-      // 1. Upload to Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // 2. Get Public URL
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = `${data.publicUrl}?t=${Date.now()}`; // Cache bust
-
-      // 3. Update Staff Table
-      const { error: dbError } = await supabase
-        .from('staff')
-        .update({ avatar_url: publicUrl })
-        .eq('auth_user_id', user.id);
-
-      if (dbError) throw dbError;
-
-      // 4. Update Local State
-      setMyAvatar(publicUrl);
-      // Also update the staff list if I'm in it (optional but good UI)
-      setStaff(prev => prev.map(m => m.email === user.email ? { ...m, avatar: publicUrl } : m));
-
-      alert('Profile picture updated!');
-      // Note: App header won't update until refresh or we lift state, but that's acceptable for V1.
-
-    } catch (error) {
-      console.error('Error uploading avatar:', error);
-      alert('Failed to update profile picture.');
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  };
 
   const handleSave = async () => {
     if (!firmId) return;
@@ -357,57 +309,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           </div>
         </div>
       )}
-
-      {/* My Profile Section */}
-      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-              <Users size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">My Profile</h2>
-              <p className="text-xs text-slate-500">Manage your personal account settings.</p>
-            </div>
-          </div>
-        </div>
-        <div className="p-8 flex items-center gap-8">
-          <div className="relative group">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg bg-slate-100">
-              <img
-                src={myAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.email}`}
-                alt="Profile"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <label className="absolute bottom-0 right-0 p-2 bg-brand text-white rounded-full cursor-pointer hover:bg-brand/90 transition-colors shadow-sm">
-              <Upload size={14} />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                disabled={isUploadingAvatar}
-                className="hidden"
-              />
-            </label>
-            {isUploadingAvatar && (
-              <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              </div>
-            )}
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-800">{user?.user_metadata?.full_name || 'User'}</h3>
-            <p className="text-sm text-slate-500">{user?.email}</p>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider rounded">
-                {/* Role isn't easily available here without prop drilling, assume looked up or from metadata */}
-                {user?.user_metadata?.role || 'Staff Member'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Firm Profile & Branding Section */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

@@ -105,7 +105,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
             <button
               key={view}
               onClick={() => setActiveView(view)}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-[#4aa936] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
             >
               {view}
@@ -139,7 +139,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       }
       return (
         <div className="flex items-center gap-2">
-          <span className="px-4 py-2 bg-[#f0f9ed] text-[#4aa936] text-xs font-bold rounded-lg border border-[#e1f2dc] flex items-center gap-2">
+          <span className="px-4 py-2 bg-brand-light text-brand text-xs font-bold rounded-lg border border-brand/20 flex items-center gap-2">
             <UserCheck size={14} />
             My Clients
           </span>
@@ -157,7 +157,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
               <button
                 key={view}
                 onClick={() => setActiveView(view)}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-[#4aa936] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
                   }`}
               >
                 {view}
@@ -236,7 +236,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button className="p-1.5 text-[#4aa936] bg-white rounded shadow-sm"><LayoutGrid size={16} /></button>
+                <button className="p-1.5 text-brand bg-white rounded shadow-sm"><LayoutGrid size={16} /></button>
                 <button className="p-1.5 text-slate-400 hover:text-slate-600"><List size={16} /></button>
               </div>
               <span className="text-xs font-bold text-slate-400 uppercase">Viewing {activeView}</span>
@@ -279,7 +279,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                         </button>
                         <button
                           onClick={() => handleManageReturn(client.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-[#4aa936] text-xs font-bold rounded-xl hover:bg-[#f0f9ed] transition-all shadow-sm"
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-brand text-xs font-bold rounded-xl hover:bg-brand-light transition-all shadow-sm"
                         >
                           Manage Return
                           <ArrowRight size={14} />

@@ -304,7 +304,7 @@ const AuthenticatedApp: React.FC = () => {
                     ? 'text-indigo-600 bg-indigo-50 border-indigo-100'
                     : 'text-brand bg-brand-light border-brand/20'
                   }`}>
-                  {isSuperAdmin ? 'Platform SuperAdmin' : isStaff ? (isExtension ? 'Staff' : 'Staff Workspace') : (isExtension ? 'Client' : 'Client Workspace')} • {selectedRole}
+                  {isSuperAdmin ? 'Platform SuperAdmin' : selectedRole}
                 </span>
                 {!isExtension && (
                   <button
