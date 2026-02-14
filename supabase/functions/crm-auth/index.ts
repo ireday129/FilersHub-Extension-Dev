@@ -432,7 +432,7 @@ serve(async (req) => {
 
                 // Redirect directly to app with session tokens in URL fragment
                 const { access_token, refresh_token, expires_in, expires_at } = verifyData.session;
-                const params = new URLSearchParams({
+                const sessionParams = new URLSearchParams({
                     access_token,
                     refresh_token,
                     expires_in: String(expires_in),
@@ -441,7 +441,7 @@ serve(async (req) => {
                     type: 'magiclink',
                 });
 
-                return Response.redirect(`${appUrl}/dashboard#${params.toString()}`, 302);
+                return Response.redirect(`${appUrl}/dashboard#${sessionParams.toString()}`, 302);
             }
 
             // Standard Flow Redirect
