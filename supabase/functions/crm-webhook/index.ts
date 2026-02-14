@@ -22,7 +22,27 @@ Deno.serve(async (req) => {
         const { locationId: rawLocationId, location_id, type } = payload;
         const locationId = rawLocationId || location_id;
 
-        console.log(`Received Webhook: Type=${type}, Location=${locationId}`);
+        // RAW AUDIT LOGGING (Log everything immediately)
+        // We use a separate try/catch to ensure logging failure doesn't crash the webhook processing if mostly harmless
+        let webhookLogId = null;
+        try {
+            const { data: logData, error: logError } = await supabaseClient.from('ghl_webhooks').insert({
+                event_type: type,
+                payload: payload,
+                location_id: locationId,
+                company_id: payload.companyId || payload.company_id,
+                user_id: payload.userId || payload.user_id,
+                app_id: payload.appId || payload.app_id,
+                processed: false
+            }).select('id').single();
+
+            if (logData) webhookLogId = logData.id;
+            if (logError) console.error("Failed to log webhook:", logError);
+        } catch (logErr) {
+            console.error("Webhook logging exception:", logErr);
+        }
+
+        console.log(`Received Webhook: Type=${type}, Location=${locationId}, LogID=${webhookLogId}`);
 
         // MARKETPLACE SAFETY:
         // GHL Marketplace apps receive ALL events. We must filter for what we care about.
@@ -197,14 +217,13 @@ Deno.serve(async (req) => {
 
             if (staffError) throw staffError;
 
-            // Log Webhook (INSTALL)
-            await supabaseClient.from('ghl_webhooks').insert({
-                firm_id: firmId,
-                event_type: type,
-                payload: payload,
-                processed: true,
-                processed_at: new Date().toISOString()
-            });
+            // Update Log to Processed
+            if (webhookLogId) {
+                await supabaseClient.from('ghl_webhooks').update({
+                    processed: true,
+                    firm_id: firmId
+                }).eq('id', webhookLogId);
+            }
 
             return new Response(JSON.stringify({ message: "Install processed: Owner created" }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -268,14 +287,14 @@ Deno.serve(async (req) => {
             throw result.error;
         }
 
-        // 4. Log Webhook
-        await supabaseClient.from('ghl_webhooks').insert({
-            firm_id: firm.firm_id,
-            event_type: type,
-            payload: payload,
-            processed: true,
-            processed_at: new Date().toISOString()
-        });
+        // 4. Update Webhook Log
+        if (webhookLogId) {
+            await supabaseClient.from('ghl_webhooks').update({
+                firm_id: firm.firm_id,
+                processed: true,
+                processed_at: new Date().toISOString()
+            }).eq('id', webhookLogId);
+        }
 
         return new Response(JSON.stringify({ message: "Client processed successfully" }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
