@@ -119,8 +119,8 @@ serve(async (req) => {
                                     }
                                 });
 
-                                if (!linkErr && link?.action_link) {
-                                    return Response.redirect(link.action_link, 302);
+                                if (!linkErr && link?.properties?.action_link) {
+                                    return Response.redirect(link.properties.action_link, 302);
                                 }
                             }
                         }
@@ -406,12 +406,12 @@ serve(async (req) => {
                     return new Response("Failed to generate login link", { status: 500 });
                 }
 
-                if (!link || !link.action_link) {
-                    console.error("No action_link returned from generateLink");
+                if (!link || !link.properties?.action_link) {
+                    console.error("No action_link returned from generateLink. Data:", JSON.stringify(link));
                     return new Response("Failed to generate login link (no URL returned)", { status: 500 });
                 }
 
-                return Response.redirect(link.action_link, 302);
+                return Response.redirect(link.properties.action_link, 302);
             }
 
             // Standard Flow Redirect
