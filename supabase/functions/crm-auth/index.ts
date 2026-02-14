@@ -2,6 +2,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
+// Trigger deployment check
+
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -181,7 +183,7 @@ serve(async (req) => {
             const userId = isSso && parts[2] !== 'null' ? parts[2] : null;
             let rawEmail = isSso && parts[3] && parts[3] !== 'null' ? parts[3] : null;
             // Decode in case of URL encoding artifacts from OAuth round-trip
-            try { if (rawEmail) rawEmail = decodeURIComponent(rawEmail).trim(); } catch (_) {}
+            try { if (rawEmail) rawEmail = decodeURIComponent(rawEmail).trim(); } catch (_) { }
             const userEmail = rawEmail && rawEmail.includes('@') ? rawEmail : null;
             const firmIdParam = isSso ? null : state;
 
