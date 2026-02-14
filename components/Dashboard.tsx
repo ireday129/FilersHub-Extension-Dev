@@ -325,7 +325,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
 
       // 2. Trigger GHL Sync via Edge Function
       // Fire and forget (don't block UI on this)
-      supabase.functions.invoke('ghl-update', {
+      supabase.functions.invoke('crm-update', {
         body: {
           clientId: selectedReturn.id,
           status: selectedReturn.status,

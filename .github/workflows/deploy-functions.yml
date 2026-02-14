@@ -23,10 +23,10 @@ jobs:
 
       - name: Deploy Public Functions (No JWT Check)
         run: |
-          supabase functions deploy ghl-auth --project-ref $PROJECT_ID --no-verify-jwt
-          supabase functions deploy ghl-webhook --project-ref $PROJECT_ID --no-verify-jwt
+          supabase functions deploy crm-auth --project-ref $PROJECT_ID --no-verify-jwt
+          supabase functions deploy crm-webhook --project-ref $PROJECT_ID --no-verify-jwt
 
       - name: Deploy Protected Functions (Require JWT)
         run: |
-          supabase functions deploy ghl-users --project-ref $PROJECT_ID
-          supabase functions deploy ghl-update --project-ref $PROJECT_ID
+          supabase functions deploy crm-users --project-ref $PROJECT_ID
+          supabase functions deploy crm-update --project-ref $PROJECT_ID

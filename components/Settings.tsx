@@ -84,7 +84,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     setShowGHLModal(true);
     try {
       // We use a query parameter in the invoke URL
-      const { data, error } = await supabase.functions.invoke('ghl-users?action=list', {
+      const { data, error } = await supabase.functions.invoke('crm-users?action=list', {
         method: 'GET'
       });
 
@@ -101,7 +101,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const inviteUser = async (user: GHLUser) => {
     setInviteStatus(prev => ({ ...prev, [user.id]: 'sending' }));
     try {
-      const { error } = await supabase.functions.invoke('ghl-users?action=invite', {
+      const { error } = await supabase.functions.invoke('crm-users?action=invite', {
         method: 'POST',
         body: {
           ghlUserId: user.id,
@@ -654,7 +654,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 onClick={async () => {
                   if (!firmId) return;
                   try {
-                    const { data, error } = await supabase.functions.invoke('ghl-auth', {
+                    const { data, error } = await supabase.functions.invoke('crm-auth', {
                       method: 'POST',
                       body: { action: 'init', firmId }
                     });
