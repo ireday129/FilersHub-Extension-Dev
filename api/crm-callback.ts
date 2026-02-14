@@ -49,25 +49,42 @@ export default async function handler(req: any, res: any) {
         );
 
         // 3. Upsert Firm Record
-        const { data, error: dbError } = await supabaseAdmin
+        // We check existence first to preserve 'slug' if it exists (don't overwrite custom slugs)
+        const { data: existingFirm } = await supabaseAdmin
             .from("firms")
-            .upsert(
-                {
+            .select("firm_id")
+            .eq("ghl_location_id", tokenData.locationId)
+            .maybeSingle();
+
+        let dbError;
+
+        if (existingFirm) {
+            // Update existing firm (refresh tokens)
+            const { error } = await supabaseAdmin
+                .from("firms")
+                .update({
+                    ghl_access_token: tokenData.access_token,
+                    ghl_refresh_token: tokenData.refresh_token,
+                    ghl_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+                    subscription_status: 'trialing' // Ensure status is active/trialing on re-connect
+                })
+                .eq("ghl_location_id", tokenData.locationId);
+            dbError = error;
+        } else {
+            // Insert new firm (requires slug)
+            const { error } = await supabaseAdmin
+                .from("firms")
+                .insert({
                     ghl_location_id: tokenData.locationId,
                     ghl_access_token: tokenData.access_token,
                     ghl_refresh_token: tokenData.refresh_token,
-                    // Calculate expiry
                     ghl_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-                    firm_name: `GHL Location ${tokenData.locationId}`, // Default name
-                    subscription_status: 'trialing'
-                },
-                {
-                    onConflict: "ghl_location_id",
-                    ignoreDuplicates: false
-                }
-            )
-            .select()
-            .single();
+                    firm_name: `GHL Location ${tokenData.locationId}`,
+                    subscription_status: 'trialing',
+                    slug: tokenData.locationId.toLowerCase() // Generate default slug
+                });
+            dbError = error;
+        }
 
         if (dbError) {
             console.error("Database Error:", dbError);
