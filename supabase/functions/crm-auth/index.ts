@@ -153,7 +153,7 @@ serve(async (req) => {
             // Scopes: contacts.readonly, locations.readonly is a good start
             const scopes = 'contacts.readonly contacts.write locations.readonly users.readonly'
 
-            const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${redirectUri}&client_id=${clientId}&scope=${scopes}&state=${state}`
+            const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`
 
             // If SSO action, we should redirect to Auth URL directly (browser navigation)
             if (action === 'sso') {
@@ -179,7 +179,10 @@ serve(async (req) => {
             const parts = state.split(':');
             const locationId = isSso ? parts[1] : null;
             const userId = isSso && parts[2] !== 'null' ? parts[2] : null;
-            const userEmail = isSso && parts[3] && parts[3] !== 'null' ? parts[3] : null;
+            let rawEmail = isSso && parts[3] && parts[3] !== 'null' ? parts[3] : null;
+            // Decode in case of URL encoding artifacts from OAuth round-trip
+            try { if (rawEmail) rawEmail = decodeURIComponent(rawEmail).trim(); } catch (_) {}
+            const userEmail = rawEmail && rawEmail.includes('@') ? rawEmail : null;
             const firmIdParam = isSso ? null : state;
 
             // Exchange Code for Token
@@ -295,8 +298,8 @@ serve(async (req) => {
                 let email = userEmail;
                 let name = 'Firm Owner';
 
-                if (!email && userId) {
-                    // Fetch User by ID if email missing
+                // Always try GHL API if we have userId (gets verified email + name)
+                if (userId) {
                     const userResp = await fetch(`https://services.leadconnectorhq.com/users/${userId}`, {
                         headers: {
                             'Authorization': `Bearer ${tokenData.access_token}`,
@@ -304,21 +307,22 @@ serve(async (req) => {
                         }
                     });
 
-                    if (!userResp.ok) {
-                        console.error("Failed to fetch user:", await userResp.text());
-                        return new Response("Failed to fetch user from GHL", { status: 500 });
+                    if (userResp.ok) {
+                        const userData = await userResp.json();
+                        const ghlUser = userData.user || userData;
+                        if (ghlUser.email) {
+                            email = ghlUser.email.trim();
+                            name = `${ghlUser.firstName || ''} ${ghlUser.lastName || ''}`.trim() || name;
+                        }
+                    } else {
+                        console.error("Failed to fetch GHL user:", userResp.status, await userResp.text());
                     }
-
-                    const userData = await userResp.json();
-                    const ghlUser = userData.user || userData;
-                    email = ghlUser.email;
-                    name = `${ghlUser.firstName} ${ghlUser.lastName}`;
                 }
 
-                if (!email) {
-                    // Try fetch /users/me as last resort?
-                    // Or just fail.
-                    return new Response("User has no email (and could not fetch)", { status: 400 });
+                console.log("SSO email resolved:", email, "| from state:", userEmail, "| userId:", userId);
+
+                if (!email || !email.includes('@')) {
+                    return new Response("User has no valid email (state: " + userEmail + ", userId: " + userId + ")", { status: 400 });
                 }
 
                 // 2. Find/Create Auth User (Robust Pattern)

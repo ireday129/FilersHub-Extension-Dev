@@ -6,3 +6,6 @@
 ## Code Style
 - **React/TypeScript:** Use functional components and hooks.
 - **Styling:** Use Tailwind CSS.
+
+## Extension Consideration
+- We have a google chrome extension that will be used to access the application. Make sure the entire application is accessible within the extension and also within any iframe.
