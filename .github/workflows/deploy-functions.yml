@@ -1,0 +1,32 @@
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_ID: yjbteykmsvsgvndgnziw
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Public Functions (No JWT Check)
+        run: |
+          supabase functions deploy ghl-auth --project-ref $PROJECT_ID --no-verify-jwt
+          supabase functions deploy ghl-webhook --project-ref $PROJECT_ID --no-verify-jwt
+
+      - name: Deploy Protected Functions (Require JWT)
+        run: |
+          supabase functions deploy ghl-users --project-ref $PROJECT_ID
+          supabase functions deploy ghl-update --project-ref $PROJECT_ID
