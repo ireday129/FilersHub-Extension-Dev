@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
         // GHL Marketplace apps receive ALL events. We must filter for what we care about.
         // Returning 200 OK is crucial for ignored events so GHL doesn't disable the webhook.
 
-        const INTERESTING_EVENTS = ['ContactCreate', 'ContactUpdate'];
+        const INTERESTING_EVENTS = ['ContactCreate', 'ContactUpdate', 'INSTALL'];
 
         if (!INTERESTING_EVENTS.includes(type)) {
             console.log(`Ignoring event type: ${type}`);
@@ -142,6 +142,123 @@ Deno.serve(async (req) => {
             status: 200,
         });
 
+        if (type === 'INSTALL') {
+            const userId = payload.userId;
+
+            // 1. Get Access Token (Check both firms and integrations_ghl)
+            let accessToken = null;
+            let firmId = null;
+
+            // Check firms table (Legacy/Install flow)
+            const { data: firmData } = await supabaseClient
+                .from('firms')
+                .select('firm_id, ghl_access_token')
+                .eq('ghl_location_id', locationId)
+                .maybeSingle();
+
+            if (firmData?.ghl_access_token) {
+                accessToken = firmData.ghl_access_token;
+                firmId = firmData.firm_id;
+            } else {
+                // Check integrations table (New flow)
+                const { data: integData } = await supabaseClient
+                    .from('integrations_ghl')
+                    .select('access_token, firm_id')
+                    .eq('location_id', locationId)
+                    .maybeSingle();
+
+                if (integData?.access_token) {
+                    accessToken = integData.access_token;
+                    firmId = integData.firm_id;
+                }
+            }
+
+            if (!accessToken || !firmId) {
+                console.error("No access token found for location:", locationId);
+                // Return 400 to trigger retry (or 200 if we give up)
+                // Returning 500 triggers retry.
+                return new Response(JSON.stringify({ error: "Access token not found yet. Retrying." }), { status: 500 });
+            }
+
+            // 2. Fetch User Details from GHL
+            const userResp = await fetch(`https://services.leadconnectorhq.com/users/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Version': '2021-07-28'
+                }
+            });
+
+            if (!userResp.ok) {
+                const errText = await userResp.text();
+                console.error("Failed to fetch user:", errText);
+                return new Response(JSON.stringify({ error: "Failed to fetch user from GHL" }), { status: 500 });
+            }
+
+            const userData = await userResp.json();
+            const ghlUser = userData.user || userData; // Adjust based on actual GHL response structure
+
+            const email = ghlUser.email;
+            const name = `${ghlUser.firstName} ${ghlUser.lastName}`;
+
+            if (!email) {
+                return new Response(JSON.stringify({ message: "No email for user, skipping." }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200,
+                });
+            }
+
+            // 3. Create/Get Supabase Auth User
+            // We use admin.createUser to provision the account
+            const { data: authUser, error: listError } = await supabaseClient.auth.admin.listUsers();
+
+            // Find existing
+            let userRecord = authUser?.users.find(u => u.email === email);
+            let isNewUser = false;
+
+            if (!userRecord) {
+                // Create random password
+                const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
+                const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
+                    email: email,
+                    password: tempPassword,
+                    email_confirm: true,
+                    user_metadata: { full_name: name, role: 'Firm Owner' }
+                });
+
+                if (createError) throw createError;
+                userRecord = newUser.user;
+                isNewUser = true;
+                console.log("Created new auth user:", email);
+            }
+
+            if (!userRecord) throw new Error("Failed to resolve auth user");
+
+            // 4. Create Staff Record (Firm Owner)
+            const { error: staffError } = await supabaseClient
+                .from('staff')
+                .upsert({
+                    firm_id: firmId,
+                    email: email,
+                    full_name: name,
+                    role: 'Firm Owner',
+                    auth_user_id: userRecord.id,
+                    ghl_user_id: userId,
+                    ghl_location_id: locationId,
+                    invite_status: 'accepted',
+                    is_active: true
+                }, { onConflict: 'email' }); // Staff email is unique
+
+            if (staffError) throw staffError;
+
+            // 5. Send password reset email if it was a new user?
+            // Or rely on them using "Forgot Password" since we set a random one.
+            // For now, logging success.
+
+            return new Response(JSON.stringify({ message: "Install processed: Owner created" }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
     } catch (error) {
         console.error("Error processing webhook:", error);
         return new Response(JSON.stringify({ error: error.message }), {
