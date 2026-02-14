@@ -28,14 +28,32 @@ Deno.serve(async (req) => {
         let loggingError = null;
         try {
             const { data: logData, error: logError } = await supabaseClient.from('ghl_webhooks').insert({
-                event_type: type,
-                payload: payload,
+                // Payload Mapping
+                type: type,
                 location_id: locationId,
+                version_id: payload.versionId || payload.version_id,
+                app_id: payload.appId || payload.app_id,
+
+                install_type: payload.installType,
                 company_id: payload.companyId || payload.company_id,
                 user_id: payload.userId || payload.user_id,
-                app_id: payload.appId || payload.app_id,
+                company_name: payload.companyName,
+                is_whitelabel_company: payload.isWhitelabelCompany,
+
                 contact_id: payload.id || payload.contact_id,
+                first_name: payload.firstName || payload.first_name,
+                last_name: payload.lastName || payload.last_name,
                 email: payload.email || payload.contact_email,
+                phone: payload.phone || payload.contact_phone,
+                tags: payload.tags,
+                country: payload.country,
+                date_added: payload.dateAdded,
+
+                payload_timestamp: payload.timestamp,
+                webhook_id: payload.webhookId || payload.webhook_id,
+
+                // System
+                payload: payload,
                 processed: false
             }).select('id').single();
 
