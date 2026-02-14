@@ -445,6 +445,13 @@ const AppContent: React.FC = () => {
       if (userEmail) ssoUrl += `&userEmail=${encodeURIComponent(userEmail)}`;
 
       window.location.href = ssoUrl;
+    } else {
+      // 5. Fallback: If in iframe but missing params (locationId/userId), redirect to staff-access
+      // User Request: "If it does not detect the locationId and userId from GHL, it needs to direct to the staff-access page."
+      if (window.location.pathname !== '/staff-access') {
+        console.log("CRM Context: Missing params, redirecting to Staff Access");
+        window.location.href = '/staff-access';
+      }
     }
   }, [loading, user]);
 
