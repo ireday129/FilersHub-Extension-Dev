@@ -380,6 +380,7 @@ const AppContent: React.FC = () => {
   const [path, setPath] = useState(window.location.pathname);
   const [firmBranding, setFirmBranding] = useState<PublicFirmData['firm_name' | 'logo_url' | 'brand_color'] | null>(null);
   const [isFirmLoading, setIsFirmLoading] = useState(false);
+  const [launchpadUrl, setLaunchpadUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const handlePathChange = () => {
@@ -444,7 +445,8 @@ const AppContent: React.FC = () => {
       if (userId) ssoUrl += `&userId=${userId}`;
       if (userEmail) ssoUrl += `&userEmail=${encodeURIComponent(userEmail)}`;
 
-      window.location.href = ssoUrl;
+      // Use Frontend Launchpad to avoid blocked redirects/scripts in iframe
+      setLaunchpadUrl(ssoUrl);
     } else {
       // 5. Fallback: If in iframe but missing params (locationId/userId), redirect to staff-access
       // User Request: "If it does not detect the locationId and userId from GHL, it needs to direct to the staff-access page."
@@ -454,6 +456,33 @@ const AppContent: React.FC = () => {
       }
     }
   }, [loading, user]);
+
+  if (launchpadUrl) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+        <div className="bg-white p-8 rounded-xl shadow-lg max-w-sm w-full text-center">
+          <h1 className="text-xl font-bold text-slate-800 mb-2">Connect to CRM</h1>
+          <p className="text-slate-500 mb-6 text-sm">
+            To securely access FilersHub within your CRM, please authorize the connection once.
+          </p>
+          <a
+            href={launchpadUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors w-full mb-4"
+          >
+            Connect Now
+          </a>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-sm text-slate-400 hover:text-slate-600 underline"
+          >
+            I've connected, refresh page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
 
   if (loading || isFirmLoading) {
