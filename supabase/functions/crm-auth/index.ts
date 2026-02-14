@@ -415,7 +415,7 @@ serve(async (req) => {
             }
 
             // Standard Flow Redirect
-            const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
+            // appUrl is already declared at line 278
             return Response.redirect(`${appUrl}/?ghl_connected=true`, 302)
         }
 
