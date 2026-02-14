@@ -101,10 +101,11 @@ const initialTaxReturns: TaxReturn[] = [
 
 
 import { useExtensionMode } from './hooks/useExtensionMode';
+import FirmSelection from './components/FirmSelection';
 
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
-  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, userAvatar } = useFirmData();
+  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, userAvatar, availableFirms, selectFirm } = useFirmData();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null); // TODO: fetch from user profile
   const [activeTab, setActiveTab] = useState<NavItem>(NavItem.Dashboard);
   // const [returns, setReturns] = useState<TaxReturn[]>(initialTaxReturns);
@@ -178,6 +179,20 @@ const AuthenticatedApp: React.FC = () => {
     }
 
     const currentRole = selectedRole || UserRole.Client;
+
+
+
+    // Multi-Firm Logic Check
+    if (!firmId && availableFirms && availableFirms.length > 1) {
+      return (
+        <FirmSelection
+          firms={availableFirms}
+          onSelect={selectFirm}
+          onLogout={handleExitSession}
+          userEmail={user?.email}
+        />
+      );
+    }
 
     if (selectedRole === UserRole.SuperAdmin) {
       return <SuperAdminDashboard />;
