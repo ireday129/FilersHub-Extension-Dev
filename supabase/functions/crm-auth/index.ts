@@ -109,18 +109,31 @@ serve(async (req) => {
                             }
 
                             if (userRecord) {
-                                // 2. Generate Magic Link
+                                // 2. Generate Magic Link & Verify Server-Side
                                 const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
-                                const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+                                const { data: ssoLink, error: ssoLinkErr } = await supabaseAdmin.auth.admin.generateLink({
                                     type: 'magiclink',
                                     email: email,
-                                    options: {
-                                        redirectTo: `${appUrl}/dashboard`
-                                    }
                                 });
 
-                                if (!linkErr && link?.properties?.action_link) {
-                                    return Response.redirect(link.properties.action_link, 302);
+                                if (!ssoLinkErr && ssoLink?.properties?.email_otp) {
+                                    const { data: ssoVerify } = await supabaseAdmin.auth.verifyOtp({
+                                        email: email,
+                                        token: ssoLink.properties.email_otp,
+                                        type: 'magiclink',
+                                    });
+
+                                    if (ssoVerify?.session) {
+                                        const p = new URLSearchParams({
+                                            access_token: ssoVerify.session.access_token,
+                                            refresh_token: ssoVerify.session.refresh_token,
+                                            expires_in: String(ssoVerify.session.expires_in),
+                                            expires_at: String(ssoVerify.session.expires_at),
+                                            token_type: 'bearer',
+                                            type: 'magiclink',
+                                        });
+                                        return Response.redirect(`${appUrl}/dashboard#${p.toString()}`, 302);
+                                    }
                                 }
                             }
                         }
@@ -391,27 +404,44 @@ serve(async (req) => {
                     }).eq('staff_id', existingStaff.staff_id);
                 }
 
-                // 4. Generate Magic Link
+                // 4. Generate Magic Link & Create Session Server-Side
+                // We verify the OTP server-side so we control the redirect URL
+                // (bypasses Supabase Site URL / Redirect URL allowlist config)
                 const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
-                const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+                const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
                     type: 'magiclink',
                     email: email,
-                    options: {
-                        redirectTo: `${appUrl}/dashboard` // Magic link handles the auth token verify
-                    }
                 });
 
-                if (linkErr) {
+                if (linkErr || !linkData?.properties?.email_otp) {
                     console.error("Failed to generate login link:", linkErr);
                     return new Response("Failed to generate login link", { status: 500 });
                 }
 
-                if (!link || !link.properties?.action_link) {
-                    console.error("No action_link returned from generateLink. Data:", JSON.stringify(link));
-                    return new Response("Failed to generate login link (no URL returned)", { status: 500 });
+                // Verify OTP server-side to create a session directly
+                const { data: verifyData, error: verifyErr } = await supabaseAdmin.auth.verifyOtp({
+                    email: email,
+                    token: linkData.properties.email_otp,
+                    type: 'magiclink',
+                });
+
+                if (verifyErr || !verifyData?.session) {
+                    console.error("Failed to verify OTP:", verifyErr);
+                    return new Response("Failed to create session", { status: 500 });
                 }
 
-                return Response.redirect(link.properties.action_link, 302);
+                // Redirect directly to app with session tokens in URL fragment
+                const { access_token, refresh_token, expires_in, expires_at } = verifyData.session;
+                const params = new URLSearchParams({
+                    access_token,
+                    refresh_token,
+                    expires_in: String(expires_in),
+                    expires_at: String(expires_at),
+                    token_type: 'bearer',
+                    type: 'magiclink',
+                });
+
+                return Response.redirect(`${appUrl}/dashboard#${params.toString()}`, 302);
             }
 
             // Standard Flow Redirect
