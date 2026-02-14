@@ -382,8 +382,9 @@ Deno.serve(async (req) => {
         }
 
         // Handle CONTACT Sync (ContactCreate, ContactUpdate)
+        // Strict Payload Mapping: Payload has 'id' for Contact ID. We map to column "id".
         if (type === 'ContactCreate' || type === 'ContactUpdate') {
-            const contactId = payload.id;
+            const contactId = payload.id; // Correct payload key is 'id'
             const email = payload.email || payload.contact_email;
             const firstName = payload.firstName || payload.first_name;
             const lastName = payload.lastName || payload.last_name;
@@ -398,19 +399,19 @@ Deno.serve(async (req) => {
 
             const fullName = `${firstName || ''} ${lastName || ''}`.trim() || email;
 
-            // 1. Try to find existing client by GHL ID first (using camelCase column "contactId")
+            // 1. Try to find existing client by GHL ID first (using strict column "id")
             let { data: existingClient } = await supabaseClient
                 .from('clients')
-                .select('client_id, "contactId"')
+                .select('client_id, "id"')
                 .eq('firm_id', firm.firm_id)
-                .eq('"contactId"', contactId)
+                .eq('"id"', contactId)
                 .maybeSingle();
 
             // 2. Fallback: Find by Email
             if (!existingClient) {
                 const { data: clientByEmail } = await supabaseClient
                     .from('clients')
-                    .select('client_id, "contactId"')
+                    .select('client_id, "id"')
                     .eq('firm_id', firm.firm_id)
                     .eq('email', email)
                     .maybeSingle();
@@ -426,7 +427,7 @@ Deno.serve(async (req) => {
                 result = await supabaseClient
                     .from('clients')
                     .update({
-                        "contactId": contactId, // Ensure ID is linked
+                        "id": contactId, // Map payload 'id' to column "id"
                         "locationId": locationId,
                         // active: true, // Maybe reactivate?
                         full_name: fullName,
@@ -444,7 +445,7 @@ Deno.serve(async (req) => {
                         email: email,
                         full_name: fullName,
                         phone: phone,
-                        "contactId": contactId,
+                        "id": contactId, // Map payload 'id' to column "id"
                         "locationId": locationId,
                         tax_return_status: 'Waiting on Documents', // Default status?
                         "lastSyncedAt": timestamp,
