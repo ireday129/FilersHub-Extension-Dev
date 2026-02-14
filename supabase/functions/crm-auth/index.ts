@@ -181,8 +181,20 @@ serve(async (req) => {
 
             const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`
 
-            // If SSO action, we should redirect to Auth URL directly (browser navigation)
+            // If SSO action, redirect to Auth URL
             if (action === 'sso') {
+                const isIframe = url.searchParams.get('iframe') === '1';
+                if (isIframe) {
+                    // Silent SSO failed and we're in an iframe — GHL OAuth won't load in iframe.
+                    // Redirect back to app with show_launchpad flag so it shows the OAuth button.
+                    const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
+                    const returnParams = new URLSearchParams();
+                    returnParams.set('show_launchpad', 'true');
+                    if (locationId) returnParams.set('location_id', locationId);
+                    if (userId && userId !== 'null') returnParams.set('user_id', userId);
+                    if (userEmail && userEmail !== 'null') returnParams.set('user_email', userEmail);
+                    return Response.redirect(`${appUrl}/?${returnParams.toString()}`, 302);
+                }
                 return Response.redirect(authUrl, 302);
             }
 

@@ -445,8 +445,19 @@ const AppContent: React.FC = () => {
       if (userId) ssoUrl += `&userId=${userId}`;
       if (userEmail) ssoUrl += `&userEmail=${encodeURIComponent(userEmail)}`;
 
-      // Use Frontend Launchpad to avoid blocked redirects/scripts in iframe
-      setLaunchpadUrl(ssoUrl);
+      // Check if we've been told to show launchpad (silent SSO failed)
+      const showLaunchpad = params.get('show_launchpad');
+      if (showLaunchpad) {
+        // Silent SSO already failed — show OAuth launchpad
+        setLaunchpadUrl(ssoUrl);
+      } else {
+        // Try silent SSO first by navigating iframe directly
+        // If it works: redirects to /dashboard#tokens
+        // If it fails: redirects back with ?show_launchpad=true
+        console.log("Attempting silent SSO in iframe...");
+        window.location.href = ssoUrl + '&iframe=1';
+        return;
+      }
     } else {
       // 5. Fallback: If in iframe but missing params (locationId/userId), redirect to staff-access
       // User Request: "If it does not detect the locationId and userId from GHL, it needs to direct to the staff-access page."
@@ -474,7 +485,7 @@ const AppContent: React.FC = () => {
             Connect Now
           </a>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => { window.location.href = launchpadUrl!; }}
             className="text-sm text-slate-400 hover:text-slate-600 underline"
           >
             I've connected, refresh page
