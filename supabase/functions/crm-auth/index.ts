@@ -167,6 +167,9 @@ serve(async (req) => {
                         console.error("Silent SSO failed, falling back to OAuth:", err);
                     }
                 }
+            } else if (action === 'login') {
+                // Generic CRM login — user will choose their GHL location during OAuth
+                state = 'login';
             } else if (firmId) {
                 state = firmId;
             } else {
@@ -180,6 +183,11 @@ serve(async (req) => {
             const scopes = 'contacts.readonly contacts.write locations.readonly users.readonly'
 
             const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`
+
+            // CRM Login: redirect directly to GHL OAuth
+            if (action === 'login') {
+                return Response.redirect(authUrl, 302);
+            }
 
             // If SSO action, redirect to Auth URL
             if (action === 'sso') {
@@ -212,8 +220,9 @@ serve(async (req) => {
                 return new Response("Missing code or state", { status: 400 })
             }
 
-            // Parse State: sso:locationId:userId:userEmail
+            // Parse State: sso:locationId:userId:userEmail OR 'login' OR firmId
             const isSso = state.startsWith('sso:');
+            const isLogin = state === 'login';
             const parts = state.split(':');
             const locationId = isSso ? parts[1] : null;
             const userId = isSso && parts[2] !== 'null' ? parts[2] : null;
@@ -221,7 +230,7 @@ serve(async (req) => {
             // Decode in case of URL encoding artifacts from OAuth round-trip
             try { if (rawEmail) rawEmail = decodeURIComponent(rawEmail).trim(); } catch (_) { }
             const userEmail = rawEmail && rawEmail.includes('@') ? rawEmail : null;
-            const firmIdParam = isSso ? null : state;
+            const firmIdParam = (isSso || isLogin) ? null : state;
 
             // Exchange Code for Token
             const clientId = Deno.env.get('GHL_CLIENT_ID')
@@ -302,6 +311,55 @@ serve(async (req) => {
                         return new Response("Firm not found and could not be created.", { status: 400 });
                     }
                 }
+            } else if (isLogin) {
+                // CRM Login flow: resolve firm from token's locationId
+                const tokenLocationId = tokenData.locationId;
+                if (tokenLocationId) {
+                    const { data: firmData } = await supabaseAdmin
+                        .from('firms')
+                        .select('firm_id')
+                        .eq('ghl_location_id', tokenLocationId)
+                        .maybeSingle();
+
+                    if (firmData) {
+                        firmId = firmData.firm_id;
+                        firm = firmData;
+                    } else {
+                        const { data: integ } = await supabaseAdmin
+                            .from('integrations_ghl')
+                            .select('firm_id')
+                            .eq('location_id', tokenLocationId)
+                            .maybeSingle();
+
+                        if (integ) {
+                            firmId = integ.firm_id;
+                        }
+                    }
+
+                    if (!firmId) {
+                        // Auto-provision firm
+                        const { data: newFirm, error: createFirmError } = await supabaseAdmin
+                            .from("firms")
+                            .insert({
+                                ghl_location_id: tokenLocationId,
+                                ghl_access_token: tokenData.access_token,
+                                ghl_refresh_token: tokenData.refresh_token,
+                                ghl_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+                                firm_name: `GHL Location ${tokenLocationId}`,
+                                subscription_status: 'trialing',
+                                slug: tokenLocationId.toLowerCase()
+                            })
+                            .select()
+                            .single();
+
+                        if (!createFirmError && newFirm) {
+                            firmId = newFirm.firm_id;
+                            firm = newFirm;
+                        } else {
+                            return new Response("Firm not found and could not be created.", { status: 400 });
+                        }
+                    }
+                }
             }
 
             // Always update tokens
@@ -331,14 +389,17 @@ serve(async (req) => {
             // HANDLE SSO LOGIC
             const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
 
-            if (isSso) {
-                // 1. Resolve User (via Email in Params OR Fetch by ID)
+            if (isSso || isLogin) {
+                // 1. Resolve User (via Email in Params OR Fetch by ID from GHL API)
                 let email = userEmail;
                 let name = 'Firm Owner';
 
+                // For CRM login flow, resolve userId from token response
+                const resolvedUserId = isLogin ? tokenData.userId : userId;
+
                 // Always try GHL API if we have userId (gets verified email + name)
-                if (userId) {
-                    const userResp = await fetch(`https://services.leadconnectorhq.com/users/${userId}`, {
+                if (resolvedUserId) {
+                    const userResp = await fetch(`https://services.leadconnectorhq.com/users/${resolvedUserId}`, {
                         headers: {
                             'Authorization': `Bearer ${tokenData.access_token}`,
                             'Version': '2021-07-28'
@@ -357,7 +418,7 @@ serve(async (req) => {
                     }
                 }
 
-                console.log("SSO email resolved:", email, "| from state:", userEmail, "| userId:", userId);
+                console.log("SSO/Login email resolved:", email, "| from state:", userEmail, "| userId:", resolvedUserId);
 
                 if (!email || !email.includes('@')) {
                     return new Response("User has no valid email (state: " + userEmail + ", userId: " + userId + ")", { status: 400 });
@@ -398,17 +459,18 @@ serve(async (req) => {
 
                 // 2b. Sync to "users" Table (Robustness for Install/SSO Race Conditions)
                 // Ensure the user exists in 'users' table with Firm Owner role, even if webhook failed
-                if (userId && locationId) {
+                const resolvedLocationId = isLogin ? tokenData.locationId : locationId;
+                if (resolvedUserId && resolvedLocationId) {
                     const firstName = name.split(' ')[0] || name;
                     const lastName = name.split(' ').slice(1).join(' ') || '';
 
                     const userPayload = {
-                        id: userId,
+                        id: resolvedUserId,
                         email: email,
                         firstName: firstName,
                         lastName: lastName,
                         name: name,
-                        locationId: locationId,
+                        locationId: resolvedLocationId,
                         roles: { type: 'firmowner' } // SSO user treated as owner for initial access
                     };
 

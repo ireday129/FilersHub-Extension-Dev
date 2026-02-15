@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
-import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, ExternalLink } from 'lucide-react';
 import { WatermarkBackground } from './WatermarkBackground';
 import { supabase } from '../services/supabase';
 
@@ -96,6 +96,28 @@ const StaffLogin: React.FC = () => {
                                 Sign In to Workspace <ArrowRight size={18} />
                             </>
                         )}
+                    </button>
+
+                    <div className="relative my-5">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-slate-200"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-3 bg-white text-slate-400 text-xs font-medium">Or</span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                            window.location.href = `${supabaseUrl}/functions/v1/crm-auth/init?action=login`;
+                        }}
+                        disabled={isLoading}
+                        className="w-full py-3 bg-white border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                        <ExternalLink size={18} />
+                        Login with CRM
                     </button>
                 </form>
 

@@ -459,11 +459,10 @@ const AppContent: React.FC = () => {
         return;
       }
     } else {
-      // 5. Fallback: If in iframe but missing params (locationId/userId), redirect to staff-access
-      // User Request: "If it does not detect the locationId and userId from GHL, it needs to direct to the staff-access page."
-      if (window.location.pathname !== '/staff-access') {
-        console.log("CRM Context: Missing params, redirecting to Staff Access");
-        window.location.href = '/staff-access';
+      // 5. Fallback: If in iframe but missing params (locationId/userId), redirect to home (Staff Login)
+      if (window.location.pathname !== '/') {
+        console.log("CRM Context: Missing params, redirecting to Staff Login");
+        window.location.href = '/';
       }
     }
   }, [loading, user]);
@@ -533,8 +532,9 @@ const AppContent: React.FC = () => {
   }
 
   if (!user) {
-    if (path === '/staff-access') {
-      return <StaffLogin />;
+    // Dev-only role bypass tool
+    if (path === '/dev') {
+      return <RoleSelection />;
     }
 
     // Portal Login with Branding
@@ -546,12 +546,13 @@ const AppContent: React.FC = () => {
       }} />;
     }
 
-    // Default Login (branded generically) or Role Selection as landing
+    // Generic login page
     if (path === '/login') {
       return <Login />;
     }
 
-    return <RoleSelection />;
+    // Home page: Staff Login (default landing page)
+    return <StaffLogin />;
   }
 
   return <AuthenticatedApp />;
