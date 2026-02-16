@@ -9,4 +9,6 @@
 - **App Developement** Use these two Githubs for reference whenever we are adding any features or coding that is specific to GoHighLevel: https://github.com/GoHighLevel/ghl-marketplace-app-template and https://github.com/GoHighLevel/highlevel-api-docs
 
 ## Extension Consideration
-- We have a google chrome extension that will be used to access the application. Make sure the entire application is accessible within the extension and also within any iframe.
+- We have a Google Chrome extension that loads the app at the `/extension` route. Extension mode is **path-based** — the `useExtensionMode` hook (`hooks/useExtensionMode.ts`) checks `window.location.pathname.startsWith('/extension')` to determine if the compact extension UI should be used.
+- The app also runs inside GHL (GoHighLevel) iframes. GHL iframes load the app at `/` (not `/extension`), so they always get the full desktop UI. Never use iframe detection (`window.self !== window.top`) to determine extension mode — use the `/extension` path only.
+- Make sure the entire application is accessible within the Chrome extension at `/extension` and within any iframe (GHL or otherwise).

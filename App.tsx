@@ -430,9 +430,6 @@ const AppContent: React.FC = () => {
     const inIframe = window.self !== window.top;
     if (!inIframe) return;
 
-    // Mark GHL iframe context so useExtensionMode doesn't treat it as a Chrome extension
-    sessionStorage.setItem('ghl_context', 'true');
-
     // 3. Extract GHL Params
     const params = new URLSearchParams(window.location.search);
     const locationId = params.get('location_id') || params.get('locationId');
