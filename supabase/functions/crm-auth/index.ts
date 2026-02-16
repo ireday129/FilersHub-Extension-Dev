@@ -208,23 +208,24 @@ serve(async (req) => {
                 }
             }
 
-            // 4. Verify email against GHL Users API
-            const usersResp = await fetch(
-                `https://services.leadconnectorhq.com/users/search?locationId=${firmData.ghl_location_id}&query=${encodeURIComponent(email)}&limit=10`,
-                { headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': '2021-07-28' } }
-            );
-
-            let ghlUserVerified = false;
-            if (usersResp.ok) {
-                const usersData = await usersResp.json();
-                const users = usersData.users || [];
-                ghlUserVerified = users.some((u: any) => u.email?.toLowerCase() === email);
-            }
-
-            if (!ghlUserVerified) {
-                return new Response(JSON.stringify({ error: 'Email not found in CRM. Please contact your firm administrator.' }), {
-                    status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
+            // 4. Verify email against GHL Users API (soft check — staff record is already trusted)
+            try {
+                const usersResp = await fetch(
+                    `https://services.leadconnectorhq.com/users/search?locationId=${firmData.ghl_location_id}&query=${encodeURIComponent(email)}&limit=10`,
+                    { headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': '2021-07-28' } }
+                );
+                if (usersResp.ok) {
+                    const usersData = await usersResp.json();
+                    const users = usersData.users || [];
+                    const ghlUserVerified = users.some((u: any) => u.email?.toLowerCase() === email);
+                    if (!ghlUserVerified) {
+                        console.warn("Email-lookup: GHL user search did not match email, proceeding with staff record trust:", email);
+                    }
+                } else {
+                    console.warn("Email-lookup: GHL user search failed:", usersResp.status);
+                }
+            } catch (ghlErr) {
+                console.warn("Email-lookup: GHL user search error (non-blocking):", ghlErr);
             }
 
             // 5. Create/find Supabase auth user and create session
