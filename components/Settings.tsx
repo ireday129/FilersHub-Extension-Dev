@@ -133,31 +133,41 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     }
   };
 
+  // Helper: get a fresh access token, forcing a refresh if needed
+  const getFreshToken = async (): Promise<string> => {
+    // First try refreshing the session to get a new JWT
+    const { data: { session } } = await supabase.auth.refreshSession();
+    if (session?.access_token) return session.access_token;
+    // Fallback: try getSession (maybe refresh isn't needed)
+    const { data: { session: existing } } = await supabase.auth.getSession();
+    if (existing?.access_token) return existing.access_token;
+    throw new Error('Your session has expired. Please sign out and sign back in.');
+  };
+
   const fetchGHLUsers = async () => {
     setIsLoadingGHL(true);
     setShowGHLModal(true);
     setGhlError('');
     try {
-      // Ensure session is fresh before calling the edge function
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Your session has expired. Please sign out and sign back in.');
-      }
+      const token = await getFreshToken();
 
       const { data, error } = await supabase.functions.invoke('crm-users', {
         body: { action: 'list' },
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       // Extract detailed error from response body (data) or the generic supabase error
       if (data?.error) throw new Error(data.error);
       if (error) {
-        // Try to read the response body from FunctionsHttpError for a detailed message
         let detail = '';
         try {
           const ctx = await error.context?.json();
           if (ctx?.error) detail = ctx.error;
         } catch (_) { /* no parseable context */ }
+        // Detect gateway 401 specifically
+        if (error.message?.includes('non-2xx') || error.message?.includes('401')) {
+          throw new Error('Authentication failed. The edge function may need to be redeployed with --no-verify-jwt. Please contact your administrator.');
+        }
         throw new Error(detail || error.message || 'Edge function error');
       }
       setGhlUsers(data?.users || []);
@@ -173,8 +183,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     const role = selectedRoles[user.id] || 'Tax Pro';
     setGrantStatus(prev => ({ ...prev, [user.id]: 'granting' }));
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Session expired');
+      const token = await getFreshToken();
 
       const { data, error } = await supabase.functions.invoke('crm-users', {
         body: {
@@ -184,7 +193,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           name: user.name || `${user.firstName} ${user.lastName}`,
           role,
         },
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       if (data?.error) throw new Error(data.error);
@@ -224,12 +233,11 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
   const revokeAccess = async (staffId: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Session expired');
+      const token = await getFreshToken();
 
       const { data, error } = await supabase.functions.invoke('crm-users', {
         body: { action: 'revoke', staffId },
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (data?.error) throw new Error(data.error);
       if (error) throw error;
