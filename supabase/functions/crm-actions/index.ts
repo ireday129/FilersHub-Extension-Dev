@@ -281,7 +281,9 @@ async function handleCreateTaxReturn(
         return jsonResponse({
             success: true,
             returnId: existing.return_id,
+            clientId: client.client_id,
             clientName: client.full_name,
+            clientEmail: client.email,
             taxYear: existing.tax_year,
             returnType: existing.return_type,
             message: 'Tax return already exists',
@@ -309,7 +311,9 @@ async function handleCreateTaxReturn(
     return jsonResponse({
         success: true,
         returnId: newReturn.return_id,
+        clientId: client.client_id,
         clientName: client.full_name,
+        clientEmail: client.email,
         taxYear,
         returnType,
     });
@@ -488,14 +492,14 @@ Deno.serve(async (req) => {
             accessToken = tokenResult.accessToken;
         } catch (tokenErr) {
             // Token is only required for create_client and update_return_stage
-            if (actionKey === 'create_client' || actionKey === 'update_return_stage') {
+            if (actionKey === 'fh_newclientaccess' || actionKey === 'update_return_stage') {
                 return jsonResponse({ success: false, error: tokenErr.message });
             }
             console.warn('Token unavailable, proceeding without GHL API access:', tokenErr.message);
         }
 
         switch (actionKey) {
-            case 'create_client':
+            case 'fh_newclientaccess':
                 return await handleCreateClient(supabase, extras, data, firmId, accessToken);
             case 'create_tax_return':
                 return await handleCreateTaxReturn(supabase, extras, data, firmId);
