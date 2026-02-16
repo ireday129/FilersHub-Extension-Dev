@@ -20,6 +20,7 @@ const Login: React.FC<LoginProps> = ({ firmBranding, firmId }) => {
     const [error, setError] = useState<string | null>(null);
     const [isSignUp, setIsSignUp] = useState(false);
     const [magicLinkSent, setMagicLinkSent] = useState(false);
+    const [resetSent, setResetSent] = useState(false);
 
     const brandColor = firmBranding?.color || '#2563eb';
     const brandName = firmBranding?.name || 'FilersHub';
@@ -100,6 +101,24 @@ const Login: React.FC<LoginProps> = ({ firmBranding, firmId }) => {
         }
     };
 
+    const handleForgotPassword = async () => {
+        if (!email) {
+            setError('Please enter your email address first.');
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email);
+            if (error) throw error;
+            setResetSent(true);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
             <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-slate-100">
@@ -121,15 +140,19 @@ const Login: React.FC<LoginProps> = ({ firmBranding, firmId }) => {
                     </div>
                 )}
 
-                {magicLinkSent ? (
+                {magicLinkSent || resetSent ? (
                     <div className="bg-green-50 text-green-700 p-4 rounded-lg text-center">
                         <h3 className="font-bold mb-2">Check your email</h3>
-                        <p className="text-sm">We sent a magic link to {email}</p>
+                        <p className="text-sm">
+                            {resetSent
+                                ? `We sent a password reset link to ${email}`
+                                : `We sent a magic link to ${email}`}
+                        </p>
                         <button
-                            onClick={() => setMagicLinkSent(false)}
+                            onClick={() => { setMagicLinkSent(false); setResetSent(false); }}
                             className="mt-4 text-green-700 underline text-sm"
                         >
-                            Try another method
+                            Back to sign in
                         </button>
                     </div>
                 ) : (
@@ -199,14 +222,23 @@ const Login: React.FC<LoginProps> = ({ firmBranding, firmId }) => {
                             Send Magic Link
                         </button>
 
-                        <div className="mt-4 text-center text-sm">
+                        <div className="mt-4 text-center text-sm space-y-2">
+                            {!isPortal && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsSignUp(!isSignUp)}
+                                    style={{ color: brandColor }}
+                                    className="font-medium hover:underline"
+                                >
+                                    {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+                                </button>
+                            )}
                             <button
                                 type="button"
-                                onClick={() => setIsSignUp(!isSignUp)}
-                                style={{ color: brandColor }}
-                                className="font-medium hover:underline"
+                                onClick={handleForgotPassword}
+                                className="block mx-auto text-slate-500 hover:text-slate-700 font-medium hover:underline"
                             >
-                                {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+                                Forgot password?
                             </button>
                         </div>
                     </form>
