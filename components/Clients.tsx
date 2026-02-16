@@ -262,8 +262,9 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
           <div className="flex items-center gap-3">
             <div className={`${isExtension ? 'w-10 h-10' : 'w-14 h-14'} rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0`}>
               <img
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedClient.name}`}
+                src={selectedClient.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedClient.name}`}
                 alt={selectedClient.name}
+                className="w-full h-full object-cover"
               />
             </div>
             <div>

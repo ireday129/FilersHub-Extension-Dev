@@ -49,18 +49,34 @@ const Profile: React.FC<ProfileProps> = ({ role }) => {
 
             setAvatarUrl(publicUrl);
 
-            // Update staff table — try auth_user_id first, fall back to email
-            const { data: updated } = await supabase
-                .from('staff')
-                .update({ avatar_url: publicUrl })
-                .eq('auth_user_id', user.id)
-                .select('staff_id');
+            if (role === UserRole.Client) {
+                // Update clients table
+                const { data: updated } = await supabase
+                    .from('clients')
+                    .update({ avatar_url: publicUrl })
+                    .eq('auth_user_id', user.id)
+                    .select('client_id');
 
-            if (!updated?.length) {
-                await supabase
+                if (!updated?.length) {
+                    await supabase
+                        .from('clients')
+                        .update({ avatar_url: publicUrl })
+                        .eq('email', user.email!.toLowerCase());
+                }
+            } else {
+                // Update staff table — try auth_user_id first, fall back to email
+                const { data: updated } = await supabase
                     .from('staff')
                     .update({ avatar_url: publicUrl })
-                    .eq('email', user.email!.toLowerCase());
+                    .eq('auth_user_id', user.id)
+                    .select('staff_id');
+
+                if (!updated?.length) {
+                    await supabase
+                        .from('staff')
+                        .update({ avatar_url: publicUrl })
+                        .eq('email', user.email!.toLowerCase());
+                }
             }
 
         } catch (error) {
@@ -81,18 +97,32 @@ const Profile: React.FC<ProfileProps> = ({ role }) => {
 
             if (error) throw error;
 
-            // Update staff table — try auth_user_id first, fall back to email
-            const { data: updated } = await supabase
-                .from('staff')
-                .update({ full_name: fullName })
-                .eq('auth_user_id', user.id)
-                .select('staff_id');
+            if (role === UserRole.Client) {
+                const { data: updated } = await supabase
+                    .from('clients')
+                    .update({ full_name: fullName })
+                    .eq('auth_user_id', user.id)
+                    .select('client_id');
 
-            if (!updated?.length) {
-                await supabase
+                if (!updated?.length) {
+                    await supabase
+                        .from('clients')
+                        .update({ full_name: fullName })
+                        .eq('email', user.email!.toLowerCase());
+                }
+            } else {
+                const { data: updated } = await supabase
                     .from('staff')
                     .update({ full_name: fullName })
-                    .eq('email', user.email!.toLowerCase());
+                    .eq('auth_user_id', user.id)
+                    .select('staff_id');
+
+                if (!updated?.length) {
+                    await supabase
+                        .from('staff')
+                        .update({ full_name: fullName })
+                        .eq('email', user.email!.toLowerCase());
+                }
             }
 
             alert('Profile updated successfully!');
