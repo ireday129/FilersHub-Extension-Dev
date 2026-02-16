@@ -50,7 +50,7 @@ const SuperAdminDashboard: React.FC = () => {
         // Fetch firms with staff relationships in one query
         const { data: firmsData, error: firmsError } = await supabase
           .from('firms')
-          .select('firm_id, firm_name, slug, subscription_tier, subscription_status, max_staff, ghl_location_id, created_at')
+          .select('firm_id, firm_name, logo_url, slug, subscription_tier, subscription_status, max_staff, ghl_location_id, created_at')
           .order('created_at', { ascending: false });
 
         if (firmsError) throw firmsError;
@@ -78,6 +78,7 @@ const SuperAdminDashboard: React.FC = () => {
           return {
             id: f.firm_id,
             name: f.firm_name || 'Unnamed Firm',
+            logoUrl: f.logo_url || '',
             ownerName: owner?.full_name || '—',
             ownerEmail: owner?.email || '—',
             subscriptionTier: normalizeTier(f.subscription_tier),
@@ -261,9 +262,13 @@ const SuperAdminDashboard: React.FC = () => {
                 <tr key={firm.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
-                        {firm.name.charAt(0)}
-                      </div>
+                      {firm.logoUrl ? (
+                        <img src={firm.logoUrl} alt={firm.name} className="w-10 h-10 rounded-xl object-contain bg-white border border-slate-100" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">
+                          {firm.name.charAt(0)}
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm font-bold text-slate-800">{firm.name}</p>
                         <span className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase ${

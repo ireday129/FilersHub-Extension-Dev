@@ -36,6 +36,7 @@ export enum TaxReturnStatus {
 export interface Firm {
   id: string;
   name: string;
+  logoUrl: string;
   ownerName: string;
   ownerEmail: string;
   subscriptionTier: string;
