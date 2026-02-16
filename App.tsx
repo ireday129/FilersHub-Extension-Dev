@@ -200,8 +200,8 @@ const AuthenticatedApp: React.FC = () => {
               </div>
               <h1 className={`${isExtension ? 'text-xl' : 'text-2xl'} font-bold text-slate-800`}>
                 {isSuperAdmin ? "Platform Overview"
-                  : isClient ? `Hello, ${user?.email}`
-                  : activeTab === NavItem.Dashboard ? `Hello, ${(user?.user_metadata?.full_name || user?.email || '').split(' ')[0]}`
+                  : isClient ? `Hello, ${user?.user_metadata?.full_name || user?.email}`
+                  : activeTab === NavItem.Dashboard ? `Hello, ${staffName || (user?.user_metadata?.full_name || user?.email || '').split(' ')[0]}`
                   : activeTab}
               </h1>
               {!isExtension && (

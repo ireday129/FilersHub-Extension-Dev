@@ -844,7 +844,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
           </button>
           <div>
             <h2 className="text-xl font-bold text-slate-800">{selectedReturn.year} {selectedReturn.type}</h2>
-            <p className="text-sm text-slate-500">Return ID: {selectedReturn.id} • {selectedReturn.clientName}</p>
+            <p className="text-sm text-slate-500">{selectedReturn.clientName}</p>
           </div>
         </div>
 
@@ -1442,7 +1442,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       </div>
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Federal:</span>
                     </div>
-                    <span className={`text-sm font-black ${selectedReturn.federalBalance?.toLowerCase().includes('refund') ? 'text-brand' : 'text-rose-500'}`}>
+                    <span className={`text-sm font-black ${selectedReturn.federalBalance?.trim().startsWith('+') ? 'text-emerald-600' : selectedReturn.federalBalance?.trim().startsWith('-') ? 'text-rose-500' : 'text-slate-800'}`}>
                       {selectedReturn.federalBalance}
                     </span>
                   </div>
@@ -1454,7 +1454,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       </div>
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">State:</span>
                     </div>
-                    <span className={`text-sm font-black ${selectedReturn.stateBalance?.toLowerCase().includes('refund') ? 'text-brand' : 'text-rose-500'}`}>
+                    <span className={`text-sm font-black ${selectedReturn.stateBalance?.trim().startsWith('+') ? 'text-emerald-600' : selectedReturn.stateBalance?.trim().startsWith('-') ? 'text-rose-500' : 'text-slate-800'}`}>
                       {selectedReturn.stateBalance}
                     </span>
                   </div>
