@@ -19,10 +19,8 @@ export default defineConfig(({ mode }) => {
       }
     },
     plugins: [tailwindcss(), react()],
-    define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-    },
+    // GEMINI_API_KEY removed from client bundle — move AI calls to a server-side route
+    define: {},
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

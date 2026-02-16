@@ -36,7 +36,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
             if (error) throw error;
         } catch (error: any) {
             console.error('Login error:', error);
-            alert(error.message || 'Failed to sign in');
+            setCrmError(error.message || 'Failed to sign in');
             setIsLoading(false);
         }
     };

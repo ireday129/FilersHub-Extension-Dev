@@ -2,14 +2,29 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const ALLOWED_ORIGINS = [
+    Deno.env.get('APP_URL') || 'https://app.filershub.com',
+    'https://app.filershub.com',
+    'chrome-extension://',
+];
+
+function getCorsOrigin(req: Request): string {
+    const origin = req.headers.get('origin') || '';
+    if (ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))) return origin;
+    if (origin.includes('gohighlevel.com') || origin.includes('leadconnectorhq.com')) return origin;
+    return ALLOWED_ORIGINS[0];
+}
+
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
+    const requestCorsHeaders = { ...corsHeaders, 'Access-Control-Allow-Origin': getCorsOrigin(req) };
+
     if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders })
+        return new Response('ok', { headers: requestCorsHeaders })
     }
 
     try {

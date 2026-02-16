@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { TaxReturn, TaxReturnStatus, TaxDocument, DocStatus } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,8 @@ export const useFirmData = () => {
     const [firmId, setFirmId] = useState<string | null>(null);
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
     const [availableFirms, setAvailableFirms] = useState<any[]>([]);
+    const hasFetchedRef = useRef(false);
+    const clientRoleSyncedRef = useRef(false);
 
     const [staffName, setStaffName] = useState<string>('');
 
@@ -49,7 +51,6 @@ export const useFirmData = () => {
                         amount: '$500',
                         agi: '$150,000',
                         files: [],
-                        paymentStatus: 'Paid',
                         paymentType: 'CC'
                     }
                 ]);
@@ -139,11 +140,13 @@ export const useFirmData = () => {
                 }
             }
 
-            // Sync role to user metadata if detected as Client but metadata doesn't match
+            // Sync role to user metadata — deferred to a separate effect to avoid re-render loops
             if (allFirmsMap.size > 0) {
                 const firstFirm = Array.from(allFirmsMap.values())[0];
-                if (firstFirm.role === 'Client' && user.user_metadata?.role !== 'Client') {
-                    await supabase.auth.updateUser({ data: { role: 'Client' } });
+                if (firstFirm.role === 'Client' && user.user_metadata?.role !== 'Client' && !clientRoleSyncedRef.current) {
+                    clientRoleSyncedRef.current = true;
+                    // Fire-and-forget: don't await to avoid triggering onAuthStateChange mid-fetch
+                    supabase.auth.updateUser({ data: { role: 'Client' } }).catch(console.error);
                 }
             }
 
@@ -285,10 +288,11 @@ export const useFirmData = () => {
     };
 
     useEffect(() => {
-        if (user && !firmId && availableFirms.length === 0) {
+        if (user && !hasFetchedRef.current) {
+            hasFetchedRef.current = true;
             fetchData();
         }
-    }, [user]);
+    }, [user, fetchData]);
 
     return { returns, setReturns, loading, refresh: fetchData, firmId, firmSettings, setFirmSettings, userAvatar, setUserAvatar, availableFirms, selectFirm, staffName };
 };

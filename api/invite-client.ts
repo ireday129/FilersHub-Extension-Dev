@@ -17,11 +17,21 @@ export default async function handler(req: any, res: any) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        // Check if user already exists in auth
-        const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-        const existingUser = existingUsers?.users?.find(
-            (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-        );
+        // Check if user already exists in auth (targeted lookup by email)
+        const { data: userLookup } = await supabaseAdmin
+            .from('auth.users')
+            .select('id, email, raw_user_meta_data')
+            .ilike('email', email.toLowerCase())
+            .maybeSingle();
+
+        // Fallback: if the direct query fails (RLS), use the admin API
+        let existingUser: any = null;
+        if (userLookup) {
+            existingUser = { id: userLookup.id, email: userLookup.email, user_metadata: userLookup.raw_user_meta_data };
+        } else {
+            const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+            existingUser = users?.find((u: any) => u.email?.toLowerCase() === email.toLowerCase()) || null;
+        }
 
         if (existingUser) {
             // User exists — link to client record if not already linked

@@ -167,7 +167,7 @@ const Tasks: React.FC<TasksProps> = ({ firmId, role, isExtension }) => {
   };
 
   // Task card component
-  const TaskCard = ({ task, showType, showDelete }: { task: Task; showType?: boolean; showDelete?: boolean }) => (
+  const TaskCard: React.FC<{ task: Task; showType?: boolean; showDelete?: boolean }> = ({ task, showType, showDelete }) => (
     <div className={`bg-white ${isExtension ? 'p-3' : 'p-4'} rounded-xl border border-slate-100 shadow-sm hover:border-brand/30 transition-all group`}>
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">

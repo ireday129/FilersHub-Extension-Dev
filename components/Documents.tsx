@@ -28,19 +28,15 @@ interface DocumentsProps {
   returns: TaxReturn[];
   setReturns: React.Dispatch<React.SetStateAction<TaxReturn[]>>;
   firmId: string | null;
+  currentStaffName?: string;
 }
 
-const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId }) => {
+const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId, currentStaffName }) => {
   const { user } = useAuth();
   const { isExtension } = useExtensionMode();
   const isStaff = isStaffRole(role);
 
-  const staffName = useMemo(() => {
-    if (role === UserRole.FirmOwner) return "Sarah Johnson";
-    if (role === UserRole.Manager) return "Marcus Aurelius";
-    if (role === UserRole.TaxPro) return "David Smith";
-    return "";
-  }, [role]);
+  const staffName = currentStaffName || '';
 
   // States
   const [filterStatus, setFilterStatus] = useState<DocStatus | 'All'>(isStaff ? 'Uploaded' : 'All');

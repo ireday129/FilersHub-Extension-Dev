@@ -33,12 +33,14 @@ interface SettingsProps {
     logo: string;
     color: string;
     slug?: string;
+    portalMessage?: string;
   };
   setFirmSettings: React.Dispatch<React.SetStateAction<{
     name: string;
     logo: string;
     color: string;
     slug?: string;
+    portalMessage?: string;
   }>>;
   firmId: string | null;
 }

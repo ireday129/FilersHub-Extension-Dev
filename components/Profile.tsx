@@ -50,13 +50,13 @@ const Profile: React.FC<ProfileProps> = ({ role }) => {
             setAvatarUrl(publicUrl);
 
             // Update staff table — try auth_user_id first, fall back to email
-            const { count } = await supabase
+            const { data: updated } = await supabase
                 .from('staff')
                 .update({ avatar_url: publicUrl })
                 .eq('auth_user_id', user.id)
-                .select('staff_id', { count: 'exact', head: true });
+                .select('staff_id');
 
-            if (!count) {
+            if (!updated?.length) {
                 await supabase
                     .from('staff')
                     .update({ avatar_url: publicUrl })
@@ -82,13 +82,13 @@ const Profile: React.FC<ProfileProps> = ({ role }) => {
             if (error) throw error;
 
             // Update staff table — try auth_user_id first, fall back to email
-            const { count } = await supabase
+            const { data: updated } = await supabase
                 .from('staff')
                 .update({ full_name: fullName })
                 .eq('auth_user_id', user.id)
-                .select('staff_id', { count: 'exact', head: true });
+                .select('staff_id');
 
-            if (!count) {
+            if (!updated?.length) {
                 await supabase
                     .from('staff')
                     .update({ full_name: fullName })

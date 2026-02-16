@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { NavItem, UserRole, isStaffRole, TaxReturn, TaxReturnStatus, TAX_RETURN_TYPES } from './types';
+import React, { useState, useEffect } from 'react';
+import { NavItem, UserRole, isStaffRole } from './types';
 import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
 import Clients from './components/Clients';
@@ -11,137 +11,35 @@ import SuperAdminDashboard from './components/SuperAdminDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LogOut, Loader2 } from 'lucide-react';
 import { useFirmData } from './hooks/useFirmData';
-const initialTaxReturns: TaxReturn[] = [
-  {
-    id: 'tr1',
-    clientName: 'John Doe',
-    year: '2023',
-    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label,
-    status: TaxReturnStatus.Filed,
-    preparer: 'Sarah Johnson',
-    date: 'Mar 15, 2024',
-    amount: '$2,105.00',
-    agi: '$85,400.00',
-    federalBalance: '$1,200.00 Refund',
-    stateBalance: '$340.00 Due',
-    paymentType: 'Invoice',
-    files: [
-      { name: '1040_Final_Signed.pdf', size: '1.2 MB', type: 'PDF' },
-      { name: 'Schedule_C_Profit_Loss.pdf', size: '450 KB', type: 'PDF' },
-      { name: 'Tax_Payment_Confirmation.png', size: '1.1 MB', type: 'Image' }
-    ]
-  },
-  {
-    id: 'tr2',
-    clientName: 'Jane Smith',
-    year: '2023',
-    type: TAX_RETURN_TYPES.BUSINESS_S_CORP_1120S.label,
-    status: TaxReturnStatus.ComplianceReview,
-    preparer: 'David Smith',
-    date: 'Apr 02, 2024',
-    amount: 'N/A',
-    agi: '--',
-    federalBalance: '--',
-    stateBalance: '--',
-    paymentType: 'Invoice',
-    files: [
-      { name: 'Draft_1120S_V2.pdf', size: '2.4 MB', type: 'PDF' },
-      { name: 'Business_Expenses_Summary.xlsx', size: '840 KB', type: 'XLSX' }
-    ]
-  },
-  {
-    id: 'tr3',
-    clientName: 'Sarah Jenkins',
-    year: '2022',
-    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label,
-    status: TaxReturnStatus.Accepted,
-    preparer: 'Marcus Aurelius',
-    date: 'Apr 10, 2023',
-    amount: '$1,850.00',
-    agi: '$72,100.00',
-    federalBalance: '$850.00 Refund',
-    stateBalance: '$120.00 Refund',
-    paymentType: 'Bank Product',
-    files: [
-      { name: '1040_Full_Return_2022.pdf', size: '3.1 MB', type: 'PDF' }
-    ]
-  },
-  {
-    id: 'tr4',
-    clientName: 'Robert California',
-    year: '2024',
-    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label,
-    status: TaxReturnStatus.IntakeReceived,
-    preparer: 'Sarah Johnson',
-    date: 'May 12, 2024',
-    amount: 'N/A',
-    agi: '--',
-    federalBalance: '--',
-    stateBalance: '--',
-    paymentType: 'Invoice',
-    files: []
-  },
-  {
-    id: 'tr5',
-    clientName: 'Stanley Hudson',
-    year: '2023',
-    type: TAX_RETURN_TYPES.INDIVIDUAL_1040.label,
-    status: TaxReturnStatus.InPreparation,
-    preparer: 'David Smith',
-    date: 'Jun 10, 2024',
-    amount: 'N/A',
-    agi: '--',
-    federalBalance: '--',
-    stateBalance: '--',
-    paymentType: 'Invoice',
-    files: []
-  },
-];
-
-
-
 import { useExtensionMode } from './hooks/useExtensionMode';
 import FirmSelection from './components/FirmSelection';
 
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
-  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, userAvatar, availableFirms, selectFirm, staffName } = useFirmData();
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null); // TODO: fetch from user profile
+  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, availableFirms, selectFirm, staffName } = useFirmData();
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [activeTab, setActiveTab] = useState<NavItem>(NavItem.Dashboard);
-  // const [returns, setReturns] = useState<TaxReturn[]>(initialTaxReturns);
   const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
 
   const { isExtension } = useExtensionMode();
 
-  // Global Firm Settings - now fetched from useFirmData
-
-
-  // Fetch role from user profile (metadata) or from firm data
+  // Determine role: URL path takes priority, then user metadata, then first available firm
   useEffect(() => {
-    if (user?.user_metadata?.role) {
-      setSelectedRole(user.user_metadata.role as UserRole);
-    } else if (availableFirms && availableFirms.length > 0) {
-      setSelectedRole(availableFirms[0].role as UserRole);
-    }
-  }, [user, availableFirms]);
-
-  // Handle URL Path Routing (No hashes allowed per project rules)
-  useEffect(() => {
-    const handlePathChange = () => {
+    const resolveRole = () => {
       const path = window.location.pathname;
       if (path === '/super-admin') {
         setSelectedRole(UserRole.SuperAdmin);
-      } else if (path === '/' || path === '/index.html') {
-        // Only reset if we were specifically in super admin mode via path
-        setSelectedRole(prev => prev === UserRole.SuperAdmin ? UserRole.FirmOwner : prev);
+      } else if (user?.user_metadata?.role) {
+        setSelectedRole(prev => prev === UserRole.SuperAdmin ? (user.user_metadata.role as UserRole) : (prev || user.user_metadata.role as UserRole));
+      } else if (availableFirms && availableFirms.length > 0) {
+        setSelectedRole(prev => prev || availableFirms[0].role as UserRole);
       }
     };
 
-    handlePathChange();
-    // Listen for popstate (browser back/forward)
-    window.addEventListener('popstate', handlePathChange);
-    return () => window.removeEventListener('popstate', handlePathChange);
-  }, []);
+    resolveRole();
+    window.addEventListener('popstate', resolveRole);
+    return () => window.removeEventListener('popstate', resolveRole);
+  }, [user, availableFirms]);
 
   // Dynamic Theme Injection
   useEffect(() => {
@@ -225,7 +123,7 @@ const AuthenticatedApp: React.FC = () => {
           />
         );
       case NavItem.Documents:
-        return <Documents role={currentRole} returns={returns} setReturns={setReturns} firmId={firmId} />;
+        return <Documents role={currentRole} returns={returns} setReturns={setReturns} firmId={firmId} currentStaffName={staffName} />;
       case NavItem.Tasks:
         return <Tasks firmId={firmId} role={currentRole} isExtension={isExtension} />;
       case NavItem.Settings:
@@ -508,7 +406,7 @@ const AppContent: React.FC = () => {
       return <SuperAdminLogin />;
     }
 
-    if (user.email === 'irene@hannahfinancial.com') {
+    if (user.user_metadata?.is_super_admin === true) {
       return (
         <div className="flex flex-col min-h-screen bg-slate-50 p-8">
           <SuperAdminDashboard />

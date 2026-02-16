@@ -182,7 +182,7 @@ const Login: React.FC<LoginProps> = ({ firmBranding, firmId }) => {
                             />
                         </div>
 
-                        {!isPortal && (
+                        {import.meta.env.DEV && !isPortal && (
                             <div className="flex justify-end mb-4">
                                 <button
                                     type="button"
