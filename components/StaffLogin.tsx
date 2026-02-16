@@ -8,6 +8,12 @@ interface StaffLoginProps {
     ghlContext?: GhlContext | null;
 }
 
+interface FirmChoice {
+    firm_id: string;
+    firm_name: string;
+    logo_url: string | null;
+}
+
 const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -15,6 +21,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
     const [crmLoading, setCrmLoading] = useState(false);
     const [crmError, setCrmError] = useState('');
     const [showPasswordLogin, setShowPasswordLogin] = useState(!ghlContext);
+    const [firmChoices, setFirmChoices] = useState<FirmChoice[]>([]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,21 +41,35 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
         }
     };
 
-    const handleCrmLogin = async () => {
+    const handleCrmLogin = async (overrideFirmId?: string) => {
         if (!email) {
             setCrmError('Please enter your email address first.');
             return;
         }
         setCrmError('');
+        setFirmChoices([]);
         setCrmLoading(true);
         try {
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const payload: Record<string, string> = { action: 'email-lookup', email };
+            if (overrideFirmId) {
+                payload.firmId = overrideFirmId;
+            } else if (ghlContext?.locationId) {
+                payload.locationId = ghlContext.locationId;
+            }
             const resp = await fetch(`${supabaseUrl}/functions/v1/crm-auth`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'email-lookup', email }),
+                body: JSON.stringify(payload),
             });
             const data = await resp.json();
+
+            // Handle multi-firm response
+            if (data.error === 'multiple_firms' && data.firms?.length) {
+                setFirmChoices(data.firms);
+                return;
+            }
+
             if (!resp.ok) {
                 setCrmError(data.error || 'CRM login failed');
                 return;
@@ -96,7 +117,46 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                     </div>
                 )}
 
+                {/* Firm Selector — shown when user belongs to multiple firms */}
+                {firmChoices.length > 0 && (
+                    <div className="p-8 pt-6 space-y-4">
+                        <div className="text-center">
+                            <p className="text-sm font-bold text-slate-700">Select Your Firm</p>
+                            <p className="text-xs text-slate-500 mt-1">Your email is associated with multiple firms.</p>
+                        </div>
+                        <div className="space-y-2">
+                            {firmChoices.map((firm) => (
+                                <button
+                                    key={firm.firm_id}
+                                    type="button"
+                                    onClick={() => handleCrmLogin(firm.firm_id)}
+                                    disabled={crmLoading}
+                                    className="w-full p-3 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl flex items-center gap-3 transition-all text-left"
+                                >
+                                    {firm.logo_url ? (
+                                        <img src={firm.logo_url} alt="" className="w-8 h-8 rounded-lg object-cover" />
+                                    ) : (
+                                        <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                            <Building2 className="text-indigo-600" size={16} />
+                                        </div>
+                                    )}
+                                    <span className="text-sm font-semibold text-slate-700">{firm.firm_name}</span>
+                                    <ArrowRight className="ml-auto text-slate-400" size={16} />
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => { setFirmChoices([]); setCrmError(''); }}
+                            className="w-full text-center text-xs text-slate-400 hover:text-slate-600 py-2"
+                        >
+                            Back to login
+                        </button>
+                    </div>
+                )}
+
                 {/* Login Form */}
+                {firmChoices.length === 0 && (
                 <form onSubmit={handleLogin} className="p-8 pt-6 space-y-5">
                     {/* Email field — always shown */}
                     <div className="space-y-1.5">
@@ -119,7 +179,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                         <>
                             <button
                                 type="button"
-                                onClick={handleCrmLogin}
+                                onClick={() => handleCrmLogin()}
                                 disabled={isLoading || crmLoading}
                                 className="w-full py-3 bg-[#42ab31] hover:bg-[#3d9c2e] text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                             >
@@ -196,7 +256,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
 
                             <button
                                 type="button"
-                                onClick={handleCrmLogin}
+                                onClick={() => handleCrmLogin()}
                                 disabled={isLoading || crmLoading}
                                 className="w-full py-3 bg-white border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                             >
@@ -215,6 +275,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                         </>
                     )}
                 </form>
+                )}
 
                 <div className="bg-slate-50 p-4 text-center border-t border-slate-100">
                     <p className="text-xs text-slate-400">

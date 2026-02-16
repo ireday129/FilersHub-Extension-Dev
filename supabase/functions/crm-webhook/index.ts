@@ -217,19 +217,32 @@ Deno.serve(async (req) => {
 
             if (!userRecord) throw new Error("Failed to resolve auth user");
 
-            // 4. Create Staff Record (Firm Owner)
-            const { error: staffError } = await supabaseClient
-                .from('staff')
-                .upsert({
+            // 4. Create Staff Record (Firm Owner) — multi-firm safe
+            const { data: existingStaff } = await supabaseClient.from('staff')
+                .select('staff_id').eq('email', email).eq('firm_id', firmId).maybeSingle();
+
+            if (!existingStaff) {
+                const { error: staffError } = await supabaseClient.from('staff').insert({
                     firm_id: firmId,
                     email: email,
                     full_name: name,
                     role: 'Firm Owner',
                     auth_user_id: userRecord.id,
-                    is_active: true
-                }, { onConflict: 'email' });
-
-            if (staffError) throw staffError;
+                    is_active: true,
+                    ghl_user_id: userId,
+                    ghl_location_id: locationId
+                });
+                if (staffError) throw staffError;
+            } else {
+                const { error: staffError } = await supabaseClient.from('staff').update({
+                    auth_user_id: userRecord.id,
+                    full_name: name,
+                    is_active: true,
+                    ghl_user_id: userId,
+                    ghl_location_id: locationId
+                }).eq('staff_id', existingStaff.staff_id);
+                if (staffError) throw staffError;
+            }
 
             // 5. UPDATE "users" Table (Exact GHL Mapping for Install User)
             if (typeof ghlUser !== 'undefined') {
@@ -323,23 +336,35 @@ Deno.serve(async (req) => {
                 throw new Error("Failed to resolve auth user for staff sync");
             }
 
-            // 4. Upsert Staff
+            // 4. Upsert Staff — multi-firm safe
             const appRole = (role === 'admin' || role === 'owner') ? 'Firm Owner' : 'Tax Pro';
-            // Default to TaxProfessional if just 'user'. Or map permissions?
-            // Simple mapping for now.
 
-            const { error: staffError } = await supabaseClient
-                .from('staff')
-                .upsert({
+            const { data: existingStaff } = await supabaseClient.from('staff')
+                .select('staff_id').eq('email', email).eq('firm_id', firm.firm_id).maybeSingle();
+
+            if (!existingStaff) {
+                const { error: staffError } = await supabaseClient.from('staff').insert({
                     firm_id: firm.firm_id,
                     email: email,
                     full_name: name,
                     role: appRole,
                     auth_user_id: userRecord.id,
-                    is_active: true
-                }, { onConflict: 'email' });
-
-            if (staffError) throw staffError;
+                    is_active: true,
+                    ghl_user_id: userId,
+                    ghl_location_id: locationId
+                });
+                if (staffError) throw staffError;
+            } else {
+                const { error: staffError } = await supabaseClient.from('staff').update({
+                    auth_user_id: userRecord.id,
+                    full_name: name,
+                    role: appRole,
+                    is_active: true,
+                    ghl_user_id: userId,
+                    ghl_location_id: locationId
+                }).eq('staff_id', existingStaff.staff_id);
+                if (staffError) throw staffError;
+            }
 
             // 5. UPDATE "users" Table (Exact GHL Mapping)
             const userPayload = {

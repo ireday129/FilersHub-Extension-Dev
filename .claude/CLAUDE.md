@@ -7,6 +7,7 @@
 - **React/TypeScript:** Use functional components and hooks.
 - **Styling:** Use Tailwind CSS.
 - **App Developement** Use these two Githubs for reference whenever we are adding any features or coding that is specific to GoHighLevel: https://github.com/GoHighLevel/ghl-marketplace-app-template and https://github.com/GoHighLevel/highlevel-api-docs
+- **Creating Workflow Triggers & Actions:** Use the GHL API docs to create workflow triggers and actions. The GHL API docs for workflow triggers and actions can be found here: https://help.gohighlevel.com/support/solutions/articles/155000001024#Trigger-Data
 
 ## Extension Consideration
 - We have a Google Chrome extension that loads the app via `index.html` in the popup. Extension mode is detected by **protocol** (`chrome-extension://`) or **path** (starting with `/extension`). The `useExtensionMode` hook (`hooks/useExtensionMode.ts`) checks both to determine if the compact extension UI should be used.

@@ -54,23 +54,83 @@ serve(async (req) => {
         // 0. EMAIL LOOKUP: Verify staff email against GHL and create session
         if (req.method === 'POST' && body.action === 'email-lookup') {
             const email = (body.email || '').trim().toLowerCase();
+            const requestedLocationId = (body.locationId || '').trim();
+            const requestedFirmId = (body.firmId || '').trim();
+
             if (!email || !email.includes('@')) {
                 return new Response(JSON.stringify({ error: 'Valid email is required' }), {
                     status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
 
-            // 1. Find staff record by email → get firm_id
-            const { data: staffRecord } = await supabaseAdmin
+            // 1. Find staff records by email → support multi-firm
+            const { data: staffRecords } = await supabaseAdmin
                 .from('staff')
-                .select('staff_id, firm_id, full_name')
+                .select('staff_id, firm_id, full_name, ghl_location_id')
                 .eq('email', email)
-                .eq('is_active', true)
-                .maybeSingle();
+                .eq('is_active', true);
 
-            if (!staffRecord) {
+            if (!staffRecords || staffRecords.length === 0) {
                 return new Response(JSON.stringify({ error: 'No active staff account found for this email' }), {
                     status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // Resolve to a single staff record
+            let staffRecord;
+
+            if (staffRecords.length === 1) {
+                staffRecord = staffRecords[0];
+            } else if (requestedFirmId) {
+                // User explicitly selected a firm (from firm chooser UI)
+                staffRecord = staffRecords.find((s: any) => s.firm_id === requestedFirmId);
+                if (!staffRecord) {
+                    return new Response(JSON.stringify({ error: 'You are not a member of the selected firm' }), {
+                        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+            } else if (requestedLocationId) {
+                // Extension provided a GHL locationId — match by ghl_location_id on staff or firm
+                staffRecord = staffRecords.find((s: any) => s.ghl_location_id === requestedLocationId);
+                if (!staffRecord) {
+                    // Check which firm owns this locationId
+                    const { data: firmByLoc } = await supabaseAdmin
+                        .from('firms')
+                        .select('firm_id')
+                        .eq('ghl_location_id', requestedLocationId)
+                        .maybeSingle();
+                    if (firmByLoc) {
+                        staffRecord = staffRecords.find((s: any) => s.firm_id === firmByLoc.firm_id);
+                    }
+                }
+                if (!staffRecord) {
+                    // locationId didn't resolve — return firm list for user to choose
+                    const firmIds = staffRecords.map((s: any) => s.firm_id);
+                    const { data: firms } = await supabaseAdmin
+                        .from('firms')
+                        .select('firm_id, firm_name, logo_url')
+                        .in('firm_id', firmIds);
+                    return new Response(JSON.stringify({
+                        error: 'multiple_firms',
+                        message: 'You belong to multiple firms. Please select one.',
+                        firms: firms || []
+                    }), {
+                        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+            } else {
+                // Multiple firms, no locationId or firmId to disambiguate — return firm list
+                const firmIds = staffRecords.map((s: any) => s.firm_id);
+                const { data: firms } = await supabaseAdmin
+                    .from('firms')
+                    .select('firm_id, firm_name, logo_url')
+                    .in('firm_id', firmIds);
+                return new Response(JSON.stringify({
+                    error: 'multiple_firms',
+                    message: 'You belong to multiple firms. Please select one.',
+                    firms: firms || []
+                }), {
+                    status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
             }
 
@@ -339,11 +399,12 @@ serve(async (req) => {
                             }
 
                             if (userRecord) {
-                                // 2. Ensure Staff Record Exists (Critical for RLS)
+                                // 2. Ensure Staff Record Exists (Critical for RLS) — multi-firm safe
                                 const { data: existingStaff } = await supabaseAdmin
                                     .from('staff')
                                     .select('staff_id')
                                     .eq('email', email)
+                                    .eq('firm_id', integ.firm_id)
                                     .maybeSingle();
 
                                 if (!existingStaff) {
@@ -353,13 +414,17 @@ serve(async (req) => {
                                         full_name: name,
                                         role: 'Firm Owner',
                                         auth_user_id: userRecord.id,
-                                        is_active: true
+                                        is_active: true,
+                                        ghl_user_id: userId !== 'null' ? userId : null,
+                                        ghl_location_id: locationId
                                     });
                                     if (staffErr) console.error("Silent SSO: Failed to create staff record:", staffErr);
                                 } else {
                                     // Ensure auth_user_id is linked
                                     await supabaseAdmin.from('staff').update({
                                         auth_user_id: userRecord.id,
+                                        ghl_user_id: userId !== 'null' ? userId : null,
+                                        ghl_location_id: locationId
                                     }).eq('staff_id', existingStaff.staff_id);
                                 }
 
@@ -728,26 +793,30 @@ serve(async (req) => {
                     if (usersError) console.error("Failed to sync SSO user to 'users' table:", usersError);
                 }
 
-                // 3. Ensure Staff Record Exists
+                // 3. Ensure Staff Record Exists — multi-firm safe
                 const staffParams = {
                     firm_id: firmId,
                     email: email,
                     full_name: name,
                     role: 'Firm Owner',
                     auth_user_id: userRecord.id,
-                    is_active: true
+                    is_active: true,
+                    ghl_user_id: resolvedUserId || null,
+                    ghl_location_id: resolvedLocationId || null
                 };
 
-                // Check if Staff exists (to avoid overwriting Role if they are already Staff)
-                const { data: existingStaff } = await supabaseAdmin.from('staff').select('staff_id').eq('email', email).maybeSingle();
+                // Check if Staff exists at THIS firm (to avoid overwriting Role if they are already Staff)
+                const { data: existingStaff } = await supabaseAdmin.from('staff').select('staff_id').eq('email', email).eq('firm_id', firmId).maybeSingle();
 
                 if (!existingStaff) {
                     const { error: staffInsertErr } = await supabaseAdmin.from('staff').insert(staffParams);
                     if (staffInsertErr) console.error("Callback: Failed to create staff:", staffInsertErr);
                 } else {
-                    // Ensure auth_user_id is linked
+                    // Ensure auth_user_id and GHL fields are linked
                     await supabaseAdmin.from('staff').update({
-                        auth_user_id: userRecord.id
+                        auth_user_id: userRecord.id,
+                        ghl_user_id: resolvedUserId || null,
+                        ghl_location_id: resolvedLocationId || null
                     }).eq('staff_id', existingStaff.staff_id);
                 }
 
@@ -824,18 +893,20 @@ serve(async (req) => {
                             }
 
                             if (userRecord) {
-                                // Upsert staff record
+                                // Upsert staff record — multi-firm safe
                                 const { data: existingStaff } = await supabaseAdmin.from('staff')
-                                    .select('staff_id').eq('email', email).maybeSingle();
+                                    .select('staff_id').eq('email', email).eq('firm_id', firmId).maybeSingle();
 
                                 if (!existingStaff) {
                                     await supabaseAdmin.from('staff').insert({
                                         firm_id: firmId, email, full_name: name,
-                                        role: 'Firm Owner', auth_user_id: userRecord.id, is_active: true
+                                        role: 'Firm Owner', auth_user_id: userRecord.id, is_active: true,
+                                        ghl_user_id: tokenData.userId, ghl_location_id: tokenData.locationId
                                     });
                                 } else {
                                     await supabaseAdmin.from('staff').update({
-                                        auth_user_id: userRecord.id, firm_id: firmId, is_active: true
+                                        auth_user_id: userRecord.id, is_active: true,
+                                        ghl_user_id: tokenData.userId, ghl_location_id: tokenData.locationId
                                     }).eq('staff_id', existingStaff.staff_id);
                                 }
                             }

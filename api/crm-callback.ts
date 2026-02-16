@@ -130,17 +130,20 @@ export default async function handler(req: any, res: any) {
                         }
 
                         if (userRecord) {
+                            // Multi-firm safe: check by email AND firm_id
                             const { data: existingStaff } = await supabaseAdmin.from('staff')
-                                .select('staff_id').eq('email', email).maybeSingle();
+                                .select('staff_id').eq('email', email).eq('firm_id', firmRecord.firm_id).maybeSingle();
 
                             if (!existingStaff) {
                                 await supabaseAdmin.from('staff').insert({
                                     firm_id: firmRecord.firm_id, email, full_name: name,
-                                    role: 'Firm Owner', auth_user_id: userRecord.id, is_active: true
+                                    role: 'Firm Owner', auth_user_id: userRecord.id, is_active: true,
+                                    ghl_user_id: tokenData.userId, ghl_location_id: tokenData.locationId
                                 });
                             } else {
                                 await supabaseAdmin.from('staff').update({
-                                    auth_user_id: userRecord.id, firm_id: firmRecord.firm_id, is_active: true
+                                    auth_user_id: userRecord.id, is_active: true,
+                                    ghl_user_id: tokenData.userId, ghl_location_id: tokenData.locationId
                                 }).eq('staff_id', existingStaff.staff_id);
                             }
                         }
