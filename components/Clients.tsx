@@ -32,6 +32,7 @@ interface ClientsProps {
 type ClientView = 'My Clients' | 'Firm Clients';
 
 interface ClientGroup {
+  clientId: string;
   name: string;
   returns: TaxReturn[];
   returnCount: number;
@@ -70,19 +71,20 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
   }, []);
 
   const handleCreateReturn = async () => {
-    if (!createReturnClientId || !createReturnYear || !createReturnType) return;
+    if (!createReturnClientId || !createReturnYear || !createReturnType || !firmId) return;
     setCreatingReturn(true);
     setCreateReturnError(null);
 
     try {
       const { error } = await supabase
-        .from('clients')
-        .update({
+        .from('tax_returns')
+        .insert({
+          client_id: createReturnClientId,
+          firm_id: firmId,
           tax_year: createReturnYear,
           return_type: createReturnType,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('client_id', createReturnClientId);
+          tax_return_status: 'Intake Received',
+        });
 
       if (error) throw error;
 
@@ -175,14 +177,16 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
     return base;
   }, [returns, activeView, staffName, role, searchQuery]);
 
-  // Group returns by client name
+  // Group returns by client name (using clientId as the grouping key)
   const clientGroups = useMemo((): ClientGroup[] => {
-    const map: Record<string, TaxReturn[]> = {};
+    const map: Record<string, { clientId: string; name: string; returns: TaxReturn[] }> = {};
     filteredReturns.forEach(r => {
-      if (!map[r.clientName]) map[r.clientName] = [];
-      map[r.clientName].push(r);
+      const key = r.clientId;
+      if (!map[key]) map[key] = { clientId: r.clientId, name: r.clientName, returns: [] };
+      map[key].returns.push(r);
     });
-    return Object.entries(map).map(([name, rets]) => ({
+    return Object.values(map).map(({ clientId, name, returns: rets }) => ({
+      clientId,
       name,
       returns: rets,
       returnCount: rets.filter(r => r.year && r.type).length,
@@ -241,8 +245,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
   const renderClientDetail = () => {
     if (!selectedClient) return null;
     const clientReturns = selectedClient.returns;
-    const hasReturn = clientReturns.some(r => r.year && r.type);
-    const noReturnEntry = clientReturns.find(r => !r.year || !r.type);
+    const clientId = selectedClient.clientId;
 
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -278,15 +281,13 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
               <FileText size={16} className="text-brand" />
               Tax Returns
             </h3>
-            {noReturnEntry && (
-              <button
-                onClick={() => { setCreateReturnClientId(noReturnEntry.id); setCreateReturnYear(''); setCreateReturnType(''); setCreateReturnError(null); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all"
-              >
-                <Plus size={14} />
-                New Return
-              </button>
-            )}
+            <button
+              onClick={() => { setCreateReturnClientId(clientId); setCreateReturnYear(''); setCreateReturnType(''); setCreateReturnError(null); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all"
+            >
+              <Plus size={14} />
+              New Return
+            </button>
           </div>
 
           <div className="divide-y divide-slate-100">
@@ -356,15 +357,13 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                   <h4 className="text-sm font-bold text-slate-700">No returns yet</h4>
                   <p className="text-xs text-slate-400 mt-1">Create a tax return for this client to get started.</p>
                 </div>
-                {noReturnEntry && (
-                  <button
-                    onClick={() => { setCreateReturnClientId(noReturnEntry.id); setCreateReturnYear(''); setCreateReturnType(''); setCreateReturnError(null); }}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand/90 transition-all shadow-sm mx-auto"
-                  >
-                    <Plus size={14} />
-                    Create Return
-                  </button>
-                )}
+                <button
+                  onClick={() => { setCreateReturnClientId(clientId); setCreateReturnYear(''); setCreateReturnType(''); setCreateReturnError(null); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand/90 transition-all shadow-sm mx-auto"
+                >
+                  <Plus size={14} />
+                  Create Return
+                </button>
               </div>
             )}
           </div>
@@ -583,7 +582,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
               <div>
                 <h3 className="text-lg font-bold text-slate-800">Create Tax Return</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  For: {returns.find(r => r.id === createReturnClientId)?.clientName}
+                  For: {returns.find(r => r.clientId === createReturnClientId)?.clientName}
                 </p>
               </div>
               <button onClick={() => setCreateReturnClientId(null)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">

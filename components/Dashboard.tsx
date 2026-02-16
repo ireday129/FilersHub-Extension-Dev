@@ -402,9 +402,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     setSaveStatus('idle');
 
     try {
-      // 1. Update Supabase
+      // 1. Update Supabase (tax_returns table)
       const { error } = await supabase
-        .from('clients')
+        .from('tax_returns')
         .update({
           tax_return_status: selectedReturn.status,
           assigned_to: selectedReturn.preparer || null,
@@ -417,7 +417,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
           internal_notes: selectedReturn.internalNotes || null,
           updated_at: new Date().toISOString()
         })
-        .eq('client_id', selectedReturn.id);
+        .eq('return_id', selectedReturn.id);
 
       if (error) throw error;
 
@@ -425,7 +425,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
       // Fire and forget (don't block UI on this)
       supabase.functions.invoke('crm-update', {
         body: {
-          clientId: selectedReturn.id,
+          clientId: selectedReturn.clientId,
           status: selectedReturn.status,
           firmId: firmId
         }
@@ -523,7 +523,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     let assignedToName = '';
 
     if (newCaseTask.type === 'client') {
-      assignedTo = selectedReturn.id;
+      assignedTo = selectedReturn.clientId;
       assignedToName = selectedReturn.clientName;
     } else {
       assignedTo = newCaseTask.assigned_to;
@@ -556,7 +556,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     setShowCaseTaskForm(false);
     setNewCaseTask({ title: '', description: '', type: 'client', priority: 'Medium', assigned_to: '', due_date: '' });
     setCreatingCaseTask(false);
-    await fetchCaseTasks(selectedReturn.id);
+    await fetchCaseTasks(selectedReturn.clientId);
   };
 
   const handleToggleCaseTask = async (task: Task) => {
@@ -582,7 +582,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
 
   useEffect(() => {
     if (selectedReturnId && firmId && isStaff) {
-      fetchCaseTasks(selectedReturnId);
+      const ret = returns.find(r => r.id === selectedReturnId);
+      fetchCaseTasks(ret?.clientId || selectedReturnId);
     } else {
       setCaseTasks([]);
     }
@@ -642,7 +643,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     setIsUploading(true); // Ensure loading state
 
     try {
-      await uploadDocument(file, selectedReturnId, firmId, selectedDocType);
+      const clientId = selectedReturn?.clientId || selectedReturnId;
+      await uploadDocument(file, clientId!, firmId, selectedDocType, selectedReturnId || undefined);
 
       // Refresh data to show new file
       await refreshData();

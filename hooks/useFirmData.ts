@@ -41,7 +41,8 @@ export const useFirmData = () => {
                 // Mock Returns
                 setReturns([
                     {
-                        id: 'dev-client-1',
+                        id: 'dev-return-1',
+                        clientId: 'dev-client-1',
                         clientName: 'Dev Client A',
                         year: '2024',
                         type: '1040',
@@ -50,6 +51,8 @@ export const useFirmData = () => {
                         date: new Date().toLocaleDateString(),
                         amount: '$500',
                         agi: '$150,000',
+                        federalBalance: 'N/A',
+                        stateBalance: 'N/A',
                         files: [],
                         paymentType: 'CC'
                     }
@@ -218,7 +221,7 @@ export const useFirmData = () => {
 
             // Now load data SPECIFIC to this firm and role
 
-            // 2. Fetch Clients for this firm (Only if Staff)
+            // 2. Fetch Clients for this firm
             let clientsData: any[] = [];
             if (selectedFirm.isStaff) {
                 const { data, error } = await supabase
@@ -228,19 +231,38 @@ export const useFirmData = () => {
                 if (error) throw error;
                 clientsData = data || [];
             } else {
-                // If Client login, only fetch THEIR own client record
                 const { data, error } = await supabase
                     .from('clients')
                     .select('*')
                     .eq('firm_id', selectedId)
                     .eq('auth_user_id', user?.id)
                     .single();
-
-                // If error, might mean they are not a client in this firm?? but we checked earlier.
                 if (data) clientsData = [data];
             }
 
-            // 3. Fetch Documents for this firm
+            // 3. Fetch Tax Returns for this firm
+            let returnsData: any[] = [];
+            if (selectedFirm.isStaff) {
+                const { data, error } = await supabase
+                    .from('tax_returns')
+                    .select('*')
+                    .eq('firm_id', selectedId);
+                if (error) throw error;
+                returnsData = data || [];
+            } else {
+                // Client: only fetch returns for their own client records
+                const clientIds = clientsData.map(c => c.client_id);
+                if (clientIds.length > 0) {
+                    const { data, error } = await supabase
+                        .from('tax_returns')
+                        .select('*')
+                        .in('client_id', clientIds);
+                    if (error) throw error;
+                    returnsData = data || [];
+                }
+            }
+
+            // 4. Fetch Documents for this firm
             const { data: docsData, error: docsError } = await supabase
                 .from('documents')
                 .select('*')
@@ -249,11 +271,22 @@ export const useFirmData = () => {
 
             if (docsError) throw docsError;
 
-            // 4. Map to TaxReturn type
-            const mappedReturns: TaxReturn[] = clientsData.map((client: any) => {
-                const clientDocs = docsData ? docsData.filter((doc: any) => doc.client_id === client.client_id) : [];
+            // 5. Build a client lookup map
+            const clientsMap = new Map<string, any>();
+            clientsData.forEach(c => clientsMap.set(c.client_id, c));
 
-                const files = clientDocs.map((doc: any) => ({
+            // 6. Map tax_returns rows to TaxReturn[]
+            const clientIdsWithReturns = new Set<string>();
+            const mappedReturns: TaxReturn[] = returnsData.map((ret: any) => {
+                clientIdsWithReturns.add(ret.client_id);
+                const client = clientsMap.get(ret.client_id);
+
+                // Match docs: prefer return_id match, fallback to client_id for unassociated docs
+                const returnDocs = docsData ? docsData.filter((doc: any) =>
+                    doc.return_id === ret.return_id || (doc.client_id === ret.client_id && !doc.return_id)
+                ) : [];
+
+                const files = returnDocs.map((doc: any) => ({
                     name: doc.file_name,
                     size: (doc.file_size / 1024 / 1024).toFixed(2) + ' MB',
                     type: doc.file_type.toUpperCase(),
@@ -262,21 +295,45 @@ export const useFirmData = () => {
                 }));
 
                 return {
-                    id: client.client_id,
-                    clientName: client.full_name,
-                    year: client.tax_year || '',
-                    type: client.return_type || '',
-                    status: client.tax_return_status as TaxReturnStatus,
-                    preparer: client.assigned_to || '',
-                    date: new Date(client.updated_at).toLocaleDateString(),
+                    id: ret.return_id,
+                    clientId: ret.client_id,
+                    clientName: client?.full_name || '',
+                    year: ret.tax_year || '',
+                    type: ret.return_type || '',
+                    status: ret.tax_return_status as TaxReturnStatus,
+                    preparer: ret.assigned_to || '',
+                    date: new Date(ret.updated_at).toLocaleDateString(),
                     amount: 'N/A',
-                    agi: client.agi || 'N/A',
-                    federalBalance: client.federal_balance || 'N/A',
-                    stateBalance: client.state_balance || 'N/A',
-                    paymentType: client.payment_type || 'Invoice',
+                    agi: ret.agi || 'N/A',
+                    federalBalance: ret.federal_balance || 'N/A',
+                    stateBalance: ret.state_balance || 'N/A',
+                    paymentType: ret.payment_type || 'Invoice',
                     files: files,
-                    internalNotes: client.internal_notes || ''
+                    internalNotes: ret.internal_notes || ''
                 };
+            });
+
+            // 7. Add placeholder entries for clients with NO returns (so they appear in client list)
+            clientsData.forEach((client: any) => {
+                if (!clientIdsWithReturns.has(client.client_id)) {
+                    mappedReturns.push({
+                        id: client.client_id, // placeholder uses client_id as id
+                        clientId: client.client_id,
+                        clientName: client.full_name,
+                        year: '',
+                        type: '',
+                        status: TaxReturnStatus.IntakeReceived,
+                        preparer: '',
+                        date: new Date(client.updated_at).toLocaleDateString(),
+                        amount: 'N/A',
+                        agi: 'N/A',
+                        federalBalance: 'N/A',
+                        stateBalance: 'N/A',
+                        paymentType: 'Invoice',
+                        files: [],
+                        internalNotes: ''
+                    });
+                }
             });
 
             setReturns(mappedReturns);

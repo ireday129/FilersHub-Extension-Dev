@@ -5,7 +5,8 @@ export const uploadDocument = async (
     file: File,
     clientId: string,
     firmId: string,
-    docType: string
+    docType: string,
+    returnId?: string
 ) => {
     try {
         // 1. Upload to Storage
@@ -19,17 +20,23 @@ export const uploadDocument = async (
         if (storageError) throw storageError;
 
         // 2. Insert into 'documents' table
+        const insertData: Record<string, any> = {
+            firm_id: firmId,
+            client_id: clientId,
+            file_name: file.name,
+            file_path: filePath,
+            file_type: docType,
+            file_size: file.size,
+            uploaded_by_user_id: (await supabase.auth.getUser()).data.user?.id
+        };
+
+        if (returnId) {
+            insertData.return_id = returnId;
+        }
+
         const { data: dbData, error: dbError } = await supabase
             .from('documents')
-            .insert({
-                firm_id: firmId,
-                client_id: clientId,
-                file_name: file.name,
-                file_path: filePath,
-                file_type: docType,
-                file_size: file.size,
-                uploaded_by_user_id: (await supabase.auth.getUser()).data.user?.id
-            })
+            .insert(insertData)
             .select()
             .single();
 

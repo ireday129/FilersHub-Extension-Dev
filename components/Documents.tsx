@@ -121,9 +121,10 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
 
     try {
       // 1. Upload to Supabase Storage
+      const clientId = selectedReturn?.clientId || selectedReturnId;
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${Date.now()}_${selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      const filePath = `${firmId}/${selectedReturnId}/${fileName}`;
+      const filePath = `${firmId}/${clientId}/${fileName}`;
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
@@ -134,19 +135,24 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
       // Get public URL? No, it's a private bucket. We store the path.
 
       // 2. Insert into DB
+      const insertData: Record<string, any> = {
+        firm_id: firmId,
+        client_id: clientId,
+        file_name: selectedFile.name,
+        file_type: fileExt || 'unknown',
+        file_size: selectedFile.size,
+        file_url: filePath,
+        document_category: selectedDocType,
+        uploaded_by: user.id,
+        uploader_type: isStaff ? 'staff' : 'client'
+      };
+      if (selectedReturnId !== 'All') {
+        insertData.return_id = selectedReturnId;
+      }
+
       const { data: dbDoc, error: dbError } = await supabase
         .from('documents')
-        .insert({
-          firm_id: firmId,
-          client_id: selectedReturnId,
-          file_name: selectedFile.name,
-          file_type: fileExt || 'unknown',
-          file_size: selectedFile.size,
-          file_url: filePath, // Storing storage path
-          document_category: selectedDocType,
-          uploaded_by: user.id,
-          uploader_type: isStaff ? 'staff' : 'client'
-        })
+        .insert(insertData)
         .select()
         .single();
 

@@ -215,6 +215,7 @@ export interface Message {
 
 export interface TaxReturn {
   id: string;
+  clientId: string;
   clientName: string;
   year: string;
   type: string;
