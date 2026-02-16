@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Upload,
   Palette,
@@ -13,8 +13,6 @@ import {
   Sparkles,
   Zap,
   CheckCircle2,
-  Link,
-  ExternalLink
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { supabase } from '../services/supabase';
@@ -63,11 +61,45 @@ interface GHLUser {
 const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firmId }) => {
   const { isExtension } = useExtensionMode();
   const [localSettings, setLocalSettings] = useState(firmSettings);
-  const [staff, setStaff] = useState<StaffMember[]>([
-    { id: '1', name: 'Marcus Aurelius', email: 'marcus@filershub.com', role: UserRole.Manager, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus' },
-    { id: '2', name: 'David Smith', email: 'david@filershub.com', role: UserRole.TaxPro, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David' },
-    { id: '3', name: 'Angela Martin', email: 'angela@filershub.com', role: UserRole.TaxPro, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Angela' },
-  ]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [staffLoading, setStaffLoading] = useState(true);
+
+  // Plan limits: Core = 5 staff, Pro = 20 (Firm Owner excluded from count)
+  const CORE_LIMIT = 5;
+  const PRO_LIMIT = 20;
+  const staffLimit = CORE_LIMIT; // Default to Core plan (active plan shown below)
+
+  useEffect(() => {
+    if (!firmId) return;
+    const fetchStaff = async () => {
+      setStaffLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('staff')
+          .select('staff_id, full_name, email, role, is_active')
+          .eq('firm_id', firmId)
+          .eq('is_active', true);
+
+        if (error) throw error;
+
+        const mapped: StaffMember[] = (data || []).map((s: any) => ({
+          id: s.staff_id,
+          name: s.full_name,
+          email: s.email,
+          role: s.role as UserRole,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.email)}`
+        }));
+        setStaff(mapped);
+      } catch (err) {
+        console.error('Error fetching staff:', err);
+      } finally {
+        setStaffLoading(false);
+      }
+    };
+    fetchStaff();
+  }, [firmId]);
+
+  const assignedStaff = staff.filter(m => m.role !== UserRole.FirmOwner).length;
 
   const [showGHLModal, setShowGHLModal] = useState(false);
   const [ghlUsers, setGhlUsers] = useState<GHLUser[]>([]);
@@ -374,28 +406,19 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 </div>
                 <div className="space-y-3">
                   <div className="relative">
+                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 transition-colors pointer-events-none">
+                      <Upload size={14} />
+                      {isUploadingLogo ? "Uploading..." : "Upload New Image"}
+                    </button>
                     <input
-                      type="text"
-                      placeholder="Logo Image URL"
-                      value={localSettings.logo}
-                      onChange={(e) => setLocalSettings(p => ({ ...p, logo: e.target.value }))}
-                      className="w-full px-4 py-2 bg-white border border-slate-200 text-xs font-semibold rounded-lg focus:ring-2 focus:ring-brand outline-none mb-2"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={isUploadingLogo}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
-                    <div className="relative">
-                      <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 transition-colors pointer-events-none">
-                        <Upload size={14} />
-                        {isUploadingLogo ? "Uploading..." : "Upload New Image"}
-                      </button>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                        disabled={isUploadingLogo}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      />
-                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-400 max-w-[180px]">Enter URL or upload a file (Transparent PNG recommended).</p>
+                  <p className="text-[10px] text-slate-400 max-w-[180px]">Transparent PNG recommended.</p>
                 </div>
               </div>
             </div>
@@ -456,7 +479,12 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               <Users size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800">Team & Permissions</h2>
+              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
+                Team & Permissions
+                <span className="text-sm font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg">
+                  {assignedStaff} / {staffLimit} Staff Seats
+                </span>
+              </h2>
               <p className="text-xs text-slate-500">Manage your staff accounts and app access levels.</p>
             </div>
           </div>
@@ -480,12 +508,32 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {staff.map((member) => (
+              {staffLoading ? (
+                <tr>
+                  <td colSpan={isExtension ? 3 : 4} className="px-6 py-8 text-center text-sm text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
+                      Loading staff...
+                    </div>
+                  </td>
+                </tr>
+              ) : staff.length === 0 ? (
+                <tr>
+                  <td colSpan={isExtension ? 3 : 4} className="px-6 py-8 text-center text-sm text-slate-400">
+                    No staff members found.
+                  </td>
+                </tr>
+              ) : staff.map((member) => (
                 <tr key={member.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
                     <div className="flex items-center gap-2 min-w-0">
                       <img src={member.avatar} alt={member.name} className={`${isExtension ? 'w-6 h-6' : 'w-8 h-8'} rounded-full border border-slate-200 group-hover:border-brand/40 transition-colors shrink-0`} />
-                      <span className="text-sm font-semibold text-slate-700 truncate">{member.name}</span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-semibold text-slate-700 truncate block">{member.name}</span>
+                        {member.role === UserRole.FirmOwner && (
+                          <span className="text-[10px] font-bold text-amber-600">Owner</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   {!isExtension && (
@@ -496,87 +544,29 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
                     <div className="flex items-center gap-1">
                       <Shield size={14} className="text-brand shrink-0" />
-                      <select
-                        value={member.role}
-                        onChange={(e) => handleRoleChange(member.id, e.target.value as UserRole)}
-                        className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer focus:text-brand"
-                      >
-                        <option value={UserRole.Manager}>Manager</option>
-                        <option value={UserRole.TaxPro}>Tax Pro</option>
-                      </select>
+                      {member.role === UserRole.FirmOwner ? (
+                        <span className="text-sm font-medium text-slate-700">Firm Owner</span>
+                      ) : (
+                        <select
+                          value={member.role}
+                          onChange={(e) => handleRoleChange(member.id, e.target.value as UserRole)}
+                          className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer focus:text-brand"
+                        >
+                          <option value={UserRole.Manager}>Manager</option>
+                          <option value={UserRole.TaxPro}>Tax Pro</option>
+                        </select>
+                      )}
                     </div>
                   </td>
                   <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-right`}>
-                    <button className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all">{isExtension ? 'Revoke' : 'Revoke Access'}</button>
+                    {member.role !== UserRole.FirmOwner && (
+                      <button className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all">{isExtension ? 'Revoke' : 'Revoke Access'}</button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </section>
-
-      {/* Integrations Section */}
-      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <Link size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Integrations</h2>
-              <p className="text-xs text-slate-500">Connect FilersHub with your favorite tools.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6">
-          <div className="border border-slate-200 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:border-brand/30 transition-colors">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-[#1559E8] rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm">
-                {/* CRM Logo (Generic) */}
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-7 h-7">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  CRM
-                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">Integration</span>
-                </h3>
-                <p className="text-sm text-slate-500 mt-1 max-w-sm">
-                  Sync contacts, tags, and custom fields bi-directionally. Trigger workflows based on tax status updates.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-end gap-2 w-full md:w-auto">
-              <button
-                onClick={async () => {
-                  if (!firmId) return;
-                  try {
-                    const { data, error } = await supabase.functions.invoke('crm-auth', {
-                      method: 'POST',
-                      body: { action: 'init', firmId }
-                    });
-
-                    if (error) throw error;
-
-                    if (data?.url) {
-                      window.location.href = data.url;
-                    }
-                  } catch (err) {
-                    console.error("Error initiating CRM auth:", err);
-                    alert("Failed to start connection process.");
-                  }
-                }}
-                className="px-5 py-2.5 bg-[#1559E8] text-white text-sm font-bold rounded-xl hover:bg-[#1559E8]/90 transition-all shadow-sm flex items-center gap-2 whitespace-nowrap w-full md:w-auto justify-center"
-              >
-                Connect CRM
-                <ExternalLink size={14} />
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -615,7 +605,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">User Limits</h4>
                   <ul className="space-y-2">
                     <PlanFeature text="1 Firm Owner" />
-                    <PlanFeature text="Up to 5 staff users" />
+                    <PlanFeature text={`Up to ${CORE_LIMIT} staff users (${assignedStaff}/${CORE_LIMIT} used)`} />
                     <PlanFeature text="Unlimited clients" />
                   </ul>
                 </div>
@@ -664,7 +654,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-3">User Limits</h4>
                   <ul className="space-y-2">
                     <PlanFeature text="1 Firm Owner" />
-                    <PlanFeature text="Up to 20 staff users" />
+                    <PlanFeature text={`Up to ${PRO_LIMIT} staff users`} />
                     <PlanFeature text="Unlimited clients" />
                   </ul>
                 </div>

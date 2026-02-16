@@ -74,10 +74,10 @@ serve(async (req) => {
                 });
             }
 
-            // 2. Get firm's GHL location ID
+            // 2. Get firm's GHL location ID and tokens
             const { data: firmData } = await supabaseAdmin
                 .from('firms')
-                .select('ghl_location_id')
+                .select('ghl_location_id, ghl_access_token, ghl_refresh_token, ghl_token_expires_at')
                 .eq('firm_id', staffRecord.firm_id)
                 .maybeSingle();
 
@@ -87,12 +87,26 @@ serve(async (req) => {
                 });
             }
 
-            // 3. Get stored GHL token (refresh if expired)
-            const { data: integ } = await supabaseAdmin
+            // 3. Get stored GHL token — check integrations_ghl by firm_id first, fall back to firms table
+            let integ: any = null;
+
+            const { data: integData } = await supabaseAdmin
                 .from('integrations_ghl')
                 .select('access_token, refresh_token, token_expires_at, firm_id')
-                .eq('location_id', firmData.ghl_location_id)
+                .eq('firm_id', staffRecord.firm_id)
                 .maybeSingle();
+
+            if (integData?.access_token) {
+                integ = integData;
+            } else if (firmData.ghl_access_token) {
+                // Fallback: tokens stored directly on firms table (from OAuth callback)
+                integ = {
+                    access_token: firmData.ghl_access_token,
+                    refresh_token: firmData.ghl_refresh_token,
+                    token_expires_at: firmData.ghl_token_expires_at,
+                    firm_id: staffRecord.firm_id,
+                };
+            }
 
             if (!integ?.access_token) {
                 return new Response(JSON.stringify({ error: 'CRM integration not configured for this firm' }), {
@@ -115,10 +129,17 @@ serve(async (req) => {
                 if (refreshResp.ok) {
                     const refreshData = await refreshResp.json();
                     accessToken = refreshData.access_token;
+                    const newExpiry = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+                    // Update both tables for consistency
                     await supabaseAdmin.from('integrations_ghl').update({
                         access_token: refreshData.access_token,
                         refresh_token: refreshData.refresh_token,
-                        token_expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+                        token_expires_at: newExpiry,
+                    }).eq('firm_id', integ.firm_id);
+                    await supabaseAdmin.from('firms').update({
+                        ghl_access_token: refreshData.access_token,
+                        ghl_refresh_token: refreshData.refresh_token,
+                        ghl_token_expires_at: newExpiry,
                     }).eq('firm_id', integ.firm_id);
                 } else {
                     return new Response(JSON.stringify({ error: 'CRM token expired and could not be refreshed' }), {

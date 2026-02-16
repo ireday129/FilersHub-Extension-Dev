@@ -117,7 +117,7 @@ export const useFirmData = () => {
             const firmIds = Array.from(allFirmsMap.keys());
             const { data: firmsDetails, error: firmsError } = await supabase
                 .from('firms')
-                .select('firm_id, firm_name, logo_url, brand_color')
+                .select('firm_id, firm_name, logo_url, brand_color, slug')
                 .in('firm_id', firmIds);
 
             if (firmsError) {
