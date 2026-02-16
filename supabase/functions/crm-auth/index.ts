@@ -791,8 +791,61 @@ serve(async (req) => {
                 return Response.redirect(`${appUrl}/dashboard#${sessionParams.toString()}`, 302);
             }
 
-            // Standard Flow Redirect
-            // appUrl is already declared at line 278
+            // Standard Flow: Also ensure installing user has a staff record
+            // tokenData contains userId and locationId from the OAuth token response
+            if (firmId && tokenData.userId) {
+                try {
+                    const userResp = await fetch(`https://services.leadconnectorhq.com/users/${tokenData.userId}`, {
+                        headers: {
+                            'Authorization': `Bearer ${tokenData.access_token}`,
+                            'Version': '2021-07-28'
+                        }
+                    });
+
+                    if (userResp.ok) {
+                        const userData = await userResp.json();
+                        const ghlUser = userData.user || userData;
+                        const email = ghlUser.email?.trim();
+                        const name = `${ghlUser.firstName || ''} ${ghlUser.lastName || ''}`.trim() || 'Firm Owner';
+
+                        if (email) {
+                            // Find/Create auth user
+                            let userRecord;
+                            const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
+                            const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                                email, password: tempPassword, email_confirm: true,
+                                user_metadata: { full_name: name }
+                            });
+                            if (createError) {
+                                const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email });
+                                userRecord = linkData?.user;
+                            } else {
+                                userRecord = newUser.user;
+                            }
+
+                            if (userRecord) {
+                                // Upsert staff record
+                                const { data: existingStaff } = await supabaseAdmin.from('staff')
+                                    .select('staff_id').eq('email', email).maybeSingle();
+
+                                if (!existingStaff) {
+                                    await supabaseAdmin.from('staff').insert({
+                                        firm_id: firmId, email, full_name: name,
+                                        role: 'Firm Owner', auth_user_id: userRecord.id, is_active: true
+                                    });
+                                } else {
+                                    await supabaseAdmin.from('staff').update({
+                                        auth_user_id: userRecord.id, firm_id: firmId, is_active: true
+                                    }).eq('staff_id', existingStaff.staff_id);
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Standard flow: Failed to create staff record:", err);
+                }
+            }
+
             return Response.redirect(`${appUrl}/?ghl_connected=true`, 302)
         }
 

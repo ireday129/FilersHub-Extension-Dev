@@ -91,8 +91,67 @@ export default async function handler(req: any, res: any) {
             return res.status(500).json({ error: 'Failed to save firm data', details: dbError });
         }
 
+        // 3b. Resolve firm_id for staff creation
+        const { data: firmRecord } = await supabaseAdmin
+            .from("firms")
+            .select("firm_id")
+            .eq("ghl_location_id", tokenData.locationId)
+            .maybeSingle();
+
+        // 3c. Create staff record for the installing user
+        if (firmRecord?.firm_id && tokenData.userId) {
+            try {
+                const userResp = await fetch(`https://services.leadconnectorhq.com/users/${tokenData.userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${tokenData.access_token}`,
+                        'Version': '2021-07-28'
+                    }
+                });
+
+                if (userResp.ok) {
+                    const userData = await userResp.json();
+                    const ghlUser = userData.user || userData;
+                    const email = ghlUser.email?.trim();
+                    const name = `${ghlUser.firstName || ''} ${ghlUser.lastName || ''}`.trim() || 'Firm Owner';
+
+                    if (email) {
+                        // Find/Create auth user
+                        let userRecord;
+                        const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
+                        const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                            email, password: tempPassword, email_confirm: true,
+                            user_metadata: { full_name: name }
+                        });
+                        if (createError) {
+                            const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email });
+                            userRecord = linkData?.user;
+                        } else {
+                            userRecord = newUser?.user;
+                        }
+
+                        if (userRecord) {
+                            const { data: existingStaff } = await supabaseAdmin.from('staff')
+                                .select('staff_id').eq('email', email).maybeSingle();
+
+                            if (!existingStaff) {
+                                await supabaseAdmin.from('staff').insert({
+                                    firm_id: firmRecord.firm_id, email, full_name: name,
+                                    role: 'Firm Owner', auth_user_id: userRecord.id, is_active: true
+                                });
+                            } else {
+                                await supabaseAdmin.from('staff').update({
+                                    auth_user_id: userRecord.id, firm_id: firmRecord.firm_id, is_active: true
+                                }).eq('staff_id', existingStaff.staff_id);
+                            }
+                        }
+                    }
+                }
+            } catch (staffErr) {
+                console.error("crm-callback: Failed to create staff record:", staffErr);
+            }
+        }
+
         // 4. Redirect to Dashboard
-        // Use the stored firm ID if available, or just go to dashboard
         return res.redirect(302, `https://${process.env.APP_URL || process.env.VERCEL_URL}/`);
 
     } catch (error: any) {
