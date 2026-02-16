@@ -64,10 +64,39 @@ export const useFirmData = () => {
             }
 
             // 1b. Get ALL Client entries for this user
-            const { data: clientEntries, error: clientError } = await supabase
+            let clientEntries: any[] | null = null;
+            const { data: clientData, error: clientError } = await supabase
                 .from('clients')
                 .select('firm_id, full_name')
                 .eq('auth_user_id', user.id);
+
+            clientEntries = clientData;
+
+            // 1c. Email fallback: if no client entries found by auth_user_id, try linking via RPC
+            if ((!clientEntries || clientEntries.length === 0) && user.email) {
+                const metaRole = user.user_metadata?.role;
+                const metaFirmId = user.user_metadata?.firm_id;
+
+                if (metaRole === 'Client' && metaFirmId) {
+                    try {
+                        const { data: linkResult } = await supabase.rpc('link_client_auth', {
+                            p_email: user.email.toLowerCase(),
+                            p_firm_id: metaFirmId
+                        });
+
+                        if (linkResult?.success) {
+                            // Re-query after successful linking
+                            const { data: linkedEntries } = await supabase
+                                .from('clients')
+                                .select('firm_id, full_name')
+                                .eq('auth_user_id', user.id);
+                            clientEntries = linkedEntries;
+                        }
+                    } catch (linkErr) {
+                        console.warn('Client email fallback link failed:', linkErr);
+                    }
+                }
+            }
 
             const allFirmsMap = new Map();
 
@@ -84,7 +113,6 @@ export const useFirmData = () => {
                             slug: '',
                             isStaff: true
                         });
-                        // Avatar handled separately if column exists
                     }
                 }
             }
@@ -95,7 +123,7 @@ export const useFirmData = () => {
                     if (!allFirmsMap.has(entry.firm_id)) {
                         allFirmsMap.set(entry.firm_id, {
                             id: entry.firm_id,
-                            role: 'Client', // Explicitly mark as client
+                            role: 'Client',
                             name: '',
                             logo: '',
                             brandColor: '',
@@ -103,6 +131,14 @@ export const useFirmData = () => {
                             isStaff: false
                         });
                     }
+                }
+            }
+
+            // Sync role to user metadata if detected as Client but metadata doesn't match
+            if (allFirmsMap.size > 0) {
+                const firstFirm = Array.from(allFirmsMap.values())[0];
+                if (firstFirm.role === 'Client' && user.user_metadata?.role !== 'Client') {
+                    await supabase.auth.updateUser({ data: { role: 'Client' } });
                 }
             }
 

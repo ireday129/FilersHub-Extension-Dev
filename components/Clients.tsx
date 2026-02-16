@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { UserRole, TaxReturn, TaxReturnStatus, NavItem } from '../types';
 import { useExtensionMode } from '../hooks/useExtensionMode';
+import { supabase } from '../services/supabase';
 import {
   Users,
   Search,
@@ -12,7 +13,10 @@ import {
   LayoutGrid,
   List,
   Mail,
-  MoreVertical
+  MoreVertical,
+  Plus,
+  X,
+  Loader2
 } from 'lucide-react';
 
 interface ClientsProps {
@@ -20,17 +24,68 @@ interface ClientsProps {
   returns: TaxReturn[];
   setSelectedReturnId: (id: string | null) => void;
   setActiveTab: (tab: NavItem) => void;
+  firmId: string | null;
+  refreshData: () => Promise<void>;
 }
 
 type ClientView = 'My Clients' | 'Active Returns' | 'Completed Returns' | 'Firm Clients';
 
-const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab }) => {
+const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData }) => {
   const { isExtension } = useExtensionMode();
   const [activeView, setActiveView] = useState<ClientView>(() => {
     if (role === UserRole.TaxPro) return 'Active Returns';
     return 'My Clients';
   });
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Add Client form state
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
+  const [addingClient, setAddingClient] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addSuccess, setAddSuccess] = useState(false);
+
+  const canAddClients = role === UserRole.FirmOwner || role === UserRole.Manager;
+
+  const handleAddClient = async () => {
+    if (!newClientName.trim() || !newClientEmail.trim() || !firmId) return;
+    setAddingClient(true);
+    setAddError(null);
+    setAddSuccess(false);
+
+    try {
+      const { error } = await supabase.from('clients').insert({
+        firm_id: firmId,
+        full_name: newClientName.trim(),
+        email: newClientEmail.trim().toLowerCase(),
+        tax_return_status: 'Intake Received',
+        is_active: true,
+      });
+
+      if (error) {
+        if (error.message?.includes('unique') || error.code === '23505') {
+          setAddError('A client with this email already exists for your firm.');
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      setNewClientName('');
+      setNewClientEmail('');
+      setAddSuccess(true);
+      setTimeout(() => {
+        setShowAddClient(false);
+        setAddSuccess(false);
+      }, 1500);
+      await refreshData();
+    } catch (err: any) {
+      setAddError(err.message || 'Failed to add client.');
+    } finally {
+      setAddingClient(false);
+    }
+  };
 
   const staffName = useMemo(() => {
     if (role === UserRole.FirmOwner) return "Sarah Johnson";
@@ -188,16 +243,63 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
             </div>
           </div>
 
-          <div className="bg-[#1e293b] p-6 rounded-2xl text-white relative overflow-hidden group">
-            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-              <Users size={120} />
+          {canAddClients && (
+            <div className="bg-[#1e293b] p-6 rounded-2xl text-white relative overflow-hidden group">
+              <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                <Users size={120} />
+              </div>
+              {showAddClient ? (
+                <div className="relative z-10 space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-bold">Add New Client</h4>
+                    <button onClick={() => { setShowAddClient(false); setAddError(null); setAddSuccess(false); }} className="text-slate-400 hover:text-white">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {addError && (
+                    <div className="bg-rose-500/20 text-rose-300 text-xs font-bold p-2 rounded-lg">{addError}</div>
+                  )}
+                  {addSuccess && (
+                    <div className="bg-emerald-500/20 text-emerald-300 text-xs font-bold p-2 rounded-lg">Client added successfully!</div>
+                  )}
+                  <input
+                    type="text"
+                    placeholder="Full Name"
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email Address"
+                    value={newClientEmail}
+                    onChange={(e) => setNewClientEmail(e.target.value)}
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand"
+                  />
+                  <button
+                    onClick={handleAddClient}
+                    disabled={addingClient || !newClientName.trim() || !newClientEmail.trim()}
+                    className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {addingClient ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                    {addingClient ? 'Adding...' : 'Add Client'}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h4 className="text-sm font-bold mb-2">Add a new client</h4>
+                  <p className="text-xs text-slate-400 mb-4 leading-relaxed">Add client details so they can access their portal.</p>
+                  <button
+                    onClick={() => setShowAddClient(true)}
+                    className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus size={14} />
+                    Add New Client
+                  </button>
+                </>
+              )}
             </div>
-            <h4 className="text-sm font-bold mb-2">Need to invite a new client?</h4>
-            <p className="text-xs text-slate-400 mb-4 leading-relaxed">Send a secure link to start their tax intake process immediately.</p>
-            <button className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors">
-              Create Invite Link
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Main List Area */}

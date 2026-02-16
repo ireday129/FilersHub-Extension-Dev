@@ -114,6 +114,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [ghlError, setGhlError] = useState('');
+  const [copiedPortalUrl, setCopiedPortalUrl] = useState(false);
 
   const refreshStaff = async () => {
     if (!firmId) return;
@@ -485,11 +486,21 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Portal Access URL</label>
                 <div className="relative group">
                   <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <div className="w-full pl-10 pr-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 flex items-center overflow-hidden">
+                  <div className="w-full pl-10 pr-20 py-3 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 flex items-center overflow-hidden">
                     <span className="truncate">{portalUrl}</span>
                   </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`https://${portalUrl}`);
+                      setCopiedPortalUrl(true);
+                      setTimeout(() => setCopiedPortalUrl(false), 2000);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-brand text-white text-[10px] font-bold rounded-lg hover:bg-brand/90 transition-all"
+                  >
+                    {copiedPortalUrl ? 'Copied!' : 'Copy'}
+                  </button>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 font-medium italic">Your clients will use this specific link to log in.</p>
+                <p className="text-[10px] text-slate-400 mt-2 font-medium italic">Share this link with your clients so they can log in to the portal.</p>
               </div>
             </div>
 

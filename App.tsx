@@ -116,15 +116,14 @@ const AuthenticatedApp: React.FC = () => {
   // Global Firm Settings - now fetched from useFirmData
 
 
-  // Fetch role from user profile (metadata)
+  // Fetch role from user profile (metadata) or from firm data
   useEffect(() => {
     if (user?.user_metadata?.role) {
       setSelectedRole(user.user_metadata.role as UserRole);
-    } else if (!selectedRole) {
-      // Logic to determine role would go here. For now default to FirmOwner for dev
-      setSelectedRole(UserRole.FirmOwner);
+    } else if (availableFirms && availableFirms.length > 0) {
+      setSelectedRole(availableFirms[0].role as UserRole);
     }
-  }, [user, selectedRole]);
+  }, [user, availableFirms]);
 
   // Handle URL Path Routing (No hashes allowed per project rules)
   useEffect(() => {
@@ -219,6 +218,8 @@ const AuthenticatedApp: React.FC = () => {
             returns={returns}
             setSelectedReturnId={setSelectedReturnId}
             setActiveTab={setActiveTab}
+            firmId={firmId}
+            refreshData={refresh}
           />
         );
       case NavItem.Documents:
@@ -352,7 +353,7 @@ import RoleSelection from './components/RoleSelection';
 import StaffLogin from './components/StaffLogin';
 import SuperAdminLogin from './components/SuperAdminLogin';
 
-import { getFirmBySlug, PublicFirmData } from './services/firms';
+import { getFirmBySlug } from './services/firms';
 import Login from './components/auth/Login';
 import { useGhlContext } from './hooks/useGhlContext';
 
@@ -361,7 +362,9 @@ const AppContent: React.FC = () => {
   const { isExtension } = useExtensionMode();
   const { ghlContext, loading: ghlLoading } = useGhlContext(isExtension);
   const [path, setPath] = useState(window.location.pathname);
-  const [firmBranding, setFirmBranding] = useState<PublicFirmData['firm_name' | 'logo_url' | 'brand_color'] | null>(null);
+  const [firmBranding, setFirmBranding] = useState<{
+    firm_id: string; name: string; logo: string; color: string;
+  } | null>(null);
   const [isFirmLoading, setIsFirmLoading] = useState(false);
   const [launchpadUrl, setLaunchpadUrl] = useState<string | null>(null);
 
@@ -386,6 +389,7 @@ const AppContent: React.FC = () => {
           const firmData = await getFirmBySlug(slug);
           if (firmData) {
             setFirmBranding({
+              firm_id: firmData.firm_id,
               name: firmData.firm_name,
               logo: firmData.logo_url,
               color: firmData.brand_color
@@ -525,8 +529,8 @@ const AppContent: React.FC = () => {
       return <Login firmBranding={{
         name: firmBranding.name,
         logo: firmBranding.logo,
-        color: firmBranding.brand_color
-      }} />;
+        color: firmBranding.color
+      }} firmId={firmBranding.firm_id} />;
     }
 
     // Generic login page

@@ -9,9 +9,10 @@ interface LoginProps {
         logo: string;
         color: string;
     };
+    firmId?: string;
 }
 
-const Login: React.FC<LoginProps> = ({ firmBranding }) => {
+const Login: React.FC<LoginProps> = ({ firmBranding, firmId }) => {
     const { bypassAuth } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -20,9 +21,28 @@ const Login: React.FC<LoginProps> = ({ firmBranding }) => {
     const [isSignUp, setIsSignUp] = useState(false);
     const [magicLinkSent, setMagicLinkSent] = useState(false);
 
-    const brandColor = firmBranding?.color || '#2563eb'; // Default blue-600
-    // Helper for hover state - simple approach, or just use opacity
+    const brandColor = firmBranding?.color || '#2563eb';
     const brandName = firmBranding?.name || 'FilersHub';
+    const isPortal = !!firmId;
+
+    // Attempt to link auth user to existing client record via RPC
+    const linkClientRecord = async (clientEmail: string) => {
+        if (!firmId) return;
+        try {
+            const { data: linkResult, error: linkError } = await supabase.rpc('link_client_auth', {
+                p_email: clientEmail.toLowerCase(),
+                p_firm_id: firmId
+            });
+            if (linkError) {
+                console.error('Failed to link client:', linkError);
+            }
+            if (linkResult?.error) {
+                console.warn('Client link warning:', linkResult.error);
+            }
+        } catch (err) {
+            console.error('Link client error:', err);
+        }
+    };
 
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -31,11 +51,21 @@ const Login: React.FC<LoginProps> = ({ firmBranding }) => {
 
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                });
+                const signUpPayload: any = { email, password };
+                if (isPortal) {
+                    signUpPayload.options = {
+                        data: { role: 'Client', firm_id: firmId }
+                    };
+                }
+
+                const { data, error } = await supabase.auth.signUp(signUpPayload);
                 if (error) throw error;
+
+                // If sign-up returned a session (auto-confirm enabled), link immediately
+                if (data.session && firmId) {
+                    await linkClientRecord(email);
+                }
+
                 alert('Check your email for the confirmation link!');
             } else {
                 const { error } = await supabase.auth.signInWithPassword({
@@ -43,6 +73,11 @@ const Login: React.FC<LoginProps> = ({ firmBranding }) => {
                     password,
                 });
                 if (error) throw error;
+
+                // After sign-in through portal, attempt to link client record (idempotent)
+                if (isPortal) {
+                    await linkClientRecord(email);
+                }
             }
         } catch (err: any) {
             setError(err.message);
@@ -122,17 +157,19 @@ const Login: React.FC<LoginProps> = ({ firmBranding }) => {
                                 placeholder="••••••••"
                             />
                         </div>
-                        <div className="flex justify-end mb-4">
-                            <button
-                                type="button"
-                                onClick={bypassAuth}
-                                className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
-                            >
-                                <ShieldCheck size={12} />
-                                Skip Login (Dev Mode)
-                            </button>
-                        </div>
 
+                        {!isPortal && (
+                            <div className="flex justify-end mb-4">
+                                <button
+                                    type="button"
+                                    onClick={bypassAuth}
+                                    className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
+                                >
+                                    <ShieldCheck size={12} />
+                                    Skip Login (Dev Mode)
+                                </button>
+                            </div>
+                        )}
 
                         <button
                             type="submit"
