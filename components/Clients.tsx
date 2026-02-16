@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { UserRole, TaxReturn, TaxReturnStatus, NavItem } from '../types';
+import { UserRole, TaxReturn, TaxReturnStatus, NavItem, TAX_RETURN_TYPES, TAX_YEARS } from '../types';
 import { useExtensionMode } from '../hooks/useExtensionMode';
 import { supabase } from '../services/supabase';
 import {
@@ -16,7 +16,8 @@ import {
   MoreVertical,
   Plus,
   X,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 
 interface ClientsProps {
@@ -43,6 +44,50 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState(false);
 
+  // Create Return modal state
+  const [createReturnClientId, setCreateReturnClientId] = useState<string | null>(null);
+  const [createReturnYear, setCreateReturnYear] = useState('');
+  const [createReturnType, setCreateReturnType] = useState('');
+  const [creatingReturn, setCreatingReturn] = useState(false);
+  const [createReturnError, setCreateReturnError] = useState<string | null>(null);
+
+  const groupedReturnTypes = useMemo(() => {
+    const groups: Record<string, { key: string; label: string }[]> = {};
+    Object.entries(TAX_RETURN_TYPES).forEach(([key, val]) => {
+      if (!groups[val.category]) groups[val.category] = [];
+      groups[val.category].push({ key, label: val.label });
+    });
+    return groups;
+  }, []);
+
+  const handleCreateReturn = async () => {
+    if (!createReturnClientId || !createReturnYear || !createReturnType) return;
+    setCreatingReturn(true);
+    setCreateReturnError(null);
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          tax_year: createReturnYear,
+          return_type: createReturnType,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('client_id', createReturnClientId);
+
+      if (error) throw error;
+
+      setCreateReturnClientId(null);
+      setCreateReturnYear('');
+      setCreateReturnType('');
+      await refreshData();
+    } catch (err: any) {
+      setCreateReturnError(err.message || 'Failed to create return.');
+    } finally {
+      setCreatingReturn(false);
+    }
+  };
+
   const canAddClients = role === UserRole.FirmOwner || role === UserRole.Manager;
 
   const handleAddClient = async () => {
@@ -65,6 +110,25 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
           throw error;
         }
         return;
+      }
+
+      // Invite client to Supabase Auth so they can log in to their portal
+      try {
+        const resp = await fetch('/api/invite-client', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: newClientEmail.trim().toLowerCase(),
+            firmId,
+            fullName: newClientName.trim(),
+          }),
+        });
+        const result = await resp.json();
+        if (!resp.ok) {
+          console.error('Auth invite failed:', result.error);
+        }
+      } catch (inviteErr) {
+        console.error('Failed to send auth invite:', inviteErr);
       }
 
       setNewClientName('');
@@ -289,7 +353,9 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                             {client.status}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium">{client.year} • {client.type}</p>
+                        <p className="text-xs text-slate-500 font-medium">
+                          {client.year && client.type ? `${client.year} • ${client.type}` : 'No return created'}
+                        </p>
                       </div>
                     </div>
 
@@ -303,13 +369,23 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                         <button className="p-2 text-slate-400 hover:text-brand hover:bg-brand-light rounded-lg transition-all" title="Message Client">
                           <Mail size={18} />
                         </button>
-                        <button
-                          onClick={() => handleManageReturn(client.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-brand text-xs font-bold rounded-xl hover:bg-brand-light transition-all shadow-sm"
-                        >
-                          Manage Return
-                          <ArrowRight size={14} />
-                        </button>
+                        {client.year && client.type ? (
+                          <button
+                            onClick={() => handleManageReturn(client.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-brand text-xs font-bold rounded-xl hover:bg-brand-light transition-all shadow-sm"
+                          >
+                            Manage Return
+                            <ArrowRight size={14} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => { setCreateReturnClientId(client.id); setCreateReturnYear(''); setCreateReturnType(''); setCreateReturnError(null); }}
+                            className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand/90 transition-all shadow-sm"
+                          >
+                            <FileText size={14} />
+                            Create Return
+                          </button>
+                        )}
                         <button className="p-2 text-slate-400 hover:text-slate-600">
                           <MoreVertical size={18} />
                         </button>
@@ -336,6 +412,74 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
           </div>
         </div>
       </div>
+
+      {/* Create Return Modal */}
+      {createReturnClientId && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setCreateReturnClientId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Create Tax Return</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  For: {returns.find(r => r.id === createReturnClientId)?.clientName}
+                </p>
+              </div>
+              <button onClick={() => setCreateReturnClientId(null)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {createReturnError && (
+                <div className="bg-rose-50 text-rose-600 text-xs font-bold p-3 rounded-xl border border-rose-100">{createReturnError}</div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Tax Year</label>
+                <select
+                  value={createReturnYear}
+                  onChange={(e) => setCreateReturnYear(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all"
+                >
+                  <option value="">-- Select Tax Year --</option>
+                  {Object.entries(TAX_YEARS).map(([key, val]) => (
+                    <option key={key} value={val.label}>{val.label}{!val.isOpen ? ' (Closed)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Return Type</label>
+                <select
+                  value={createReturnType}
+                  onChange={(e) => setCreateReturnType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all"
+                >
+                  <option value="">-- Select Return Type --</option>
+                  {Object.entries(groupedReturnTypes).map(([category, items]) => (
+                    <optgroup key={category} label={category}>
+                      {(items as { key: string; label: string }[]).map(item => (
+                        <option key={item.key} value={item.label}>{item.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="p-6 pt-0">
+              <button
+                onClick={handleCreateReturn}
+                disabled={creatingReturn || !createReturnYear || !createReturnType}
+                className="w-full py-3 bg-brand text-white text-sm font-bold rounded-xl hover:bg-brand/90 transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {creatingReturn ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                {creatingReturn ? 'Creating...' : 'Create Tax Return'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

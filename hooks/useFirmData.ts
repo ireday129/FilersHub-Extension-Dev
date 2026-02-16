@@ -257,18 +257,18 @@ export const useFirmData = () => {
                 return {
                     id: client.client_id,
                     clientName: client.full_name,
-                    year: '2024',
-                    type: 'Individual 1040',
+                    year: client.tax_year || '',
+                    type: client.return_type || '',
                     status: client.tax_return_status as TaxReturnStatus,
-                    preparer: 'Sarah Johnson',
+                    preparer: client.assigned_to || '',
                     date: new Date(client.updated_at).toLocaleDateString(),
                     amount: 'N/A',
-                    agi: 'N/A',
-                    federalBalance: 'N/A',
-                    stateBalance: 'N/A',
-                    paymentType: 'Invoice',
+                    agi: client.agi || 'N/A',
+                    federalBalance: client.federal_balance || 'N/A',
+                    stateBalance: client.state_balance || 'N/A',
+                    paymentType: client.payment_type || 'Invoice',
                     files: files,
-                    internalNotes: ''
+                    internalNotes: client.internal_notes || ''
                 };
             });
 

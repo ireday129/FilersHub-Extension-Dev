@@ -383,6 +383,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
         .from('clients')
         .update({
           tax_return_status: selectedReturn.status,
+          assigned_to: selectedReturn.preparer || null,
+          return_type: selectedReturn.type || null,
+          tax_year: selectedReturn.year || null,
+          agi: selectedReturn.agi || null,
+          federal_balance: selectedReturn.federalBalance || null,
+          state_balance: selectedReturn.stateBalance || null,
+          payment_type: selectedReturn.paymentType || null,
+          internal_notes: selectedReturn.internalNotes || null,
           updated_at: new Date().toISOString()
         })
         .eq('client_id', selectedReturn.id);
@@ -970,6 +978,19 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     >
                       {STATUS_ORDER.map(status => (
                         <option key={status} value={status}>{STATUS_EMOJIS[status]} {status}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Assigned Staff</label>
+                    <select
+                      value={selectedReturn.preparer || ''}
+                      onChange={(e) => handleUpdateField(selectedReturn.id, 'preparer', e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all"
+                    >
+                      <option value="">-- Unassigned --</option>
+                      {staffMembers.map(name => (
+                        <option key={name} value={name}>{name}</option>
                       ))}
                     </select>
                   </div>
