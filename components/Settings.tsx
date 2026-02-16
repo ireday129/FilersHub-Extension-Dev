@@ -138,8 +138,15 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     setShowGHLModal(true);
     setGhlError('');
     try {
+      // Ensure session is fresh before calling the edge function
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Your session has expired. Please sign out and sign back in.');
+      }
+
       const { data, error } = await supabase.functions.invoke('crm-users', {
-        body: { action: 'list' }
+        body: { action: 'list' },
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
 
       // Extract detailed error from response body (data) or the generic supabase error
@@ -166,6 +173,9 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     const role = selectedRoles[user.id] || 'Tax Pro';
     setGrantStatus(prev => ({ ...prev, [user.id]: 'granting' }));
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Session expired');
+
       const { data, error } = await supabase.functions.invoke('crm-users', {
         body: {
           action: 'grant',
@@ -173,11 +183,12 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           email: user.email,
           name: user.name || `${user.firstName} ${user.lastName}`,
           role,
-        }
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
 
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      if (error) throw error;
 
       setGrantStatus(prev => ({ ...prev, [user.id]: 'granted' }));
       // Mark as having access in the GHL users list
@@ -213,11 +224,15 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
   const revokeAccess = async (staffId: string) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Session expired');
+
       const { data, error } = await supabase.functions.invoke('crm-users', {
-        body: { action: 'revoke', staffId }
+        body: { action: 'revoke', staffId },
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      if (error) throw error;
       setStaff(prev => prev.filter(m => m.id !== staffId));
     } catch (err: any) {
       console.error('Error revoking access:', err);
