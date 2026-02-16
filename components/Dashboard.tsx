@@ -842,6 +842,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
           >
             <ArrowLeft size={20} />
           </button>
+          <div className={`${isExtension ? 'w-9 h-9' : 'w-11 h-11'} rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0`}>
+            <img
+              src={selectedReturn.clientAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedReturn.clientName}`}
+              alt={selectedReturn.clientName}
+              className="w-full h-full object-cover"
+            />
+          </div>
           <div>
             <h2 className="text-xl font-bold text-slate-800">{selectedReturn.year} {selectedReturn.type}</h2>
             <p className="text-sm text-slate-500">{selectedReturn.clientName}</p>
@@ -1809,8 +1816,15 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       <button
                         key={tr.id}
                         onClick={() => setSelectedReturnId(tr.id)}
-                        className="w-full flex items-center justify-between px-3 py-3 hover:bg-slate-50 transition-colors text-left group"
+                        className="w-full flex items-center gap-2.5 px-3 py-3 hover:bg-slate-50 transition-colors text-left group"
                       >
+                        <div className="w-7 h-7 rounded-full bg-slate-200 border border-white shadow-sm overflow-hidden shrink-0">
+                          <img
+                            src={tr.clientAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${tr.clientName}`}
+                            alt={tr.clientName}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-slate-800 truncate group-hover:text-brand transition-colors">{tr.clientName}</p>
                           <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter truncate">{tr.year} • {tr.type}</p>
@@ -1835,9 +1849,18 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       {displayedReturns.length > 0 ? displayedReturns.map(tr => (
                         <tr key={tr.id} className="hover:bg-slate-50 transition-colors group">
                           <td className="px-6 py-4">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-800 truncate">{tr.clientName}</p>
-                              <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter truncate">{tr.year} • {tr.type}</p>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0">
+                                <img
+                                  src={tr.clientAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${tr.clientName}`}
+                                  alt={tr.clientName}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-slate-800 truncate">{tr.clientName}</p>
+                                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter truncate">{tr.year} • {tr.type}</p>
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4">

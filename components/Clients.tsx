@@ -34,6 +34,7 @@ type ClientView = 'My Clients' | 'Firm Clients';
 interface ClientGroup {
   clientId: string;
   name: string;
+  avatar: string;
   returns: TaxReturn[];
   returnCount: number;
   preparer: string;
@@ -179,15 +180,16 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
 
   // Group returns by client name (using clientId as the grouping key)
   const clientGroups = useMemo((): ClientGroup[] => {
-    const map: Record<string, { clientId: string; name: string; returns: TaxReturn[] }> = {};
+    const map: Record<string, { clientId: string; name: string; avatar: string; returns: TaxReturn[] }> = {};
     filteredReturns.forEach(r => {
       const key = r.clientId;
-      if (!map[key]) map[key] = { clientId: r.clientId, name: r.clientName, returns: [] };
+      if (!map[key]) map[key] = { clientId: r.clientId, name: r.clientName, avatar: r.clientAvatar || '', returns: [] };
       map[key].returns.push(r);
     });
-    return Object.values(map).map(({ clientId, name, returns: rets }) => ({
+    return Object.values(map).map(({ clientId, name, avatar, returns: rets }) => ({
       clientId,
       name,
+      avatar,
       returns: rets,
       returnCount: rets.filter(r => r.year && r.type).length,
       preparer: rets[0]?.preparer || '',
@@ -526,8 +528,9 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                       <div className="flex items-center gap-3 min-w-0">
                         <div className={`${isExtension ? 'w-8 h-8' : 'w-11 h-11'} rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0`}>
                           <img
-                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${client.name}`}
+                            src={client.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${client.name}`}
                             alt={client.name}
+                            className="w-full h-full object-cover"
                           />
                         </div>
                         <div className="min-w-0">

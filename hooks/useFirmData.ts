@@ -298,6 +298,7 @@ export const useFirmData = () => {
                     id: ret.return_id,
                     clientId: ret.client_id,
                     clientName: client?.full_name || '',
+                    clientAvatar: client?.avatar_url || '',
                     year: ret.tax_year || '',
                     type: ret.return_type || '',
                     status: ret.tax_return_status as TaxReturnStatus,
@@ -320,6 +321,7 @@ export const useFirmData = () => {
                         id: client.client_id, // placeholder uses client_id as id
                         clientId: client.client_id,
                         clientName: client.full_name,
+                        clientAvatar: client.avatar_url || '',
                         year: '',
                         type: '',
                         status: TaxReturnStatus.IntakeReceived,

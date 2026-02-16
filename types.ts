@@ -225,6 +225,7 @@ export interface TaxReturn {
   id: string;
   clientId: string;
   clientName: string;
+  clientAvatar?: string;
   year: string;
   type: string;
   status: TaxReturnStatus;
