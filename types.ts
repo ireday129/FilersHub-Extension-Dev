@@ -64,15 +64,15 @@ export const TAX_YEARS: Record<string, { label: string; isOpen: boolean }> = {
   },
   "TY_2023": {
     "label": "2023",
-    "isOpen": false
+    "isOpen": true
   },
   "TY_2022": {
     "label": "2022",
-    "isOpen": false
+    "isOpen": true
   },
   "TY_2021": {
     "label": "2021",
-    "isOpen": false
+    "isOpen": true
   }
 };
 
@@ -96,10 +96,6 @@ export const TAX_RETURN_TYPES: Record<string, { label: string; category: string 
   "AMENDED_1040X": {
     "label": "Amended Individual Return (1040-X)",
     "category": "Amended"
-  },
-  "BUSINESS_SOLE_PROP": {
-    "label": "Sole Proprietor (Schedule C)",
-    "category": "Business"
   },
   "BUSINESS_PARTNERSHIP_1065": {
     "label": "Partnership Return (Form 1065)",

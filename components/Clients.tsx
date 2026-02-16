@@ -659,7 +659,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                 >
                   <option value="">-- Select Tax Year --</option>
                   {Object.entries(TAX_YEARS).map(([key, val]) => (
-                    <option key={key} value={val.label}>{val.label}{!val.isOpen ? ' (Closed)' : ''}</option>
+                    <option key={key} value={val.label}>{val.label}</option>
                   ))}
                 </select>
               </div>
