@@ -98,51 +98,20 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
   };
 
   const renderTabs = () => {
-    if (role === UserRole.FirmOwner) {
+    if (role === UserRole.FirmOwner || role === UserRole.Manager) {
+      const views: ClientView[] = ['My Clients', 'Firm Clients', 'Active Returns', 'Completed Returns'];
       return (
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-          {(['My Clients', 'Active Returns', 'Completed Returns'] as ClientView[]).map(view => (
+        <div className={`flex items-center gap-1 bg-slate-100 p-1 rounded-xl ${isExtension ? 'flex-wrap' : ''}`}>
+          {views.map(view => (
             <button
               key={view}
               onClick={() => setActiveView(view)}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              className={`${isExtension ? 'px-3 py-1.5 text-[10px]' : 'px-4 py-2 text-xs'} font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
             >
               {view}
             </button>
           ))}
-        </div>
-      );
-    }
-    if (role === UserRole.Manager) {
-      if (isExtension) {
-        return (
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setActiveView('My Clients')}
-              className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1.5 ${activeView === 'My Clients' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-            >
-              <UserCheck size={12} />
-              My Clients
-            </button>
-            <button
-              onClick={() => setActiveView('Firm Clients')}
-              className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all flex items-center gap-1.5 ${activeView === 'Firm Clients' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-            >
-              <Users size={12} />
-              Firm Clients
-            </button>
-          </div>
-        );
-      }
-      return (
-        <div className="flex items-center gap-2">
-          <span className="px-4 py-2 bg-brand-light text-brand text-xs font-bold rounded-lg border border-brand/20 flex items-center gap-2">
-            <UserCheck size={14} />
-            My Clients
-          </span>
         </div>
       );
     }
@@ -175,7 +144,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-slate-800">Client Management</h2>
-          <p className="text-xs text-slate-500">Manage your book of business and monitor return lifecycle.</p>
+          <p className="text-xs text-slate-500">Manage your clients.</p>
         </div>
         {renderTabs()}
       </div>

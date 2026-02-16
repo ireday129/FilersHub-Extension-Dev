@@ -266,24 +266,42 @@ const Documents: React.FC<DocumentsProps> = ({ role, returns, setReturns, firmId
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl shrink-0">
-            <button
-              onClick={() => setFilterStatus('All')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filterStatus === 'All' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-            >
-              All <span className="text-[10px] opacity-60 font-medium">({stats.all})</span>
-            </button>
-            {(isStaff ? ['Uploaded', 'Under Review', 'Rejected'] : ['Uploaded', 'Under Review', 'Approved', 'Rejected'] as DocStatus[]).map(status => (
+          <div className="flex flex-col gap-2 shrink-0 items-end">
+            {(role === UserRole.FirmOwner || role === UserRole.Manager) && (
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setViewScope('My')}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${viewScope === 'My' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  My Clients
+                </button>
+                <button
+                  onClick={() => setViewScope('Firm')}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${viewScope === 'Firm' ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Firm Clients
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
               <button
-                key={status}
-                onClick={() => setFilterStatus(status as DocStatus)}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${filterStatus === status ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                onClick={() => setFilterStatus('All')}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filterStatus === 'All' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                   }`}
               >
-                {status} <span className="text-[10px] opacity-60 font-medium">({status === 'Uploaded' ? stats.uploaded : status === 'Under Review' ? stats.review : status === 'Approved' ? stats.approved : stats.rejected})</span>
+                All <span className="text-[10px] opacity-60 font-medium">({stats.all})</span>
               </button>
-            ))}
+              {(isStaff ? ['Uploaded', 'Under Review', 'Rejected'] : ['Uploaded', 'Under Review', 'Approved', 'Rejected'] as DocStatus[]).map(status => (
+                <button
+                  key={status}
+                  onClick={() => setFilterStatus(status as DocStatus)}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${filterStatus === status ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                >
+                  {status} <span className="text-[10px] opacity-60 font-medium">({status === 'Uploaded' ? stats.uploaded : status === 'Under Review' ? stats.review : status === 'Approved' ? stats.approved : stats.rejected})</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

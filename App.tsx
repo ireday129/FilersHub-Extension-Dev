@@ -297,13 +297,20 @@ const AuthenticatedApp: React.FC = () => {
                 )}
               </div>
               <h1 className={`${isExtension ? 'text-xl' : 'text-2xl'} font-bold text-slate-800`}>
-                {isSuperAdmin ? "Platform Overview" : isClient ? `Hello, ${user?.email}` : activeTab}
+                {isSuperAdmin ? "Platform Overview"
+                  : isClient ? `Hello, ${user?.email}`
+                  : activeTab === NavItem.Dashboard ? `Hello, ${(user?.user_metadata?.full_name || user?.email || '').split(' ')[0]}`
+                  : activeTab}
               </h1>
               {!isExtension && (
                 <p className="text-slate-500 text-sm mt-1">
                   {isSuperAdmin
                     ? "Monitoring firms and platform infrastructure usage."
-                    : isClient ? `Welcome to the ${firmSettings.name} Portal` : `Manage firm operations as a ${selectedRole}.`}
+                    : isClient ? `Welcome to the ${firmSettings.name} Portal`
+                    : activeTab === NavItem.Clients ? 'Manage your clients.'
+                    : activeTab === NavItem.Documents ? 'Manage client documents.'
+                    : activeTab === NavItem.Tasks ? 'Manage firm and client tasks.'
+                    : ''}
                 </p>
               )}
             </div>
