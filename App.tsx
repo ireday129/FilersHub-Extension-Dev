@@ -374,9 +374,12 @@ import SuperAdminLogin from './components/SuperAdminLogin';
 
 import { getFirmBySlug, PublicFirmData } from './services/firms';
 import Login from './components/auth/Login';
+import { useGhlContext } from './hooks/useGhlContext';
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
+  const { isExtension } = useExtensionMode();
+  const { ghlContext, loading: ghlLoading } = useGhlContext(isExtension);
   const [path, setPath] = useState(window.location.pathname);
   const [firmBranding, setFirmBranding] = useState<PublicFirmData['firm_name' | 'logo_url' | 'brand_color'] | null>(null);
   const [isFirmLoading, setIsFirmLoading] = useState(false);
@@ -495,7 +498,7 @@ const AppContent: React.FC = () => {
   }
 
 
-  if (loading || isFirmLoading) {
+  if (loading || isFirmLoading || (isExtension && ghlLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -552,7 +555,7 @@ const AppContent: React.FC = () => {
     }
 
     // Home page: Staff Login (default landing page)
-    return <StaffLogin />;
+    return <StaffLogin ghlContext={isExtension ? ghlContext : null} />;
   }
 
   return <AuthenticatedApp />;

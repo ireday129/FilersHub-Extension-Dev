@@ -36,6 +36,179 @@ serve(async (req) => {
             Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
+        // Helper: Fetch real location name + logo from GHL API
+        const fetchLocationInfo = async (locId: string, accessToken: string) => {
+            try {
+                const resp = await fetch(`https://services.leadconnectorhq.com/locations/${locId}`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': '2021-07-28' }
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const loc = data.location || data;
+                    return { name: loc.name || null, logoUrl: loc.logoUrl || null };
+                }
+            } catch (e) { console.error("Failed to fetch GHL location info:", e); }
+            return { name: null, logoUrl: null };
+        };
+
+        // 0. EMAIL LOOKUP: Verify staff email against GHL and create session
+        if (req.method === 'POST' && body.action === 'email-lookup') {
+            const email = (body.email || '').trim().toLowerCase();
+            if (!email || !email.includes('@')) {
+                return new Response(JSON.stringify({ error: 'Valid email is required' }), {
+                    status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // 1. Find staff record by email → get firm_id
+            const { data: staffRecord } = await supabaseAdmin
+                .from('staff')
+                .select('staff_id, firm_id, full_name')
+                .eq('email', email)
+                .eq('is_active', true)
+                .maybeSingle();
+
+            if (!staffRecord) {
+                return new Response(JSON.stringify({ error: 'No active staff account found for this email' }), {
+                    status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // 2. Get firm's GHL location ID
+            const { data: firmData } = await supabaseAdmin
+                .from('firms')
+                .select('ghl_location_id')
+                .eq('firm_id', staffRecord.firm_id)
+                .maybeSingle();
+
+            if (!firmData?.ghl_location_id) {
+                return new Response(JSON.stringify({ error: 'Firm is not connected to a CRM location' }), {
+                    status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // 3. Get stored GHL token (refresh if expired)
+            const { data: integ } = await supabaseAdmin
+                .from('integrations_ghl')
+                .select('access_token, refresh_token, token_expires_at, firm_id')
+                .eq('location_id', firmData.ghl_location_id)
+                .maybeSingle();
+
+            if (!integ?.access_token) {
+                return new Response(JSON.stringify({ error: 'CRM integration not configured for this firm' }), {
+                    status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            let accessToken = integ.access_token;
+            if (integ.token_expires_at && new Date(integ.token_expires_at) < new Date()) {
+                const refreshResp = await fetch('https://services.leadconnectorhq.com/oauth/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        client_id: Deno.env.get('GHL_CLIENT_ID')!,
+                        client_secret: Deno.env.get('GHL_CLIENT_SECRET')!,
+                        grant_type: 'refresh_token',
+                        refresh_token: integ.refresh_token,
+                    })
+                });
+                if (refreshResp.ok) {
+                    const refreshData = await refreshResp.json();
+                    accessToken = refreshData.access_token;
+                    await supabaseAdmin.from('integrations_ghl').update({
+                        access_token: refreshData.access_token,
+                        refresh_token: refreshData.refresh_token,
+                        token_expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+                    }).eq('firm_id', integ.firm_id);
+                } else {
+                    return new Response(JSON.stringify({ error: 'CRM token expired and could not be refreshed' }), {
+                        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+            }
+
+            // 4. Verify email against GHL Users API
+            const usersResp = await fetch(
+                `https://services.leadconnectorhq.com/users/search?locationId=${firmData.ghl_location_id}&query=${encodeURIComponent(email)}&limit=10`,
+                { headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': '2021-07-28' } }
+            );
+
+            let ghlUserVerified = false;
+            if (usersResp.ok) {
+                const usersData = await usersResp.json();
+                const users = usersData.users || [];
+                ghlUserVerified = users.some((u: any) => u.email?.toLowerCase() === email);
+            }
+
+            if (!ghlUserVerified) {
+                return new Response(JSON.stringify({ error: 'Email not found in CRM. Please contact your firm administrator.' }), {
+                    status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // 5. Create/find Supabase auth user and create session
+            let userRecord;
+            const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
+            const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+                email: email,
+                password: tempPassword,
+                email_confirm: true,
+                user_metadata: { full_name: staffRecord.full_name }
+            });
+
+            if (createError) {
+                const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+                    type: 'magiclink', email: email
+                });
+                userRecord = linkData?.user;
+            } else {
+                userRecord = newUser.user;
+            }
+
+            if (!userRecord) {
+                return new Response(JSON.stringify({ error: 'Failed to create user session' }), {
+                    status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // Link auth_user_id to staff record
+            await supabaseAdmin.from('staff').update({
+                auth_user_id: userRecord.id
+            }).eq('staff_id', staffRecord.staff_id);
+
+            // Generate magic link + verify server-side for session
+            const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+                type: 'magiclink', email: email
+            });
+
+            if (linkErr || !linkData?.properties?.email_otp) {
+                return new Response(JSON.stringify({ error: 'Failed to generate login session' }), {
+                    status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const { data: verifyData, error: verifyErr } = await supabaseAdmin.auth.verifyOtp({
+                email: email,
+                token: linkData.properties.email_otp,
+                type: 'magiclink',
+            });
+
+            if (verifyErr || !verifyData?.session) {
+                return new Response(JSON.stringify({ error: 'Failed to create session' }), {
+                    status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            return new Response(JSON.stringify({
+                access_token: verifyData.session.access_token,
+                refresh_token: verifyData.session.refresh_token,
+                expires_in: verifyData.session.expires_in,
+                expires_at: verifyData.session.expires_at,
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
         // 1. INIT: Generate Auth URL
         if (pathname.endsWith('/init') || (req.method === 'POST' && body.action === 'init')) {
             const action = url.searchParams.get('action') || body.action;
@@ -54,11 +227,45 @@ serve(async (req) => {
                 // If we have a valid token for this location, try to log in directly without OAuth redirect
                 const { data: integ } = await supabaseAdmin
                     .from('integrations_ghl')
-                    .select('access_token, firm_id')
+                    .select('access_token, refresh_token, token_expires_at, firm_id')
                     .eq('location_id', locationId)
                     .maybeSingle();
 
                 if (integ?.access_token) {
+                    // Refresh token if expired
+                    let ssoAccessToken = integ.access_token;
+                    if (integ.token_expires_at && new Date(integ.token_expires_at) < new Date()) {
+                        try {
+                            const refreshResp = await fetch('https://services.leadconnectorhq.com/oauth/token', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: new URLSearchParams({
+                                    client_id: Deno.env.get('GHL_CLIENT_ID')!,
+                                    client_secret: Deno.env.get('GHL_CLIENT_SECRET')!,
+                                    grant_type: 'refresh_token',
+                                    refresh_token: integ.refresh_token,
+                                })
+                            });
+                            if (refreshResp.ok) {
+                                const refreshData = await refreshResp.json();
+                                ssoAccessToken = refreshData.access_token;
+                                await supabaseAdmin.from('integrations_ghl').update({
+                                    access_token: refreshData.access_token,
+                                    refresh_token: refreshData.refresh_token,
+                                    token_expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+                                }).eq('firm_id', integ.firm_id);
+                                await supabaseAdmin.from('firms').update({
+                                    ghl_access_token: refreshData.access_token,
+                                    ghl_refresh_token: refreshData.refresh_token,
+                                    ghl_token_expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
+                                }).eq('firm_id', integ.firm_id);
+                            } else {
+                                console.error("Silent SSO: Token refresh failed:", await refreshResp.text());
+                            }
+                        } catch (refreshErr) {
+                            console.error("Silent SSO: Token refresh error:", refreshErr);
+                        }
+                    }
                     try {
                         let email = userEmail;
                         let name = 'Firm Owner';
@@ -69,7 +276,7 @@ serve(async (req) => {
                         if (userId && userId !== 'null') {
                             const userResp = await fetch(`https://services.leadconnectorhq.com/users/${userId}`, {
                                 headers: {
-                                    'Authorization': `Bearer ${integ.access_token}`,
+                                    'Authorization': `Bearer ${ssoAccessToken}`,
                                     'Version': '2021-07-28'
                                 }
                             });
@@ -290,6 +497,7 @@ serve(async (req) => {
                 if (!firmId) {
                     // If still no firm, maybe create it? (Auto-provision Firm on SSO)
                     // Replicating Install logic here for robustness
+                    const locInfo = await fetchLocationInfo(locationId, tokenData.access_token);
                     const { data: newFirm, error: createFirmError } = await supabaseAdmin
                         .from("firms")
                         .insert({
@@ -297,7 +505,8 @@ serve(async (req) => {
                             ghl_access_token: tokenData.access_token,
                             ghl_refresh_token: tokenData.refresh_token,
                             ghl_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-                            firm_name: `GHL Location ${locationId}`,
+                            firm_name: locInfo.name || `GHL Location ${locationId}`,
+                            logo_url: locInfo.logoUrl || null,
                             subscription_status: 'trialing',
                             slug: locationId.toLowerCase()
                         })
@@ -338,6 +547,7 @@ serve(async (req) => {
 
                     if (!firmId) {
                         // Auto-provision firm
+                        const locInfo = await fetchLocationInfo(tokenLocationId, tokenData.access_token);
                         const { data: newFirm, error: createFirmError } = await supabaseAdmin
                             .from("firms")
                             .insert({
@@ -345,7 +555,8 @@ serve(async (req) => {
                                 ghl_access_token: tokenData.access_token,
                                 ghl_refresh_token: tokenData.refresh_token,
                                 ghl_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-                                firm_name: `GHL Location ${tokenLocationId}`,
+                                firm_name: locInfo.name || `GHL Location ${tokenLocationId}`,
+                                logo_url: locInfo.logoUrl || null,
                                 subscription_status: 'trialing',
                                 slug: tokenLocationId.toLowerCase()
                             })
@@ -379,11 +590,26 @@ serve(async (req) => {
 
             // Also update firms table if we found a firm
             if (firmId) {
-                await supabaseAdmin.from('firms').update({
+                const firmUpdate: Record<string, any> = {
                     ghl_access_token: tokenData.access_token,
                     ghl_refresh_token: tokenData.refresh_token,
                     ghl_token_expires_at: expiresAt
-                }).eq('firm_id', firmId);
+                };
+
+                // Enrich placeholder firm names with real GHL location data
+                const { data: currentFirm } = await supabaseAdmin
+                    .from('firms')
+                    .select('firm_name')
+                    .eq('firm_id', firmId)
+                    .maybeSingle();
+
+                if (currentFirm?.firm_name?.startsWith('GHL Location ')) {
+                    const locInfo = await fetchLocationInfo(tokenData.locationId, tokenData.access_token);
+                    if (locInfo.name) firmUpdate.firm_name = locInfo.name;
+                    if (locInfo.logoUrl) firmUpdate.logo_url = locInfo.logoUrl;
+                }
+
+                await supabaseAdmin.from('firms').update(firmUpdate).eq('firm_id', firmId);
             }
 
             // HANDLE SSO LOGIC

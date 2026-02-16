@@ -104,12 +104,12 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
               title="My Profile"
             >
               <span className="text-base font-bold text-slate-800 tracking-tight hidden sm:block">{firmName}</span>
-              <img src={firmLogo} alt={`${firmName} Logo`} className="h-7 w-auto object-contain" />
+              {firmLogo && <img src={firmLogo} alt={`${firmName} Logo`} className="h-7 w-auto object-contain" />}
             </button>
           ) : (
             <>
               <span className="text-xl font-bold text-slate-800 tracking-tight hidden sm:block">{firmName}</span>
-              <img src={firmLogo} alt={`${firmName} Logo`} className="h-9 w-auto object-contain" />
+              {firmLogo && <img src={firmLogo} alt={`${firmName} Logo`} className="h-9 w-auto object-contain" />}
             </>
           )}
         </div>

@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 
 export const useExtensionMode = () => {
-    const [isExtension] = useState(() => window.location.pathname.startsWith('/extension'));
+    const [isExtension] = useState(() => {
+        const isChromeExtension = window.location.protocol === 'chrome-extension:';
+        const isExtensionPath = window.location.pathname.startsWith('/extension');
+        return isChromeExtension || isExtensionPath;
+    });
 
     useEffect(() => {
         if (isExtension) {

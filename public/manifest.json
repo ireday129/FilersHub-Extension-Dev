@@ -8,15 +8,28 @@
     },
     "permissions": [
         "storage",
-        "activeTab"
+        "activeTab",
+        "tabs"
     ],
     "host_permissions": [
-        "https://*.supabase.co/*"
+        "https://*.supabase.co/*",
+        "https://app.gohighlevel.com/*",
+        "https://*.leadconnectorhq.com/*"
     ],
     "content_security_policy": {
         "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co; img-src 'self' https: data:; object-src 'self'"
     },
     "background": {
         "service_worker": "service-worker.js"
-    }
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://app.gohighlevel.com/*",
+                "https://*.leadconnectorhq.com/*"
+            ],
+            "js": ["ghl-content-script.js"],
+            "run_at": "document_idle"
+        }
+    ]
 }
