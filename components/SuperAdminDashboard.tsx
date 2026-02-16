@@ -18,6 +18,7 @@ import {
 import { Firm } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
+import { FILERSHUB_LOGO_URL } from '../constants';
 
 const SuperAdminDashboard: React.FC = () => {
   const { signOut } = useAuth();
@@ -28,7 +29,7 @@ const SuperAdminDashboard: React.FC = () => {
   const [editingSeats, setEditingSeats] = useState<string | null>(null);
   const [editValue, setEditValue] = useState(10);
   const [saving, setSaving] = useState(false);
-  const logoUrl = "https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png";
+  const logoUrl = FILERSHUB_LOGO_URL;
 
   // Map DB tier values to display tier
   const normalizeTier = (dbTier: string): 'Core' | 'Pro' => {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Lock, Mail, ArrowRight, ShieldAlert } from 'lucide-react';
 import { WatermarkBackground } from './WatermarkBackground';
 import { supabase } from '../services/supabase';
+import { FILERSHUB_LOGO_URL } from '../constants';
 
 const SuperAdminLogin: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -31,7 +32,7 @@ const SuperAdminLogin: React.FC = () => {
         }
     };
 
-    const logoUrl = "https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png";
+    const logoUrl = FILERSHUB_LOGO_URL;
 
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">

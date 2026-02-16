@@ -119,6 +119,22 @@ export default async function handler(req: any, res: any) {
             .eq("ghl_location_id", tokenData.locationId)
             .maybeSingle();
 
+        // 3b2. Sync tokens to integrations_ghl (single source of truth)
+        if (firmRecord?.firm_id) {
+            const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+            const { error: integError } = await supabaseAdmin.from('integrations_ghl').upsert({
+                firm_id: firmRecord.firm_id,
+                location_id: tokenData.locationId,
+                access_token: tokenData.access_token,
+                refresh_token: tokenData.refresh_token,
+                token_expires_at: expiresAt,
+                user_type: tokenData.userType || 'Location',
+                scope: tokenData.scope || '',
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'firm_id' });
+            if (integError) console.error("Failed to sync tokens to integrations_ghl:", integError);
+        }
+
         // 3c. Create staff record for the installing user
         if (firmRecord?.firm_id && tokenData.userId) {
             try {

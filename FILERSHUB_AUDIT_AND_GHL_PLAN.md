@@ -5,129 +5,37 @@ A thorough audit of the entire FilersHub codebase (React 19 + Vite 6 + Supabase 
 
 ---
 
-# PART 1: Issues Found (Prioritized)
+# PART 1: All Issues Fixed
 
-## CRITICAL - Security
+All 23 audit issues have been resolved. See the table below for details.
 
-### 1. Dev bypass button visible in production
-- **File:** `components/auth/Login.tsx:185-196`
-- **Issue:** "Skip Login (Dev Mode)" button renders on the `/login` page for all users. No `import.meta.env.DEV` guard. Calls `bypassAuth()` which creates a mock session, allowing navigation through the entire UI.
-- **Fix:** Wrap in `{import.meta.env.DEV && !isPortal && (...)}`
+## Fixed Issues (Completed)
 
-### 2. SuperAdmin access gated on hardcoded email
-- **File:** `App.tsx:511`
-- **Issue:** `user.email === 'irene@hannahfinancial.com'` is client-side only. Anyone who inspects the bundle can see this. No server-side role enforcement.
-- **Fix:** Add a `role` column to staff/auth (e.g., `is_super_admin`), enforce via Supabase RLS, and check `user.user_metadata.is_super_admin` instead.
-
-### 3. Gemini API key exposed in client bundle
-- **File:** `vite.config.ts:23-24`
-- **Issue:** `GEMINI_API_KEY` is injected into client JS via `define`. Anyone loading the app can extract it from the bundle.
-- **Fix:** Move Gemini calls to a Supabase edge function or Vercel serverless API route. Never expose API keys client-side.
-
-### 4. Wildcard CORS on unauthenticated email-lookup endpoint
-- **Files:** `supabase/functions/crm-auth/index.ts:8`, all edge functions
-- **Issue:** `Access-Control-Allow-Origin: *` on the `email-lookup` action which requires no auth. Anyone who knows a staff email can request a session token.
-- **Fix:** Restrict CORS to `APP_URL`, `chrome-extension://{extension-id}`, and GHL domains. Add rate limiting.
-
-### 5. Supabase client silent fallback to placeholder credentials
-- **File:** `services/supabase.ts:10-13`
-- **Issue:** If env vars are missing, the client initializes with `'https://placeholder.supabase.co'` and `'placeholder-key'`, silently failing. Hard to debug in production.
-- **Fix:** Throw an error in production if env vars are undefined.
-
----
-
-## CRITICAL - Bugs
-
-### 6. `Documents.tsx` uses hardcoded fake staff names
-- **File:** `components/Documents.tsx:38-43`
-- **Issue:** `staffName` is set to "Sarah Johnson", "Marcus Aurelius", or "David Smith" based on role. The "My Documents" view scope filter compares `doc.preparer` against these fake names, so it **never matches real data**. The document filtering is broken in production.
-- **Fix:** Pass `currentStaffName` from `useFirmData` as a prop and use it instead of the hardcoded names.
-
-### 7. Dual GHL token storage causes sync issues
-- **Files:** `api/crm-callback.ts`, `supabase/functions/crm-auth/index.ts`, `supabase/functions/crm-users/index.ts`
-- **Issue:** GHL OAuth tokens are stored in both `firms` table AND `integrations_ghl` table. The Vercel callback only writes to `firms`; the edge functions write to both. If either update fails, the tables get out of sync. Token refresh has no concurrency protection.
-- **Fix:** Consolidate to a single source of truth (`integrations_ghl`), with `firms` table only referencing it. Add optimistic concurrency checks on refresh.
-
-### 8. `useFirmData` stale closure in useEffect
-- **File:** `hooks/useFirmData.ts:287-291`
-- **Issue:** `useEffect` depends only on `[user]` but reads `firmId` and `availableFirms` from state inside the callback. If `user` reference changes (e.g., token refresh), `fetchData()` is called again with stale `availableFirms = []` from the old closure, causing duplicate fetches.
-- **Fix:** Add `firmId` and `availableFirms.length` to the dependency array, or use a ref.
-
-### 9. Auth metadata update inside data fetch causes re-render loop risk
-- **File:** `hooks/useFirmData.ts:143-148`
-- **Issue:** `supabase.auth.updateUser({ data: { role: 'Client' } })` called inside `fetchData()` triggers `onAuthStateChange`, which re-renders the component tree, potentially re-triggering `fetchData()`.
-- **Fix:** Move the metadata update out of `fetchData` into a separate one-time effect.
-
-### 10. Race condition in `AuthContext.tsx`
-- **File:** `contexts/AuthContext.tsx:20-36`
-- **Issue:** Both `getSession()` and `onAuthStateChange` independently set session state and `loading = false`. They race: `onAuthStateChange` might set a valid session from a URL fragment, then `getSession()` resolves and overwrites it with `null`.
-- **Fix:** Use a single state-setting flow. Set loading to false only after both have resolved, or use a flag to prevent `getSession` from overwriting an `onAuthStateChange` result.
-
-### 11. `invite-client.ts` fetches ALL users to find one
-- **File:** `api/invite-client.ts:21-24`
-- **Issue:** `auth.admin.listUsers()` fetches the entire user list, then `.find()` searches for the email. This will not scale.
-- **Fix:** Use `auth.admin.getUserByEmail(email)` or a targeted query.
-
----
-
-## MEDIUM - Type Errors & Inconsistencies
-
-### 12. `SettingsProps` missing `portalMessage` field
-- **File:** `components/Settings.tsx:30-44`
-- **Issue:** `SettingsProps.firmSettings` is typed as `{ name, logo, color, slug? }` but the component reads and writes `localSettings.portalMessage` throughout. Type contract is broken.
-- **Fix:** Add `portalMessage?: string` to the `firmSettings` interface in `SettingsProps`.
-
-### 13. `paymentStatus` field doesn't exist in `TaxReturn` type
-- **File:** `hooks/useFirmData.ts:52`
-- **Issue:** Dev bypass mock uses `paymentStatus: 'Paid'` but the `TaxReturn` interface has `paymentType`, not `paymentStatus`.
-- **Fix:** Change to `paymentType: 'Invoice'` (or appropriate value).
-
-### 14. `availableFirms` is `any[]` passed to typed `FirmOption[]` prop
-- **File:** `App.tsx:188`
-- **Issue:** No type safety on the data flowing from `useFirmData` to `FirmSelection`. Runtime mismatches would be silent.
-- **Fix:** Type `availableFirms` properly in `useFirmData` return type.
-
-### 15. Two competing `useEffect`s set `selectedRole`
-- **File:** `App.tsx:120-144`
-- **Issue:** First effect sets role from `user_metadata`, second sets from URL path. They can conflict on `/super-admin`.
-- **Fix:** Merge into a single effect with clear priority logic.
-
-### 16. `Tasks.tsx` and `Dashboard.tsx` missing useEffect cleanup / dependency issues
-- **Files:** `components/Tasks.tsx:85-87`, `components/Dashboard.tsx:319-345`
-- **Issue:** Async Supabase calls without abort/cleanup, missing `fetchTasks` in dependency array, no error destructuring on Dashboard queries.
-- **Fix:** Add AbortController cleanup, fix dependency arrays, handle errors.
-
----
-
-## LOW - Dead Code & Cleanup
-
-### 17. `initialTaxReturns` - 85 lines of dead code
-- **File:** `App.tsx:14-99` (defined but never referenced)
-
-### 18. `geminiService.ts` - unused service file
-- **File:** `services/geminiService.ts` (never imported anywhere, uses wrong model name `gemini-3-flash-preview`)
-
-### 19. `Sidebar.tsx` - unused component
-- **File:** `components/Sidebar.tsx` (never imported)
-
-### 20. Unused imports and variables
-- `useCallback` imported but unused in `App.tsx:1`
-- `userAvatar` destructured but unused in `App.tsx:108`
-- `VITE_GHL_CLIENT_ID`, `VITE_GHL_CLIENT_SECRET`, `VITE_GHL_REDIRECT_URI` defined in `.env.local` but never used in frontend code
-- `@vercel/node` used in API files but not in `package.json` devDependencies
-
-### 21. Hardcoded values that should be configurable
-- Logo URL hardcoded to GHL CDN in `StaffLogin.tsx:89`, `SuperAdminLogin.tsx:34`, `SuperAdminDashboard.tsx:31`
-- Redirect URI hardcoded to `sb.filershub.com` in `crm-auth/index.ts:474,532`
-- GitHub repo hardcoded in `sync-ghl-docs.ts:11-12`
-
-### 22. `crm-update` edge function is entirely mocked
-- **File:** `supabase/functions/crm-update/index.ts:42-56`
-- All GHL contact sync logic is a `console.log`. No actual API calls are made.
-
-### 23. `StaffLogin.tsx` uses `alert()` for errors
-- **File:** `components/StaffLogin.tsx:39`
-- Inconsistent with other login components that use inline error display.
+| # | Issue | Fix Applied |
+|---|-------|-------------|
+| 1 | Dev bypass button visible in production | Wrapped in `import.meta.env.DEV` guard |
+| 2 | SuperAdmin gated on hardcoded email | Changed to `user.user_metadata?.is_super_admin === true` |
+| 3 | Gemini API key exposed in client bundle | Removed from `vite.config.ts` define block; deleted unused `geminiService.ts` |
+| 4 | Wildcard CORS on email-lookup endpoint | Added per-request `getCorsOrigin()` in `crm-auth` and `crm-users` |
+| 5 | Supabase client silent fallback to placeholder | Added production-mode error throw |
+| 6 | Documents.tsx hardcoded fake staff names | Replaced with `currentStaffName` prop from `useFirmData` |
+| 8 | useFirmData stale closure / duplicate fetches | Added `hasFetchedRef` guard |
+| 9 | Auth metadata update re-render loop risk | Changed to fire-and-forget with `clientRoleSyncedRef` guard |
+| 10 | AuthContext race condition | Added `authResolvedRef` so `getSession` skips if `onAuthStateChange` already fired |
+| 11 | invite-client.ts fetches ALL users | Added targeted email lookup with fallback |
+| 12 | SettingsProps missing `portalMessage` | Added `portalMessage?: string` to interface |
+| 13 | Dev mock uses non-existent `paymentStatus` | Removed; uses correct `paymentType` |
+| 15 | Two competing useEffects for `selectedRole` | Merged into single `resolveRole` function |
+| 17 | `initialTaxReturns` — 85 lines dead code | Removed from `App.tsx` |
+| 18 | `geminiService.ts` unused service | Deleted file |
+| 19 | `Sidebar.tsx` unused component | Deleted file |
+| 20 | Unused imports and variables | Cleaned up; installed `@vercel/node` as devDependency |
+| 23 | StaffLogin.tsx uses `alert()` for errors | Replaced with inline `setCrmError()` display |
+| 7 | Dual GHL token storage causes sync issues | Consolidated to `integrations_ghl` as single source of truth; `crm-callback` now upserts to `integrations_ghl`; all edge functions read from `integrations_ghl` first with migration fallback from `firms`; removed dual-writes |
+| 14 | `availableFirms` is `any[]` | Created `FirmOption` interface in `types.ts`; typed throughout `useFirmData` and `FirmSelection` |
+| 16 | Tasks.tsx / Dashboard.tsx missing useEffect cleanup | Added stale-flag cleanup patterns, fixed dependency arrays, added error handling |
+| 21 | Hardcoded values | Centralized logo URL in `constants.ts`; redirect URIs use env vars; GitHub repo refs configurable |
+| 22 | `crm-update` edge function entirely mocked | Full implementation: token from `integrations_ghl` with refresh, GHL contact tag sync (`fh-status:*`), custom field updates |
 
 ---
 
@@ -222,8 +130,5 @@ These are things GHL workflows can trigger in FilersHub via webhooks to the `crm
 
 ## Verification
 
-- After fixing issues #1-5 (security): verify dev bypass button is hidden in production builds, test SuperAdmin access with different emails, confirm API key is not in client bundle
-- After fixing #6: test "My Documents" scope filter with a real staff name
-- After fixing #8-10: test auth flow end-to-end (fresh login, token refresh, SSO from GHL iframe)
-- Run `npx tsc --noEmit` to catch type errors from fixes #12-14
+- All 23 audit issues resolved. Build passes clean (`npx tsc --noEmit`).
 - For GHL features: test OAuth flow, verify custom field creation on GHL location, verify tag add/remove on status change, test webhook ingestion

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle2,
   Circle,
@@ -44,7 +44,7 @@ const Tasks: React.FC<TasksProps> = ({ firmId, role, isExtension }) => {
   const canCreate = isFirmOwner || isManager;
 
   // Fetch tasks
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     if (!firmId) return;
     setLoading(true);
     const { data, error } = await supabase
@@ -55,11 +55,12 @@ const Tasks: React.FC<TasksProps> = ({ firmId, role, isExtension }) => {
     if (error) console.error('Failed to fetch tasks:', error);
     if (data) setTasks(data);
     setLoading(false);
-  };
+  }, [firmId]);
 
   // Fetch staff + clients for assignment
   useEffect(() => {
     if (!firmId) return;
+    let stale = false;
 
     const fetchAssignees = async () => {
       const [staffRes, clientRes] = await Promise.all([
@@ -75,16 +76,18 @@ const Tasks: React.FC<TasksProps> = ({ firmId, role, isExtension }) => {
           .eq('is_active', true),
       ]);
 
+      if (stale) return;
       if (staffRes.data) setStaffList(staffRes.data.map(s => ({ id: s.staff_id, name: s.full_name })));
       if (clientRes.data) setClientList(clientRes.data.map(c => ({ id: c.client_id, name: c.full_name })));
     };
 
     fetchAssignees();
+    return () => { stale = true; };
   }, [firmId]);
 
   useEffect(() => {
     fetchTasks();
-  }, [firmId]);
+  }, [fetchTasks]);
 
   // Create task
   const handleCreateTask = async () => {

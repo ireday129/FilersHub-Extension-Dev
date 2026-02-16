@@ -213,6 +213,18 @@ export interface Message {
   timestamp: string;
 }
 
+export interface FirmOption {
+  id: string;
+  name: string;
+  logo: string;
+  role: string;
+  brandColor: string;
+  slug: string;
+  isStaff: boolean;
+  staffName?: string;
+  portalMessage?: string;
+}
+
 export interface TaxReturn {
   id: string;
   clientId: string;

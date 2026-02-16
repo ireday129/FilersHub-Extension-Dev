@@ -8,9 +8,9 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN; // strongly recommended to avoid rate limits
 const SYNC_KEY = process.env.SYNC_KEY;
 
-const OWNER = "ireday129";
-const REPO = "highlevel-api-docs";
-const BRANCH = "main";
+const OWNER = process.env.GHL_DOCS_OWNER || "ireday129";
+const REPO = process.env.GHL_DOCS_REPO || "highlevel-api-docs";
+const BRANCH = process.env.GHL_DOCS_BRANCH || "main";
 
 const INCLUDE_EXT = [".md", ".markdown", ".yml", ".yaml", ".json"];
 const FILES_PER_RUN = 25; // batch size to avoid Vercel timeouts

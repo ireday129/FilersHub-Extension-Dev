@@ -65,10 +65,9 @@ serve(async (req) => {
 
         const firmId = staffData.firm_id;
 
-        // 2. Get GHL tokens — check integrations_ghl first, fall back to firms table
+        // 2. Get GHL tokens — integrations_ghl is the single source of truth
         let accessToken = null;
         let ghlLocationId = null;
-        let tokenSource = '';
 
         const { data: integData } = await supabaseAdmin
             .from('integrations_ghl')
@@ -79,11 +78,10 @@ serve(async (req) => {
         if (integData?.access_token) {
             accessToken = integData.access_token;
             ghlLocationId = integData.location_id;
-            tokenSource = 'integrations_ghl';
 
             // Refresh if expired
             if (integData.token_expires_at && new Date(integData.token_expires_at) < new Date()) {
-                console.log("Token expired (integrations_ghl), refreshing...");
+                console.log("Token expired, refreshing...");
                 const refreshResp = await fetch('https://services.leadconnectorhq.com/oauth/token', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -103,24 +101,18 @@ serve(async (req) => {
                         refresh_token: refreshData.refresh_token,
                         token_expires_at: newExpiry,
                     }).eq('firm_id', firmId);
-                    await supabaseAdmin.from('firms').update({
-                        ghl_access_token: refreshData.access_token,
-                        ghl_refresh_token: refreshData.refresh_token,
-                        ghl_token_expires_at: newExpiry,
-                    }).eq('firm_id', firmId);
-                    console.log("Token refreshed successfully (integrations_ghl)");
+                    console.log("Token refreshed successfully");
                 } else {
                     const errText = await refreshResp.text();
-                    console.error("Token refresh failed (integrations_ghl):", refreshResp.status, errText);
-                    // Token is expired and refresh failed — clear it so we try firms table
+                    console.error("Token refresh failed:", refreshResp.status, errText);
                     accessToken = null;
                     ghlLocationId = null;
                 }
             }
         }
 
+        // Fallback: migrate tokens from firms table to integrations_ghl
         if (!accessToken) {
-            // Fallback: tokens on firms table
             const { data: firmData } = await supabaseAdmin
                 .from('firms')
                 .select('ghl_access_token, ghl_refresh_token, ghl_token_expires_at, ghl_location_id')
@@ -130,11 +122,20 @@ serve(async (req) => {
             if (firmData?.ghl_access_token) {
                 accessToken = firmData.ghl_access_token;
                 ghlLocationId = firmData.ghl_location_id;
-                tokenSource = 'firms';
+
+                // Migrate to integrations_ghl
+                await supabaseAdmin.from('integrations_ghl').upsert({
+                    firm_id: firmId,
+                    location_id: firmData.ghl_location_id,
+                    access_token: firmData.ghl_access_token,
+                    refresh_token: firmData.ghl_refresh_token,
+                    token_expires_at: firmData.ghl_token_expires_at,
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'firm_id' });
 
                 // Refresh if expired
                 if (firmData.ghl_token_expires_at && new Date(firmData.ghl_token_expires_at) < new Date()) {
-                    console.log("Token expired (firms), refreshing...");
+                    console.log("Migrated token expired, refreshing...");
                     const refreshResp = await fetch('https://services.leadconnectorhq.com/oauth/token', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -149,15 +150,15 @@ serve(async (req) => {
                         const refreshData = await refreshResp.json();
                         accessToken = refreshData.access_token;
                         const newExpiry = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-                        await supabaseAdmin.from('firms').update({
-                            ghl_access_token: refreshData.access_token,
-                            ghl_refresh_token: refreshData.refresh_token,
-                            ghl_token_expires_at: newExpiry,
+                        await supabaseAdmin.from('integrations_ghl').update({
+                            access_token: refreshData.access_token,
+                            refresh_token: refreshData.refresh_token,
+                            token_expires_at: newExpiry,
                         }).eq('firm_id', firmId);
-                        console.log("Token refreshed successfully (firms)");
+                        console.log("Token refreshed successfully after migration");
                     } else {
                         const errText = await refreshResp.text();
-                        console.error("Token refresh failed (firms):", refreshResp.status, errText);
+                        console.error("Token refresh failed after migration:", refreshResp.status, errText);
                         throw new Error('CRM token expired and refresh failed. Please reconnect the CRM integration.');
                     }
                 }
@@ -171,7 +172,7 @@ serve(async (req) => {
             throw new Error('No GHL location ID found for this firm. Please reconnect the CRM integration.')
         }
 
-        console.log(`Using token from ${tokenSource}, locationId: ${ghlLocationId}, action: ${action}`);
+        console.log(`Using token for locationId: ${ghlLocationId}, action: ${action}`);
 
         // LIST: Fetch GHL users + existing staff emails
         if (action === 'list') {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../services/supabase';
-import { TaxReturn, TaxReturnStatus, TaxDocument, DocStatus } from '../types';
+import { TaxReturn, TaxReturnStatus, TaxDocument, DocStatus, FirmOption } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
 export const useFirmData = () => {
@@ -9,7 +9,7 @@ export const useFirmData = () => {
     const [returns, setReturns] = useState<TaxReturn[]>([]);
     const [firmId, setFirmId] = useState<string | null>(null);
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
-    const [availableFirms, setAvailableFirms] = useState<any[]>([]);
+    const [availableFirms, setAvailableFirms] = useState<FirmOption[]>([]);
     const hasFetchedRef = useRef(false);
     const clientRoleSyncedRef = useRef(false);
 
@@ -106,7 +106,7 @@ export const useFirmData = () => {
                 }
             }
 
-            const allFirmsMap = new Map();
+            const allFirmsMap = new Map<string, FirmOption>();
 
             // Process Staff Roles
             if (staffEntries) {
@@ -202,7 +202,7 @@ export const useFirmData = () => {
         }
     }, [user]); // Removed userAvatar dependency to avoid loops
 
-    const selectFirm = async (selectedId: string, firmList?: any[]) => {
+    const selectFirm = async (selectedId: string, firmList?: FirmOption[]) => {
         setLoading(true);
         try {
             const list = firmList || availableFirms;

@@ -1,14 +1,6 @@
 import React from 'react';
-import { UserRole } from '../types';
+import { FirmOption } from '../types';
 import { Building2, ChevronRight, LogOut } from 'lucide-react';
-
-export interface FirmOption {
-    id: string;
-    name: string;
-    logo: string;
-    role: UserRole;
-    brandColor: string;
-}
 
 interface FirmSelectionProps {
     firms: FirmOption[];

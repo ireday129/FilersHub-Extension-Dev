@@ -162,7 +162,7 @@ serve(async (req) => {
                 });
             }
 
-            // 3. Get stored GHL token — check integrations_ghl by firm_id first, fall back to firms table
+            // 3. Get stored GHL token — integrations_ghl is the single source of truth
             let integ: any = null;
 
             const { data: integData } = await supabaseAdmin
@@ -174,13 +174,22 @@ serve(async (req) => {
             if (integData?.access_token) {
                 integ = integData;
             } else if (firmData.ghl_access_token) {
-                // Fallback: tokens stored directly on firms table (from OAuth callback)
+                // Migrate: tokens on firms table but not yet in integrations_ghl
                 integ = {
                     access_token: firmData.ghl_access_token,
                     refresh_token: firmData.ghl_refresh_token,
                     token_expires_at: firmData.ghl_token_expires_at,
                     firm_id: staffRecord.firm_id,
                 };
+                // Persist migration to integrations_ghl
+                await supabaseAdmin.from('integrations_ghl').upsert({
+                    firm_id: staffRecord.firm_id,
+                    location_id: firmData.ghl_location_id,
+                    access_token: firmData.ghl_access_token,
+                    refresh_token: firmData.ghl_refresh_token,
+                    token_expires_at: firmData.ghl_token_expires_at,
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: 'firm_id' });
             }
 
             if (!integ?.access_token) {
@@ -205,16 +214,11 @@ serve(async (req) => {
                     const refreshData = await refreshResp.json();
                     accessToken = refreshData.access_token;
                     const newExpiry = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-                    // Update both tables for consistency
+                    // Write only to integrations_ghl (single source of truth)
                     await supabaseAdmin.from('integrations_ghl').update({
                         access_token: refreshData.access_token,
                         refresh_token: refreshData.refresh_token,
                         token_expires_at: newExpiry,
-                    }).eq('firm_id', integ.firm_id);
-                    await supabaseAdmin.from('firms').update({
-                        ghl_access_token: refreshData.access_token,
-                        ghl_refresh_token: refreshData.refresh_token,
-                        ghl_token_expires_at: newExpiry,
                     }).eq('firm_id', integ.firm_id);
                 } else {
                     return new Response(JSON.stringify({ error: 'CRM token expired and could not be refreshed' }), {
@@ -346,15 +350,11 @@ serve(async (req) => {
                             if (refreshResp.ok) {
                                 const refreshData = await refreshResp.json();
                                 ssoAccessToken = refreshData.access_token;
+                                // Write only to integrations_ghl (single source of truth)
                                 await supabaseAdmin.from('integrations_ghl').update({
                                     access_token: refreshData.access_token,
                                     refresh_token: refreshData.refresh_token,
                                     token_expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
-                                }).eq('firm_id', integ.firm_id);
-                                await supabaseAdmin.from('firms').update({
-                                    ghl_access_token: refreshData.access_token,
-                                    ghl_refresh_token: refreshData.refresh_token,
-                                    ghl_token_expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString(),
                                 }).eq('firm_id', integ.firm_id);
                             } else {
                                 console.error("Silent SSO: Token refresh failed:", await refreshResp.text());
@@ -486,7 +486,7 @@ serve(async (req) => {
             }
 
             const clientId = Deno.env.get('GHL_CLIENT_ID')
-            const redirectUri = `https://sb.filershub.com/functions/v1/crm-auth/callback`
+            const redirectUri = `${Deno.env.get('SUPABASE_URL') || Deno.env.get('URL') || 'https://sb.filershub.com'}/functions/v1/crm-auth/callback`
 
             // Scopes: contacts.readonly, locations.readonly is a good start
             const scopes = 'contacts.readonly contacts.write locations.readonly users.readonly'
@@ -544,7 +544,7 @@ serve(async (req) => {
             // Exchange Code for Token
             const clientId = Deno.env.get('GHL_CLIENT_ID')
             const clientSecret = Deno.env.get('GHL_CLIENT_SECRET')
-            const redirectUri = `https://sb.filershub.com/functions/v1/crm-auth/callback`
+            const redirectUri = `${Deno.env.get('SUPABASE_URL') || Deno.env.get('URL') || 'https://sb.filershub.com'}/functions/v1/crm-auth/callback`
 
             const tokenResponse = await fetch('https://services.leadconnectorhq.com/oauth/token', {
                 method: 'POST',
@@ -690,14 +690,8 @@ serve(async (req) => {
                 updated_at: new Date().toISOString()
             }, { onConflict: 'firm_id' })
 
-            // Also update firms table if we found a firm
+            // Update firms table metadata (no tokens — integrations_ghl is source of truth)
             if (firmId) {
-                const firmUpdate: Record<string, any> = {
-                    ghl_access_token: tokenData.access_token,
-                    ghl_refresh_token: tokenData.refresh_token,
-                    ghl_token_expires_at: expiresAt
-                };
-
                 // Enrich placeholder firm names with real GHL location data
                 const { data: currentFirm } = await supabaseAdmin
                     .from('firms')
@@ -707,11 +701,13 @@ serve(async (req) => {
 
                 if (currentFirm?.firm_name?.startsWith('GHL Location ')) {
                     const locInfo = await fetchLocationInfo(tokenData.locationId, tokenData.access_token);
+                    const firmUpdate: Record<string, any> = {};
                     if (locInfo.name) firmUpdate.firm_name = locInfo.name;
                     if (locInfo.logoUrl) firmUpdate.logo_url = locInfo.logoUrl;
+                    if (Object.keys(firmUpdate).length > 0) {
+                        await supabaseAdmin.from('firms').update(firmUpdate).eq('firm_id', firmId);
+                    }
                 }
-
-                await supabaseAdmin.from('firms').update(firmUpdate).eq('firm_id', firmId);
             }
 
             // HANDLE SSO LOGIC

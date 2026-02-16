@@ -318,30 +318,38 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const [staffMembers, setStaffMembers] = useState<string[]>([]);
   useEffect(() => {
     if (!firmId || !isStaff) return;
+    let stale = false;
     supabase
       .from('staff')
       .select('full_name')
       .eq('firm_id', firmId)
       .eq('is_active', true)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (stale) return;
+        if (error) console.error('Failed to fetch staff members:', error);
         if (data) {
           setStaffMembers(data.map((s: any) => s.full_name).filter(Boolean).sort());
         }
       });
+    return () => { stale = true; };
   }, [firmId, isStaff]);
 
   useEffect(() => {
     if (!firmId || !isStaff) return;
+    let stale = false;
     supabase
       .from('staff')
       .select('staff_id, full_name')
       .eq('firm_id', firmId)
       .eq('is_active', true)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (stale) return;
+        if (error) console.error('Failed to fetch staff list with IDs:', error);
         if (data) {
           setStaffListWithIds(data.map((s: any) => ({ id: s.staff_id, name: s.full_name })));
         }
       });
+    return () => { stale = true; };
   }, [firmId, isStaff]);
 
   const selectedReturn = returns.find(r => r.id === selectedReturnId);
@@ -458,7 +466,20 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   };
 
   useEffect(() => {
-    fetchAnnouncements();
+    if (!firmId) return;
+    let stale = false;
+    const run = async () => {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('firm_id', firmId)
+        .order('created_at', { ascending: false });
+      if (stale) return;
+      if (error) console.error("Failed to fetch announcements:", error);
+      if (data) setAnnouncements(data);
+    };
+    run();
+    return () => { stale = true; };
   }, [firmId]);
 
   // Client tasks fetch — filter to client-type tasks only
@@ -475,7 +496,21 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   };
 
   useEffect(() => {
-    if (isClient && firmId) fetchClientTasks();
+    if (!isClient || !firmId) return;
+    let stale = false;
+    const run = async () => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('firm_id', firmId)
+        .eq('type', 'client')
+        .order('created_at', { ascending: false });
+      if (stale) return;
+      if (error) console.error('Failed to fetch client tasks:', error);
+      if (data) setClientTasks(data);
+    };
+    run();
+    return () => { stale = true; };
   }, [firmId, isClient]);
 
   const handleToggleClientTask = async (task: Task) => {
@@ -589,7 +624,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     }
     setShowCaseTaskForm(false);
     setNewCaseTask({ title: '', description: '', type: 'client', priority: 'Medium', assigned_to: '', due_date: '' });
-  }, [selectedReturnId, firmId]);
+  }, [selectedReturnId, firmId, isStaff, returns]);
 
   const handleSaveAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.content || !firmId) return;
