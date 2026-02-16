@@ -38,11 +38,14 @@ export interface Firm {
   name: string;
   ownerName: string;
   ownerEmail: string;
-  tier: 'Core' | 'Pro';
+  subscriptionTier: string;
+  subscriptionStatus: string;
   staffCount: number;
+  maxStaff: number;
+  clientCount: number;
   installDate: string;
-  status: 'Active' | 'Suspended';
-  ghlIntegrated?: boolean;
+  ghlIntegrated: boolean;
+  slug: string;
 }
 
 export const TAX_YEARS: Record<string, { label: string; isOpen: boolean }> = {

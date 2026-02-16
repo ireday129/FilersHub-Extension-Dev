@@ -68,10 +68,21 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
 
-  // Plan limits: Core = 5 staff, Pro = 20 (Firm Owner excluded from count)
-  const CORE_LIMIT = 5;
-  const PRO_LIMIT = 20;
-  const staffLimit = CORE_LIMIT; // Default to Core plan (active plan shown below)
+  // Staff seat limit from DB (fetched from firms.max_staff)
+  const [staffLimit, setStaffLimit] = useState(10);
+
+  // Fetch max_staff from firms table
+  useEffect(() => {
+    if (!firmId) return;
+    supabase
+      .from('firms')
+      .select('max_staff')
+      .eq('firm_id', firmId)
+      .single()
+      .then(({ data }) => {
+        if (data?.max_staff) setStaffLimit(data.max_staff);
+      });
+  }, [firmId]);
 
   useEffect(() => {
     if (!firmId) return;
@@ -762,7 +773,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">User Limits</h4>
                   <ul className="space-y-2">
                     <PlanFeature text="1 Firm Owner" />
-                    <PlanFeature text={`Up to ${CORE_LIMIT} staff users (${assignedStaff}/${CORE_LIMIT} used)`} />
+                    <PlanFeature text={`Up to ${staffLimit} staff users (${assignedStaff}/${staffLimit} used)`} />
                     <PlanFeature text="Unlimited clients" />
                   </ul>
                 </div>
@@ -811,7 +822,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-3">User Limits</h4>
                   <ul className="space-y-2">
                     <PlanFeature text="1 Firm Owner" />
-                    <PlanFeature text={`Up to ${PRO_LIMIT} staff users`} />
+                    <PlanFeature text="Up to 20 staff users" />
                     <PlanFeature text="Unlimited clients" />
                   </ul>
                 </div>

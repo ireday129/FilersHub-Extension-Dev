@@ -304,10 +304,21 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     return "";
   }, [isFirmOwner, isManager, isTaxPro]);
 
-  const uniquePreparers = useMemo(() =>
-    [...new Set(returns.map(r => r.preparer).filter(Boolean))].sort(),
-    [returns]
-  );
+  // Fetch actual staff members for the firm (for the Tax Pro filter)
+  const [staffMembers, setStaffMembers] = useState<string[]>([]);
+  useEffect(() => {
+    if (!firmId || !isStaff) return;
+    supabase
+      .from('staff')
+      .select('full_name')
+      .eq('firm_id', firmId)
+      .eq('is_active', true)
+      .then(({ data }) => {
+        if (data) {
+          setStaffMembers(data.map((s: any) => s.full_name).filter(Boolean).sort());
+        }
+      });
+  }, [firmId, isStaff]);
 
   const selectedReturn = returns.find(r => r.id === selectedReturnId);
 
@@ -1443,8 +1454,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                           onChange={(e) => setFilterPreparer(e.target.value)}
                           className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
                         >
-                          <option value="All">All Tax Pros</option>
-                          {uniquePreparers.map(name => (
+                          <option value="All">All Staff</option>
+                          {staffMembers.map(name => (
                             <option key={name} value={name}>{name}</option>
                           ))}
                         </select>
