@@ -142,9 +142,18 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
         body: { action: 'list' }
       });
 
-      if (error) throw error;
+      // Extract detailed error from response body (data) or the generic supabase error
       if (data?.error) throw new Error(data.error);
-      setGhlUsers(data.users || []);
+      if (error) {
+        // Try to read the response body from FunctionsHttpError for a detailed message
+        let detail = '';
+        try {
+          const ctx = await error.context?.json();
+          if (ctx?.error) detail = ctx.error;
+        } catch (_) { /* no parseable context */ }
+        throw new Error(detail || error.message || 'Edge function error');
+      }
+      setGhlUsers(data?.users || []);
     } catch (error: any) {
       console.error('Error fetching GHL users:', error);
       setGhlError(error.message || 'Failed to load users from CRM.');

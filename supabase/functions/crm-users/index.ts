@@ -27,7 +27,7 @@ serve(async (req) => {
         )
 
         const { data: { user } } = await supabaseClient.auth.getUser()
-        if (!user) throw new Error('Unauthorized')
+        if (!user) throw new Error('Unauthorized — no active session')
 
         // Parse body for action + payload (always POST from client)
         let body: any = {};
@@ -35,7 +35,7 @@ serve(async (req) => {
         const url = new URL(req.url)
         const action = body.action || url.searchParams.get('action')
 
-        // 1. Get staff record + firm's GHL tokens
+        // 1. Get staff record
         const { data: staffData, error: staffError } = await supabaseAdmin
             .from('staff')
             .select('firm_id, role')
@@ -44,14 +44,16 @@ serve(async (req) => {
             .limit(1)
             .maybeSingle()
 
-        if (staffError || !staffData) throw new Error('Staff record not found')
+        if (staffError) throw new Error(`Staff lookup failed: ${staffError.message}`)
+        if (!staffData) throw new Error(`No active staff record found for user ${user.email}`)
         if (staffData.role !== 'Firm Owner') throw new Error('Only firm owners can manage CRM staff')
 
         const firmId = staffData.firm_id;
 
-        // Get GHL tokens — check integrations_ghl first, fall back to firms table
+        // 2. Get GHL tokens — check integrations_ghl first, fall back to firms table
         let accessToken = null;
         let ghlLocationId = null;
+        let tokenSource = '';
 
         const { data: integData } = await supabaseAdmin
             .from('integrations_ghl')
@@ -62,9 +64,11 @@ serve(async (req) => {
         if (integData?.access_token) {
             accessToken = integData.access_token;
             ghlLocationId = integData.location_id;
+            tokenSource = 'integrations_ghl';
 
             // Refresh if expired
             if (integData.token_expires_at && new Date(integData.token_expires_at) < new Date()) {
+                console.log("Token expired (integrations_ghl), refreshing...");
                 const refreshResp = await fetch('https://services.leadconnectorhq.com/oauth/token', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -89,6 +93,13 @@ serve(async (req) => {
                         ghl_refresh_token: refreshData.refresh_token,
                         ghl_token_expires_at: newExpiry,
                     }).eq('firm_id', firmId);
+                    console.log("Token refreshed successfully (integrations_ghl)");
+                } else {
+                    const errText = await refreshResp.text();
+                    console.error("Token refresh failed (integrations_ghl):", refreshResp.status, errText);
+                    // Token is expired and refresh failed — clear it so we try firms table
+                    accessToken = null;
+                    ghlLocationId = null;
                 }
             }
         }
@@ -104,9 +115,11 @@ serve(async (req) => {
             if (firmData?.ghl_access_token) {
                 accessToken = firmData.ghl_access_token;
                 ghlLocationId = firmData.ghl_location_id;
+                tokenSource = 'firms';
 
                 // Refresh if expired
                 if (firmData.ghl_token_expires_at && new Date(firmData.ghl_token_expires_at) < new Date()) {
+                    console.log("Token expired (firms), refreshing...");
                     const refreshResp = await fetch('https://services.leadconnectorhq.com/oauth/token', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -126,18 +139,31 @@ serve(async (req) => {
                             ghl_refresh_token: refreshData.refresh_token,
                             ghl_token_expires_at: newExpiry,
                         }).eq('firm_id', firmId);
+                        console.log("Token refreshed successfully (firms)");
+                    } else {
+                        const errText = await refreshResp.text();
+                        console.error("Token refresh failed (firms):", refreshResp.status, errText);
+                        throw new Error('CRM token expired and refresh failed. Please reconnect the CRM integration.');
                     }
                 }
             }
         }
 
-        if (!accessToken || !ghlLocationId) {
-            throw new Error('No CRM connection found for this firm')
+        if (!accessToken) {
+            throw new Error('No CRM access token found. Please connect your GHL location in Settings.')
         }
+        if (!ghlLocationId) {
+            throw new Error('No GHL location ID found for this firm. Please reconnect the CRM integration.')
+        }
+
+        console.log(`Using token from ${tokenSource}, locationId: ${ghlLocationId}, action: ${action}`);
 
         // LIST: Fetch GHL users + existing staff emails
         if (action === 'list') {
-            const response = await fetch(`https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}`, {
+            const ghlUrl = `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}`;
+            console.log("Fetching GHL users from:", ghlUrl);
+
+            const response = await fetch(ghlUrl, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Version': '2021-07-28'
@@ -147,11 +173,21 @@ serve(async (req) => {
             if (!response.ok) {
                 const errText = await response.text();
                 console.error("GHL users fetch failed:", response.status, errText);
-                throw new Error('Failed to fetch users from CRM');
+                if (response.status === 401) {
+                    throw new Error('CRM authorization failed (401). Your token may be expired — try reconnecting the integration.');
+                }
+                if (response.status === 403) {
+                    throw new Error('CRM access denied (403). Ensure the app has the "users.readonly" scope in your GHL Marketplace settings.');
+                }
+                if (response.status === 422) {
+                    throw new Error(`CRM validation error (422): ${errText}`);
+                }
+                throw new Error(`CRM API error (${response.status}): ${errText}`);
             }
 
             const data = await response.json();
             const ghlUsers = data.users || [];
+            console.log(`Fetched ${ghlUsers.length} GHL users`);
 
             // Get existing staff emails for this firm to mark who already has access
             const { data: existingStaff } = await supabaseAdmin
@@ -269,6 +305,7 @@ serve(async (req) => {
         throw new Error('Invalid action. Use ?action=list, ?action=grant, or ?action=revoke')
 
     } catch (error) {
+        console.error("crm-users error:", error.message);
         return new Response(JSON.stringify({ error: error.message }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
