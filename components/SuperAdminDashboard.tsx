@@ -12,7 +12,8 @@ import {
   Save,
   X,
   Minus,
-  Plus
+  Plus,
+  Zap
 } from 'lucide-react';
 import { Firm } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,13 +22,20 @@ import { supabase } from '../services/supabase';
 const SuperAdminDashboard: React.FC = () => {
   const { signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [tierFilter, setTierFilter] = useState<string>('All');
+  const [tierFilter, setTierFilter] = useState<'All' | 'Core' | 'Pro'>('All');
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingSeats, setEditingSeats] = useState<string | null>(null);
   const [editValue, setEditValue] = useState(10);
   const [saving, setSaving] = useState(false);
   const logoUrl = "https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png";
+
+  // Map DB tier values to display tier
+  const normalizeTier = (dbTier: string): 'Core' | 'Pro' => {
+    const t = dbTier?.toLowerCase();
+    if (t === 'pro' || t === 'growth' || t === 'enterprise') return 'Pro';
+    return 'Core'; // starter, core, or anything else defaults to Core
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -39,7 +47,7 @@ const SuperAdminDashboard: React.FC = () => {
     const fetchFirms = async () => {
       setLoading(true);
       try {
-        // Fetch firms
+        // Fetch firms with staff relationships in one query
         const { data: firmsData, error: firmsError } = await supabase
           .from('firms')
           .select('firm_id, firm_name, slug, subscription_tier, subscription_status, max_staff, ghl_location_id, created_at')
@@ -47,48 +55,41 @@ const SuperAdminDashboard: React.FC = () => {
 
         if (firmsError) throw firmsError;
 
-        // Fetch staff counts and owner info per firm
-        const firmsList: Firm[] = await Promise.all(
-          (firmsData || []).map(async (f: any) => {
-            // Get staff count
-            const { count: staffCount } = await supabase
-              .from('staff')
-              .select('staff_id', { count: 'exact', head: true })
-              .eq('firm_id', f.firm_id)
-              .eq('is_active', true);
+        // Fetch all staff and clients in bulk for efficiency
+        const firmIds = (firmsData || []).map((f: any) => f.firm_id);
 
-            // Get client count
-            const { count: clientCount } = await supabase
-              .from('clients')
-              .select('client_id', { count: 'exact', head: true })
-              .eq('firm_id', f.firm_id)
-              .eq('is_active', true);
+        // Get all active staff across all firms
+        const { data: allStaff } = await supabase
+          .from('staff')
+          .select('firm_id, full_name, email, role, is_active')
+          .in('firm_id', firmIds);
 
-            // Get firm owner
-            const { data: ownerData } = await supabase
-              .from('staff')
-              .select('full_name, email')
-              .eq('firm_id', f.firm_id)
-              .eq('role', 'Firm Owner')
-              .limit(1)
-              .single();
+        // Get all active clients across all firms
+        const { data: allClients } = await supabase
+          .from('clients')
+          .select('firm_id, is_active')
+          .in('firm_id', firmIds);
 
-            return {
-              id: f.firm_id,
-              name: f.firm_name || 'Unnamed Firm',
-              ownerName: ownerData?.full_name || '—',
-              ownerEmail: ownerData?.email || '—',
-              subscriptionTier: f.subscription_tier || 'starter',
-              subscriptionStatus: f.subscription_status || 'active',
-              staffCount: staffCount || 0,
-              maxStaff: f.max_staff || 10,
-              clientCount: clientCount || 0,
-              installDate: f.created_at ? new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
-              ghlIntegrated: !!f.ghl_location_id,
-              slug: f.slug || '',
-            };
-          })
-        );
+        const firmsList: Firm[] = (firmsData || []).map((f: any) => {
+          const firmStaff = (allStaff || []).filter((s: any) => s.firm_id === f.firm_id && s.is_active);
+          const firmClients = (allClients || []).filter((c: any) => c.firm_id === f.firm_id && c.is_active);
+          const owner = firmStaff.find((s: any) => s.role === 'Firm Owner');
+
+          return {
+            id: f.firm_id,
+            name: f.firm_name || 'Unnamed Firm',
+            ownerName: owner?.full_name || '—',
+            ownerEmail: owner?.email || '—',
+            subscriptionTier: normalizeTier(f.subscription_tier),
+            subscriptionStatus: f.subscription_status || 'active',
+            staffCount: firmStaff.length,
+            maxStaff: f.max_staff || 10,
+            clientCount: firmClients.length,
+            installDate: f.created_at ? new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
+            ghlIntegrated: !!f.ghl_location_id,
+            slug: f.slug || '',
+          };
+        });
 
         setFirms(firmsList);
       } catch (err) {
@@ -132,19 +133,10 @@ const SuperAdminDashboard: React.FC = () => {
     });
   }, [firms, searchQuery, tierFilter]);
 
-  // Get unique tiers for filter buttons
-  const availableTiers = useMemo(() => {
-    const tiers = new Set(firms.map(f => f.subscriptionTier));
-    return Array.from(tiers).sort();
-  }, [firms]);
-
   const stats = useMemo(() => {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
     return {
       total: firms.length,
-      activeFirms: firms.filter(f => f.subscriptionStatus === 'active' || f.subscriptionStatus === 'trialing').length,
+      proFirms: firms.filter(f => f.subscriptionTier === 'Pro').length,
       totalStaff: firms.reduce((acc, f) => acc + f.staffCount, 0),
       totalClients: firms.reduce((acc, f) => acc + f.clientCount, 0),
     };
@@ -180,11 +172,11 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Firms</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pro Tier Firms</p>
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-black text-slate-800">{loading ? '—' : stats.activeFirms}</h3>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle size={16} />
+            <h3 className="text-2xl font-black text-slate-800">{loading ? '—' : stats.proFirms}</h3>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Zap size={16} />
             </div>
           </div>
         </div>
@@ -223,11 +215,11 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-              {['All', ...availableTiers].map(t => (
+              {(['All', 'Core', 'Pro'] as const).map(t => (
                 <button
                   key={t}
                   onClick={() => setTierFilter(t)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all capitalize ${tierFilter === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${tierFilter === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'
                     }`}
                 >
                   {t}
@@ -292,8 +284,8 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border capitalize ${
-                      firm.subscriptionTier === 'growth' || firm.subscriptionTier === 'enterprise'
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
+                      firm.subscriptionTier === 'Pro'
                         ? 'bg-amber-50 text-amber-600 border-amber-100'
                         : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}>
