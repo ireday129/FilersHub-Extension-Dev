@@ -56,6 +56,8 @@ interface GHLUser {
   email: string;
   role: string;
   type: string;
+  hasAccess: boolean;
+  appRole: string | null;
 }
 
 const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firmId }) => {
@@ -104,58 +106,78 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const [showGHLModal, setShowGHLModal] = useState(false);
   const [ghlUsers, setGhlUsers] = useState<GHLUser[]>([]);
   const [isLoadingGHL, setIsLoadingGHL] = useState(false);
-  const [inviteStatus, setInviteStatus] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({});
+  const [grantStatus, setGrantStatus] = useState<Record<string, 'idle' | 'granting' | 'granted' | 'error'>>({});
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [ghlError, setGhlError] = useState('');
+
+  const refreshStaff = async () => {
+    if (!firmId) return;
+    try {
+      const { data, error } = await supabase
+        .from('staff')
+        .select('staff_id, full_name, email, role, is_active')
+        .eq('firm_id', firmId)
+        .eq('is_active', true);
+      if (!error && data) {
+        setStaff(data.map((s: any) => ({
+          id: s.staff_id,
+          name: s.full_name,
+          email: s.email,
+          role: s.role as UserRole,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.email)}`
+        })));
+      }
+    } catch (err) {
+      console.error('Error refreshing staff:', err);
+    }
+  };
 
   const fetchGHLUsers = async () => {
     setIsLoadingGHL(true);
     setShowGHLModal(true);
+    setGhlError('');
     try {
-      // We use a query parameter in the invoke URL
       const { data, error } = await supabase.functions.invoke('crm-users?action=list', {
         method: 'GET'
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       setGhlUsers(data.users || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching GHL users:', error);
-      alert('Failed to load users from CRM.');
+      setGhlError(error.message || 'Failed to load users from CRM.');
     } finally {
       setIsLoadingGHL(false);
     }
   };
 
-  const inviteUser = async (user: GHLUser) => {
-    setInviteStatus(prev => ({ ...prev, [user.id]: 'sending' }));
+  const grantAccess = async (user: GHLUser) => {
+    const role = selectedRoles[user.id] || 'Tax Pro';
+    setGrantStatus(prev => ({ ...prev, [user.id]: 'granting' }));
     try {
-      const { error } = await supabase.functions.invoke('crm-users?action=invite', {
+      const { data, error } = await supabase.functions.invoke('crm-users?action=grant', {
         method: 'POST',
         body: {
           ghlUserId: user.id,
           email: user.email,
           name: user.name || `${user.firstName} ${user.lastName}`,
-          role: 'Tax Pro' // Default role
+          role,
         }
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      setInviteStatus(prev => ({ ...prev, [user.id]: 'sent' }));
-
-      // Add to local staff list for immediate feedback
-      setStaff(prev => [...prev, {
-        id: `temp-${user.id}`,
-        name: user.name || `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        role: UserRole.TaxPro,
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}`
-      }]);
-
-    } catch (error) {
-      console.error('Error inviting user:', error);
-      setInviteStatus(prev => ({ ...prev, [user.id]: 'error' }));
-      alert('Failed to invite user.');
+      setGrantStatus(prev => ({ ...prev, [user.id]: 'granted' }));
+      // Mark as having access in the GHL users list
+      setGhlUsers(prev => prev.map(u => u.id === user.id ? { ...u, hasAccess: true, appRole: role } : u));
+      // Refresh staff list to update seat count
+      await refreshStaff();
+    } catch (error: any) {
+      console.error('Error granting access:', error);
+      setGrantStatus(prev => ({ ...prev, [user.id]: 'error' }));
     }
   };
 
@@ -172,10 +194,27 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
   const portalUrl = `app.filershub.com/portal/${firmSlug || ''}`;
 
-  const handleRoleChange = (id: string, newRole: UserRole) => {
+  const handleRoleChange = async (id: string, newRole: UserRole) => {
     setStaff(prev => prev.map(member =>
       member.id === id ? { ...member, role: newRole } : member
     ));
+    // Persist role change
+    await supabase.from('staff').update({ role: newRole }).eq('staff_id', id);
+  };
+
+  const revokeAccess = async (staffId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('crm-users?action=revoke', {
+        method: 'POST',
+        body: { staffId }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setStaff(prev => prev.filter(m => m.id !== staffId));
+    } catch (err: any) {
+      console.error('Error revoking access:', err);
+      alert('Failed to revoke access.');
+    }
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -252,23 +291,21 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       {/* GHL Users Modal */}
       {showGHLModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className={`bg-white rounded-2xl shadow-xl w-full ${isExtension ? 'max-w-full mx-2' : 'max-w-2xl'} overflow-hidden flex flex-col max-h-[80vh]`}>
+          <div className={`bg-white rounded-2xl shadow-xl w-full ${isExtension ? 'max-w-full mx-2' : 'max-w-3xl'} overflow-hidden flex flex-col max-h-[80vh]`}>
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                  <span className="font-bold text-lg">CRM</span>
+                <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center text-white shadow-lg">
+                  <Users size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800">Import from CRM</h3>
-                  <p className="text-xs text-slate-500 font-medium">Select users to invite to FilersHub</p>
+                  <h3 className="text-lg font-bold text-slate-800">CRM Team Members</h3>
+                  <p className="text-xs text-slate-500 font-medium">Grant your CRM staff access to FilersHub</p>
                 </div>
               </div>
               <button
-                onClick={() => setShowGHLModal(false)}
-                className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-500"
+                onClick={() => { setShowGHLModal(false); setGhlError(''); }}
+                className="p-2 hover:bg-slate-200 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
               >
-                <Shield size={20} className="rotate-45" /> {/* Using Shield as X icon proxy or just X */}
-                {/* Actually let's use a real close button or text */}
                 <span className="text-2xl leading-none">&times;</span>
               </button>
             </div>
@@ -277,7 +314,12 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               {isLoadingGHL ? (
                 <div className="p-12 flex flex-col items-center justify-center space-y-4 text-slate-400">
                   <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-sm font-medium">Fetching users from CRM...</p>
+                  <p className="text-sm font-medium">Fetching team from CRM...</p>
+                </div>
+              ) : ghlError ? (
+                <div className="p-12 text-center">
+                  <p className="text-sm text-red-500 font-medium">{ghlError}</p>
+                  <button onClick={fetchGHLUsers} className="mt-4 text-xs font-bold text-brand hover:underline">Try Again</button>
                 </div>
               ) : ghlUsers.length > 0 ? (
                 <table className="w-full text-left border-collapse">
@@ -285,14 +327,15 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                     <tr>
                       <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>Name</th>
                       {!isExtension && <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</th>}
-                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>Role</th>
-                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right`}>Action</th>
+                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>CRM Role</th>
+                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>App Role</th>
+                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right`}>Access</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
                     {ghlUsers.map(user => {
-                      const status = inviteStatus[user.id] || 'idle';
-                      const isInvited = status === 'sent';
+                      const status = grantStatus[user.id] || 'idle';
+                      const hasAccess = user.hasAccess || status === 'granted';
 
                       return (
                         <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
@@ -306,17 +349,34 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                           </td>
                           {!isExtension && <td className="px-6 py-4 text-sm text-slate-500">{user.email}</td>}
                           <td className={`${isExtension ? 'px-3' : 'px-6'} py-4 text-xs font-medium text-slate-400 capitalize`}>{user.role}</td>
+                          <td className={`${isExtension ? 'px-3' : 'px-6'} py-4`}>
+                            {hasAccess ? (
+                              <span className="text-xs font-semibold text-slate-600">{user.appRole || selectedRoles[user.id] || 'Tax Pro'}</span>
+                            ) : (
+                              <select
+                                value={selectedRoles[user.id] || 'Tax Pro'}
+                                onChange={(e) => setSelectedRoles(prev => ({ ...prev, [user.id]: e.target.value }))}
+                                className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand"
+                              >
+                                <option value="Tax Pro">Tax Pro</option>
+                                <option value="Manager">Manager</option>
+                              </select>
+                            )}
+                          </td>
                           <td className={`${isExtension ? 'px-3' : 'px-6'} py-4 text-right`}>
-                            <button
-                              onClick={() => inviteUser(user)}
-                              disabled={isInvited || status === 'sending'}
-                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${isInvited
-                                ? 'bg-emerald-100 text-emerald-700 cursor-default'
-                                : 'bg-brand text-white hover:bg-brand/90 hover:shadow-md active:scale-95'
-                                } disabled:opacity-70 disabled:active:scale-100`}
-                            >
-                              {status === 'sending' ? 'Sending...' : isInvited ? 'Invited' : 'Invite'}
-                            </button>
+                            {hasAccess ? (
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
+                                <CheckCircle2 size={12} /> Active
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => grantAccess(user)}
+                                disabled={status === 'granting'}
+                                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-brand text-white hover:bg-brand/90 transition-all shadow-sm hover:shadow-md active:scale-95 disabled:opacity-70"
+                              >
+                                {status === 'granting' ? 'Granting...' : status === 'error' ? 'Retry' : 'Grant Access'}
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -325,14 +385,17 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 </table>
               ) : (
                 <div className="p-12 text-center text-slate-500">
-                  <p>No users found in this CRM location.</p>
+                  <p className="text-sm font-medium">No team members found in this CRM location.</p>
                 </div>
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+              <p className="text-xs text-slate-400">
+                {ghlUsers.filter(u => u.hasAccess || grantStatus[u.id] === 'granted').length} of {ghlUsers.length} members have access
+              </p>
               <button
-                onClick={() => setShowGHLModal(false)}
+                onClick={() => { setShowGHLModal(false); setGhlError(''); }}
                 className="px-6 py-2 bg-white border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-50 transition-all shadow-sm"
               >
                 Close
@@ -490,7 +553,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           </div>
           <button
             onClick={fetchGHLUsers}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-brand/90 transition-colors shadow-sm"
           >
             <Users size={16} />
             Manage CRM Staff
@@ -560,7 +623,12 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   </td>
                   <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-right`}>
                     {member.role !== UserRole.FirmOwner && (
-                      <button className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all">{isExtension ? 'Revoke' : 'Revoke Access'}</button>
+                      <button
+                        onClick={() => revokeAccess(member.id)}
+                        className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all"
+                      >
+                        {isExtension ? 'Revoke' : 'Revoke Access'}
+                      </button>
                     )}
                   </td>
                 </tr>
