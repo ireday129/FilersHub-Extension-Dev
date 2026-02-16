@@ -56,8 +56,6 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
         firm_id: firmId,
         full_name: newClientName.trim(),
         email: newClientEmail.trim().toLowerCase(),
-        tax_return_status: 'Intake Received',
-        is_active: true,
       });
 
       if (error) {
