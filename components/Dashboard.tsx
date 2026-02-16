@@ -357,7 +357,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
       .select('*')
       .eq('firm_id', firmId)
       .order('created_at', { ascending: false });
-    if (!error && data) setAnnouncements(data);
+    if (error) {
+      console.error("Failed to fetch announcements:", error);
+    }
+    if (data) setAnnouncements(data);
   };
 
   useEffect(() => {
@@ -381,8 +384,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
       setShowAnnouncementForm(false);
       setNewAnnouncement({ title: '', content: '', type: 'client' });
       await fetchAnnouncements();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save announcement:", err);
+      alert(err?.message || 'Failed to save announcement. Check that the announcements table exists.');
     } finally {
       setIsSavingAnnouncement(false);
     }
@@ -1143,6 +1147,97 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
         </div>
       )}
 
+      {isExtension && (
+        <div className="bg-white rounded-xl border border-slate-100 shadow-sm mb-4 overflow-hidden">
+          <div className="px-3 py-2.5 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Megaphone size={14} className="text-brand" />
+              <h4 className="text-xs font-bold text-slate-800">Announcements</h4>
+            </div>
+            {isFirmOwner && (
+              <button
+                onClick={() => setShowAnnouncementForm(!showAnnouncementForm)}
+                className="p-1 bg-brand-light text-brand rounded-md hover:bg-brand hover:text-white transition-all"
+              >
+                {showAnnouncementForm ? <X size={12} /> : <BellPlus size={12} />}
+              </button>
+            )}
+          </div>
+
+          {isFirmOwner && showAnnouncementForm && (
+            <div className="p-3 bg-brand-light/30 border-b border-brand/10 space-y-2 animate-in slide-in-from-top-2 duration-300">
+              <input
+                type="text"
+                placeholder="Title"
+                value={newAnnouncement.title}
+                onChange={(e) => setNewAnnouncement(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none"
+              />
+              <textarea
+                placeholder="Write message..."
+                rows={2}
+                value={newAnnouncement.content}
+                onChange={(e) => setNewAnnouncement(prev => ({ ...prev, content: e.target.value }))}
+                className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-xs font-medium text-slate-600 focus:ring-2 focus:ring-brand outline-none resize-none"
+              />
+              <select
+                value={newAnnouncement.type}
+                onChange={(e) => setNewAnnouncement(prev => ({ ...prev, type: e.target.value as 'client' | 'firm' }))}
+                className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-600"
+              >
+                <option value="client">Client Announcement</option>
+                <option value="firm">Firm Announcement</option>
+              </select>
+              <button
+                onClick={handleSaveAnnouncement}
+                disabled={isSavingAnnouncement || !newAnnouncement.title}
+                className="w-full py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all shadow-sm flex items-center justify-center gap-1.5"
+              >
+                {isSavingAnnouncement ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                Post
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-[140px] overflow-y-auto">
+            {announcements
+              .filter(item => isClient ? item.type === 'client' : true)
+              .slice(0, 3)
+              .map((item) => (
+              <div key={item.id} className="px-3 py-2 border-b border-slate-50 last:border-0 group relative">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                    item.type === 'firm'
+                      ? 'bg-indigo-50 text-indigo-600'
+                      : 'bg-emerald-50 text-emerald-600'
+                  }`}>
+                    {item.type === 'firm' ? 'Firm' : 'Client'}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] text-slate-400">
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </span>
+                    {isFirmOwner && (
+                      <button
+                        onClick={() => handleDeleteAnnouncement(item.id)}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-300 hover:text-rose-500 transition-all"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <h5 className="text-[11px] font-bold text-slate-700">{item.title}</h5>
+                <p className="text-[10px] text-slate-500 leading-snug line-clamp-2">{item.content}</p>
+              </div>
+            ))}
+            {announcements.filter(item => isClient ? item.type === 'client' : true).length === 0 && (
+              <p className="text-[10px] text-slate-400 text-center py-4">No announcements yet.</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {isStaff && isExtension && (
         // Extension: status + year filters side-by-side
         <div className="flex items-center gap-2 mb-4">
@@ -1413,13 +1508,13 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     onChange={(e) => setNewAnnouncement(prev => ({ ...prev, content: e.target.value }))}
                     className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-brand outline-none resize-none"
                   />
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Type:</label>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Type</label>
                       <select
                         value={newAnnouncement.type}
                         onChange={(e) => setNewAnnouncement(prev => ({ ...prev, type: e.target.value as 'client' | 'firm' }))}
-                        className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:ring-2 focus:ring-brand outline-none"
                       >
                         <option value="client">Client Announcement</option>
                         <option value="firm">Firm Announcement</option>
@@ -1428,7 +1523,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     <button
                       onClick={handleSaveAnnouncement}
                       disabled={isSavingAnnouncement || !newAnnouncement.title}
-                      className="flex-1 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all shadow-sm flex items-center justify-center gap-2"
+                      className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all shadow-sm flex items-center justify-center gap-2"
                     >
                       {isSavingAnnouncement ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                       Post Announcement
