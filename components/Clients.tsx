@@ -486,20 +486,31 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
           {/* Main List Area */}
           <div className={isExtension ? 'col-span-1' : 'lg:col-span-3'}>
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase">
-                  {stats.total} {stats.total === 1 ? 'Client' : 'Clients'} • {activeView}
+              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase shrink-0">
+                  {stats.total} {stats.total === 1 ? 'Client' : 'Clients'}
                 </span>
                 {isExtension && (
-                  <div className="relative">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search..."
-                      className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] w-36 focus:ring-2 focus:ring-brand outline-none"
-                    />
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search..."
+                        className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] w-28 focus:ring-2 focus:ring-brand outline-none"
+                      />
+                    </div>
+                    {canAddClients && (
+                      <button
+                        onClick={() => setShowAddClient(true)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-brand text-white text-[11px] font-bold rounded-lg hover:bg-brand/90 transition-all shrink-0"
+                      >
+                        <Plus size={12} />
+                        Add
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -569,6 +580,50 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Client Modal (extension mode) */}
+      {isExtension && showAddClient && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowAddClient(false); setAddError(null); setAddSuccess(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800">Add New Client</h3>
+              <button onClick={() => { setShowAddClient(false); setAddError(null); setAddSuccess(false); }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              {addError && (
+                <div className="bg-rose-50 text-rose-600 text-xs font-bold p-2.5 rounded-xl border border-rose-100">{addError}</div>
+              )}
+              {addSuccess && (
+                <div className="bg-emerald-50 text-emerald-600 text-xs font-bold p-2.5 rounded-xl border border-emerald-100">Client added!</div>
+              )}
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand outline-none"
+              />
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={newClientEmail}
+                onChange={(e) => setNewClientEmail(e.target.value)}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand outline-none"
+              />
+              <button
+                onClick={handleAddClient}
+                disabled={addingClient || !newClientName.trim() || !newClientEmail.trim()}
+                className="w-full py-2.5 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {addingClient ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                {addingClient ? 'Adding...' : 'Add Client'}
+              </button>
             </div>
           </div>
         </div>
