@@ -1321,20 +1321,19 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
         <div className={`${isExtension ? 'col-span-1' : 'lg:col-span-2'} space-y-6`}>
           {isStaff ? (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className={`${isExtension ? 'p-3' : 'p-6'} border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
-                <div className="min-w-0">
+              <div className={`${isExtension ? 'p-3' : 'p-6'} border-b border-slate-100 space-y-3`}>
+                <div>
                   <h4 className={`font-bold text-slate-800 ${isExtension ? 'text-sm' : ''}`}>
                     Workflow Management
                   </h4>
                   {!isExtension && (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-500 mt-1">
                       Filter and manage the status of your client tax returns.
                     </p>
                   )}
                 </div>
                 {!isExtension && (
-                  <div className="flex items-center gap-3">
-
+                  <div className="flex items-center gap-3 flex-wrap">
                     <div className="relative flex items-center">
                       <Filter size={14} className="absolute left-3 text-slate-400" />
                       <select

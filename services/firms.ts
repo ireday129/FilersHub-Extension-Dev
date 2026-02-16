@@ -7,12 +7,13 @@ export interface PublicFirmData {
     logo_url: string;
     brand_color: string;
     slug: string;
+    portal_message: string | null;
 }
 
 export const getFirmBySlug = async (slug: string): Promise<PublicFirmData | null> => {
     const { data, error } = await supabase
         .from('firms')
-        .select('firm_id, firm_name, logo_url, brand_color, slug')
+        .select('firm_id, firm_name, logo_url, brand_color, slug, portal_message')
         .eq('slug', slug)
         .single();
 

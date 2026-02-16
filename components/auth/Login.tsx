@@ -8,6 +8,7 @@ interface LoginProps {
         name: string;
         logo: string;
         color: string;
+        portalMessage?: string;
     };
     firmId?: string;
 }
@@ -241,6 +242,12 @@ const Login: React.FC<LoginProps> = ({ firmBranding, firmId }) => {
                                 Forgot password?
                             </button>
                         </div>
+
+                        {firmBranding?.portalMessage && (
+                            <div className="mt-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                                <p className="text-sm text-slate-600 leading-relaxed">{firmBranding.portalMessage}</p>
+                            </div>
+                        )}
                     </form>
                 )}
             </div>

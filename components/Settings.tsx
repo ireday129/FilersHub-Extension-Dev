@@ -301,6 +301,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           logo_url: localSettings.logo,
           brand_color: localSettings.color,
           slug: firmSlug,
+          portal_message: localSettings.portalMessage || null,
           updated_at: new Date().toISOString()
         })
         .eq('firm_id', firmId);
@@ -501,6 +502,19 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2 font-medium italic">Share this link with your clients so they can log in to the portal.</p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Portal Welcome Message</label>
+                <textarea
+                  value={localSettings.portalMessage}
+                  onChange={(e) => setLocalSettings({ ...localSettings, portalMessage: e.target.value })}
+                  placeholder="Welcome to our client portal. Please sign in to access your tax documents and returns."
+                  rows={3}
+                  maxLength={300}
+                  className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all resize-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-1 font-medium italic">{localSettings.portalMessage.length}/300 — This message appears on your client portal login page.</p>
               </div>
             </div>
 

@@ -365,7 +365,7 @@ const AppContent: React.FC = () => {
   const { ghlContext, loading: ghlLoading } = useGhlContext(isExtension);
   const [path, setPath] = useState(window.location.pathname);
   const [firmBranding, setFirmBranding] = useState<{
-    firm_id: string; name: string; logo: string; color: string;
+    firm_id: string; name: string; logo: string; color: string; portalMessage: string;
   } | null>(null);
   const [isFirmLoading, setIsFirmLoading] = useState(false);
   const [launchpadUrl, setLaunchpadUrl] = useState<string | null>(null);
@@ -394,7 +394,8 @@ const AppContent: React.FC = () => {
               firm_id: firmData.firm_id,
               name: firmData.firm_name,
               logo: firmData.logo_url,
-              color: firmData.brand_color
+              color: firmData.brand_color,
+              portalMessage: firmData.portal_message || ''
             });
           }
         } catch (err) {
@@ -531,7 +532,8 @@ const AppContent: React.FC = () => {
       return <Login firmBranding={{
         name: firmBranding.name,
         logo: firmBranding.logo,
-        color: firmBranding.color
+        color: firmBranding.color,
+        portalMessage: firmBranding.portalMessage
       }} firmId={firmBranding.firm_id} />;
     }
 

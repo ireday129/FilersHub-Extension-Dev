@@ -15,7 +15,8 @@ export const useFirmData = () => {
         name: '',
         logo: '',
         color: '',
-        slug: ''
+        slug: '',
+        portalMessage: ''
     });
 
     const fetchData = useCallback(async () => {
@@ -30,7 +31,8 @@ export const useFirmData = () => {
                     name: 'Dev Mode Firm',
                     logo: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png',
                     color: '#42ab31',
-                    slug: 'dev-firm'
+                    slug: 'dev-firm',
+                    portalMessage: ''
                 });
                 // Mock Returns
                 setReturns([
@@ -153,7 +155,7 @@ export const useFirmData = () => {
             const firmIds = Array.from(allFirmsMap.keys());
             const { data: firmsDetails, error: firmsError } = await supabase
                 .from('firms')
-                .select('firm_id, firm_name, logo_url, brand_color, slug')
+                .select('firm_id, firm_name, logo_url, brand_color, slug, portal_message')
                 .in('firm_id', firmIds);
 
             if (firmsError) {
@@ -168,6 +170,7 @@ export const useFirmData = () => {
                         existing.logo = f.logo_url;
                         existing.brandColor = f.brand_color;
                         existing.slug = f.slug || '';
+                        existing.portalMessage = f.portal_message || '';
                     }
                 });
             }
@@ -202,7 +205,8 @@ export const useFirmData = () => {
                 name: selectedFirm.name,
                 logo: selectedFirm.logo || '',
                 color: selectedFirm.brandColor || '#3b82f6',
-                slug: selectedFirm.slug || ''
+                slug: selectedFirm.slug || '',
+                portalMessage: selectedFirm.portalMessage || ''
             });
 
             // Now load data SPECIFIC to this firm and role
