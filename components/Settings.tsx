@@ -78,7 +78,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       try {
         const { data, error } = await supabase
           .from('staff')
-          .select('staff_id, full_name, email, role, is_active')
+          .select('staff_id, full_name, email, role, is_active, avatar_url')
           .eq('firm_id', firmId)
           .eq('is_active', true);
 
@@ -89,7 +89,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           name: s.full_name,
           email: s.email,
           role: s.role as UserRole,
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.email)}`
+          avatar: s.avatar_url || ''
         }));
         setStaff(mapped);
       } catch (err) {
@@ -116,7 +116,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     try {
       const { data, error } = await supabase
         .from('staff')
-        .select('staff_id, full_name, email, role, is_active')
+        .select('staff_id, full_name, email, role, is_active, avatar_url')
         .eq('firm_id', firmId)
         .eq('is_active', true);
       if (!error && data) {
@@ -125,7 +125,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           name: s.full_name,
           email: s.email,
           role: s.role as UserRole,
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.email)}`
+          avatar: s.avatar_url || ''
         })));
       }
     } catch (err) {
@@ -621,7 +621,11 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 <tr key={member.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
                     <div className="flex items-center gap-2 min-w-0">
-                      <img src={member.avatar} alt={member.name} className={`${isExtension ? 'w-6 h-6' : 'w-8 h-8'} rounded-full border border-slate-200 group-hover:border-brand/40 transition-colors shrink-0`} />
+                      {member.avatar ? (
+                        <img src={member.avatar} alt={member.name} className={`${isExtension ? 'w-6 h-6' : 'w-8 h-8'} rounded-full border border-slate-200 group-hover:border-brand/40 transition-colors shrink-0 object-cover`} />
+                      ) : (
+                        <div className={`${isExtension ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm'} rounded-full bg-slate-100 border border-slate-200 group-hover:border-brand/40 transition-colors shrink-0 flex items-center justify-center font-bold text-slate-400`}>?</div>
+                      )}
                       <div className="min-w-0">
                         <span className="text-sm font-semibold text-slate-700 truncate block">{member.name}</span>
                         {member.role === UserRole.FirmOwner && (

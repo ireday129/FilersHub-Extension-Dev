@@ -16,3 +16,6 @@
 - The service worker (`public/service-worker.js`) manages the GHL context lifecycle, clearing it when the user navigates away from GHL pages.
 - The app also runs inside GHL (GoHighLevel) iframes. GHL iframes load the app at `/` (not `/extension`), so they always get the full desktop UI. Never use iframe detection (`window.self !== window.top`) to determine extension mode.
 - Make sure the entire application is accessible within the Chrome extension and within any iframe (GHL or otherwise).
+
+## Deployment & Updates
+- I dont want to use the Terminal ever. My Github commits push directly to my Vercel hosting and the Github Actions automatically deploy my functions updates.
