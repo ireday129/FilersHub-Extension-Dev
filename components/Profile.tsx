@@ -49,11 +49,19 @@ const Profile: React.FC<ProfileProps> = ({ role }) => {
 
             setAvatarUrl(publicUrl);
 
-            // Also try to update staff table if it exists
-            await supabase
+            // Update staff table — try auth_user_id first, fall back to email
+            const { count } = await supabase
                 .from('staff')
                 .update({ avatar_url: publicUrl })
-                .eq('auth_user_id', user.id);
+                .eq('auth_user_id', user.id)
+                .select('staff_id', { count: 'exact', head: true });
+
+            if (!count) {
+                await supabase
+                    .from('staff')
+                    .update({ avatar_url: publicUrl })
+                    .eq('email', user.email!.toLowerCase());
+            }
 
         } catch (error) {
             console.error('Error uploading avatar:', error);
@@ -73,11 +81,19 @@ const Profile: React.FC<ProfileProps> = ({ role }) => {
 
             if (error) throw error;
 
-            // Also try to update staff table if it exists
-            await supabase
+            // Update staff table — try auth_user_id first, fall back to email
+            const { count } = await supabase
                 .from('staff')
-                .update({ name: fullName })
-                .eq('auth_user_id', user.id);
+                .update({ full_name: fullName })
+                .eq('auth_user_id', user.id)
+                .select('staff_id', { count: 'exact', head: true });
+
+            if (!count) {
+                await supabase
+                    .from('staff')
+                    .update({ full_name: fullName })
+                    .eq('email', user.email!.toLowerCase());
+            }
 
             alert('Profile updated successfully!');
         } catch (error) {

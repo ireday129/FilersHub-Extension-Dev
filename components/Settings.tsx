@@ -17,6 +17,7 @@ import {
 import { UserRole } from '../types';
 import { supabase } from '../services/supabase';
 import { useExtensionMode } from '../hooks/useExtensionMode';
+import { useAuth } from '../contexts/AuthContext';
 
 interface StaffMember {
   id: string;
@@ -62,6 +63,7 @@ interface GHLUser {
 
 const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firmId }) => {
   const { isExtension } = useExtensionMode();
+  const { user } = useAuth();
   const [localSettings, setLocalSettings] = useState(firmSettings);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [staffLoading, setStaffLoading] = useState(true);
@@ -84,12 +86,14 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
         if (error) throw error;
 
+        const currentUserAvatar = user?.user_metadata?.avatar_url || '';
+        const currentUserEmail = user?.email?.toLowerCase();
         const mapped: StaffMember[] = (data || []).map((s: any) => ({
           id: s.staff_id,
           name: s.full_name,
           email: s.email,
           role: s.role as UserRole,
-          avatar: s.avatar_url || ''
+          avatar: s.avatar_url || (s.email?.toLowerCase() === currentUserEmail ? currentUserAvatar : '')
         }));
         setStaff(mapped);
       } catch (err) {
@@ -120,12 +124,14 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
         .eq('firm_id', firmId)
         .eq('is_active', true);
       if (!error && data) {
+        const currentUserAvatar = user?.user_metadata?.avatar_url || '';
+        const currentUserEmail = user?.email?.toLowerCase();
         setStaff(data.map((s: any) => ({
           id: s.staff_id,
           name: s.full_name,
           email: s.email,
           role: s.role as UserRole,
-          avatar: s.avatar_url || ''
+          avatar: s.avatar_url || (s.email?.toLowerCase() === currentUserEmail ? currentUserAvatar : '')
         })));
       }
     } catch (err) {
