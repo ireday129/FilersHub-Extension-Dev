@@ -28,14 +28,11 @@ interface ClientsProps {
   refreshData: () => Promise<void>;
 }
 
-type ClientView = 'My Clients' | 'Active Returns' | 'Completed Returns' | 'Firm Clients';
+type ClientView = 'My Clients' | 'Firm Clients';
 
 const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData }) => {
   const { isExtension } = useExtensionMode();
-  const [activeView, setActiveView] = useState<ClientView>(() => {
-    if (role === UserRole.TaxPro) return 'Active Returns';
-    return 'My Clients';
-  });
+  const [activeView, setActiveView] = useState<ClientView>('My Clients');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Add Client form state
@@ -97,36 +94,10 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
   const filteredReturns = useMemo(() => {
     let base = [...returns];
 
-    if (activeView === 'My Clients') {
+    if (activeView === 'My Clients' || role === UserRole.TaxPro) {
       base = base.filter(r => r.preparer === staffName);
-    } else if (activeView === 'Active Returns') {
-      const activeStatuses = [
-        TaxReturnStatus.IntakeReceived,
-        TaxReturnStatus.ComplianceReview,
-        TaxReturnStatus.InPreparation,
-        TaxReturnStatus.MissingDocuments,
-        TaxReturnStatus.ReadyForSignature,
-        TaxReturnStatus.InvoiceSent,
-        TaxReturnStatus.BankProduct,
-        TaxReturnStatus.Filed,
-        TaxReturnStatus.Rejected
-      ];
-      base = base.filter(r => activeStatuses.includes(r.status));
-      // For Tax Pro, only their own active returns
-      if (role === UserRole.TaxPro) {
-        base = base.filter(r => r.preparer === staffName);
-      }
-    } else if (activeView === 'Completed Returns') {
-      const completedStatuses = [TaxReturnStatus.Accepted];
-      base = base.filter(r => completedStatuses.includes(r.status));
-      // For Tax Pro, only their own completed returns
-      if (role === UserRole.TaxPro) {
-        base = base.filter(r => r.preparer === staffName);
-      }
-    } else if (activeView === 'Firm Clients') {
-      // Show all clients, no filtering
-      base = base;
     }
+    // 'Firm Clients' shows all, no filtering
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -154,7 +125,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
 
   const renderTabs = () => {
     if (role === UserRole.FirmOwner || role === UserRole.Manager) {
-      const views: ClientView[] = ['My Clients', 'Firm Clients', 'Active Returns', 'Completed Returns'];
+      const views: ClientView[] = ['My Clients', 'Firm Clients'];
       return (
         <div className={`flex items-center gap-1 bg-slate-100 p-1 rounded-xl ${isExtension ? 'flex-wrap' : ''}`}>
           {views.map(view => (
@@ -172,22 +143,8 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
     }
     if (role === UserRole.TaxPro) {
       return (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase tracking-widest mb-1">
-            <UserCheck size={14} className="text-brand" /> My Assigned Returns
-          </div>
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-            {(['Active Returns', 'Completed Returns'] as ClientView[]).map(view => (
-              <button
-                key={view}
-                onClick={() => setActiveView(view)}
-                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-              >
-                {view}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-2 text-slate-500 font-bold text-xs uppercase tracking-widest">
+          <UserCheck size={14} className="text-brand" /> My Assigned Returns
         </div>
       );
     }

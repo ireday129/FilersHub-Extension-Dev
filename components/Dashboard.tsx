@@ -103,7 +103,7 @@ interface Announcement {
   created_at: string;
 }
 
-const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOver, onDrop, onDragEnd, onDelete, compact }: any) => (
+const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOver, onDrop, onDragEnd, onDelete, compact, newCount }: any) => (
   <div
     draggable={draggable}
     onDragStart={onDragStart}
@@ -112,6 +112,11 @@ const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOv
     onDragEnd={onDragEnd}
     className={`bg-white rounded-2xl border-white shadow-sm transition-all hover:border-brand hover:shadow-md group relative flex flex-col justify-center ${compact ? 'p-3 min-h-[80px] border-2' : 'p-4 border-[5px] min-h-[100px]'} ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
   >
+    {newCount > 0 && (
+      <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-brand text-white text-[10px] font-black rounded-full shadow-md z-10 animate-in fade-in zoom-in duration-300">
+        +{newCount}
+      </span>
+    )}
     {draggable && (
       <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <button
@@ -236,6 +241,39 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'client' as 'client' | 'firm' });
   const [extensionStatusFilter, setExtensionStatusFilter] = useState<TaxReturnStatus>(TaxReturnStatus.IntakeReceived);
+
+  // "New" badge tracking: compare current return IDs per status against last-visit snapshot
+  const [prevSnapshot] = useState<Record<string, string[]> | null>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_status_snapshot');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const newCountsByStatus = useMemo(() => {
+    if (!prevSnapshot || returns.length === 0) return {};
+    const counts: Partial<Record<TaxReturnStatus, number>> = {};
+    DEFAULT_DASHBOARD_STATUSES.forEach(status => {
+      const currentIds = returns.filter(r => r.status === status).map(r => r.id);
+      const prevIds = new Set(prevSnapshot[status] || []);
+      const newCount = currentIds.filter(id => !prevIds.has(id)).length;
+      if (newCount > 0) counts[status] = newCount;
+    });
+    return counts;
+  }, [returns, prevSnapshot]);
+
+  // Save current snapshot after user has seen the dashboard (3s delay)
+  useEffect(() => {
+    if (returns.length === 0) return;
+    const timer = setTimeout(() => {
+      const snapshot: Record<string, string[]> = {};
+      DEFAULT_DASHBOARD_STATUSES.forEach(status => {
+        snapshot[status] = returns.filter(r => r.status === status).map(r => r.id);
+      });
+      localStorage.setItem('dashboard_status_snapshot', JSON.stringify(snapshot));
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [returns]);
 
   const groupedFileUploadTypes = useMemo(() => {
     const groups: Record<string, { key: string; label: string; category: string }[]> = {};
@@ -1159,6 +1197,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     onDragOver={handleDragOver}
                     onDrop={(e: any) => handleDrop(e, index)}
                     onDelete={() => handleDeleteStatus(index)}
+                    newCount={newCountsByStatus[status] || 0}
                   />
                 );
               }) : (
@@ -1343,7 +1382,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   )}
                 </div>
                 {!isExtension && (
-                  <div className={`flex items-center gap-3 flex-wrap ${isTaxPro ? 'justify-center' : ''}`}>
+                  <div className={`flex items-center gap-3 ${isTaxPro ? 'justify-center' : ''}`}>
                     <div className="relative flex items-center">
                       <Filter size={14} className="absolute left-3 text-slate-400" />
                       <select

@@ -643,13 +643,13 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider`}>Member</th>
                 {!isExtension && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>}
                 <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider`}>Role</th>
-                <th className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-xs font-bold text-slate-500 uppercase tracking-wider text-right`}>Actions</th>
+                {!isExtension && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {staffLoading ? (
                 <tr>
-                  <td colSpan={isExtension ? 3 : 4} className="px-6 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={isExtension ? 2 : 4} className="px-6 py-8 text-center text-sm text-slate-400">
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
                       Loading staff...
@@ -658,7 +658,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 </tr>
               ) : staff.length === 0 ? (
                 <tr>
-                  <td colSpan={isExtension ? 3 : 4} className="px-6 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={isExtension ? 2 : 4} className="px-6 py-8 text-center text-sm text-slate-400">
                     No staff members found.
                   </td>
                 </tr>
@@ -692,25 +692,34 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                       ) : (
                         <select
                           value={member.role}
-                          onChange={(e) => handleRoleChange(member.id, e.target.value as UserRole)}
+                          onChange={(e) => {
+                            if (e.target.value === '__revoke__') {
+                              revokeAccess(member.id);
+                            } else {
+                              handleRoleChange(member.id, e.target.value as UserRole);
+                            }
+                          }}
                           className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer focus:text-brand"
                         >
                           <option value={UserRole.Manager}>Manager</option>
                           <option value={UserRole.TaxPro}>Tax Pro</option>
+                          {isExtension && <option value="__revoke__" className="text-rose-500">Revoke Access</option>}
                         </select>
                       )}
                     </div>
                   </td>
-                  <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'} text-right`}>
-                    {member.role !== UserRole.FirmOwner && (
-                      <button
-                        onClick={() => revokeAccess(member.id)}
-                        className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all"
-                      >
-                        {isExtension ? 'Revoke' : 'Revoke Access'}
-                      </button>
-                    )}
-                  </td>
+                  {!isExtension && (
+                    <td className="px-6 py-4 text-right">
+                      {member.role !== UserRole.FirmOwner && (
+                        <button
+                          onClick={() => revokeAccess(member.id)}
+                          className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all"
+                        >
+                          Revoke Access
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
