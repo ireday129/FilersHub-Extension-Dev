@@ -71,6 +71,26 @@ export default async function handler(req: any, res: any) {
                 .eq("ghl_location_id", tokenData.locationId);
             dbError = error;
         } else {
+            // Fetch real location name from GHL API
+            let locationName = `GHL Location ${tokenData.locationId}`;
+            let locationLogo = null;
+            try {
+                const locResp = await fetch(`https://services.leadconnectorhq.com/locations/${tokenData.locationId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${tokenData.access_token}`,
+                        'Version': '2021-07-28'
+                    }
+                });
+                if (locResp.ok) {
+                    const locData = await locResp.json();
+                    const loc = locData.location || locData;
+                    if (loc.name) locationName = loc.name;
+                    if (loc.logoUrl) locationLogo = loc.logoUrl;
+                }
+            } catch (locErr) {
+                console.error("Failed to fetch GHL location info:", locErr);
+            }
+
             // Insert new firm (requires slug)
             const { error } = await supabaseAdmin
                 .from("firms")
@@ -79,7 +99,8 @@ export default async function handler(req: any, res: any) {
                     ghl_access_token: tokenData.access_token,
                     ghl_refresh_token: tokenData.refresh_token,
                     ghl_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-                    firm_name: `GHL Location ${tokenData.locationId}`,
+                    firm_name: locationName,
+                    logo_url: locationLogo,
                     subscription_status: 'trialing',
                     slug: tokenData.locationId.toLowerCase() // Generate default slug
                 });

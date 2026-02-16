@@ -91,11 +91,15 @@ const STATUS_ORDER = [
   TaxReturnStatus.Accepted
 ];
 
-const initialAnnouncements = [
-  { id: '1', title: 'Tax Extension Reminder', content: 'The federal extension deadline is Oct 15. Please ensure all documents are uploaded.', date: '2 days ago', priority: 'high' },
-  { id: '2', title: 'Office Holiday Hours', content: 'Our firm will be closed on July 4th for Independence Day.', date: '1 week ago', priority: 'medium' },
-  { id: '3', title: 'New Secure Messaging', content: 'We have updated our messaging system for better security.', date: '2 weeks ago', priority: 'low' },
-];
+interface Announcement {
+  id: string;
+  firm_id: string;
+  type: 'client' | 'firm';
+  title: string;
+  content: string;
+  created_by: string | null;
+  created_at: string;
+}
 
 const StatCard = ({ title, value, emoji, color, draggable, onDragStart, onDragOver, onDrop, onDragEnd, onDelete, compact }: any) => (
   <div
@@ -197,7 +201,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const isStaff = isStaffRole(role);
   const canToggleView = isFirmOwner || isManager;
 
-  const [announcements, setAnnouncements] = useState(initialAnnouncements);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [sortStatus, setSortStatus] = useState<string>('Default');
   const [filterYear, setFilterYear] = useState<string>('All');
   const [filterType, setFilterType] = useState<string>('All');
@@ -226,7 +230,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
 
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
-  const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', priority: 'medium' });
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'client' as 'client' | 'firm' });
   const [extensionStatusFilter, setExtensionStatusFilter] = useState<TaxReturnStatus>(TaxReturnStatus.IntakeReceived);
 
   const groupedFileUploadTypes = useMemo(() => {
@@ -346,25 +350,47 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     }
   };
 
+  const fetchAnnouncements = async () => {
+    if (!firmId) return;
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .eq('firm_id', firmId)
+      .order('created_at', { ascending: false });
+    if (!error && data) setAnnouncements(data);
+  };
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [firmId]);
+
   const handleSaveAnnouncement = async () => {
-    if (!newAnnouncement.title || !newAnnouncement.content) return;
+    if (!newAnnouncement.title || !newAnnouncement.content || !firmId) return;
     setIsSavingAnnouncement(true);
 
     try {
-      const announcement = {
-        ...newAnnouncement,
-        id: Math.random().toString(36).substr(2, 9),
-        date: 'Just now'
-      };
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setAnnouncements(prev => [announcement, ...prev]);
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase.from('announcements').insert({
+        firm_id: firmId,
+        type: newAnnouncement.type,
+        title: newAnnouncement.title,
+        content: newAnnouncement.content,
+        created_by: userData.user?.id || null,
+      });
+      if (error) throw error;
       setShowAnnouncementForm(false);
-      setNewAnnouncement({ title: '', content: '', priority: 'medium' });
+      setNewAnnouncement({ title: '', content: '', type: 'client' });
+      await fetchAnnouncements();
     } catch (err) {
       console.error("Failed to save announcement:", err);
     } finally {
       setIsSavingAnnouncement(false);
     }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    if (!error) setAnnouncements(prev => prev.filter(a => a.id !== id));
   };
 
   useEffect(() => {
@@ -1172,7 +1198,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   )}
                 </div>
                 {!isExtension && (
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-3">
 
                     <div className="relative flex items-center">
                       <Filter size={14} className="absolute left-3 text-slate-400" />
@@ -1355,7 +1381,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
                 <Megaphone size={18} className="text-brand" />
-                <h4 className="font-bold text-slate-800">Firm Announcements</h4>
+                <h4 className="font-bold text-slate-800">Announcements</h4>
               </div>
               {isFirmOwner && (
                 <button
@@ -1381,7 +1407,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none"
                   />
                   <textarea
-                    placeholder="Write message to all users..."
+                    placeholder="Write message..."
                     rows={3}
                     value={newAnnouncement.content}
                     onChange={(e) => setNewAnnouncement(prev => ({ ...prev, content: e.target.value }))}
@@ -1389,15 +1415,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   />
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Priority:</label>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Type:</label>
                       <select
-                        value={newAnnouncement.priority}
-                        onChange={(e) => setNewAnnouncement(prev => ({ ...prev, priority: e.target.value }))}
+                        value={newAnnouncement.type}
+                        onChange={(e) => setNewAnnouncement(prev => ({ ...prev, type: e.target.value as 'client' | 'firm' }))}
                         className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-600"
                       >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
+                        <option value="client">Client Announcement</option>
+                        <option value="firm">Firm Announcement</option>
                       </select>
                     </div>
                     <button
@@ -1406,7 +1431,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       className="flex-1 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all shadow-sm flex items-center justify-center gap-2"
                     >
                       {isSavingAnnouncement ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                      Post to Firm
+                      Post Announcement
                     </button>
                   </div>
                 </div>
@@ -1414,27 +1439,44 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
             )}
 
             <div className="space-y-4 flex-1 overflow-y-auto max-h-[600px] pr-1">
-              {announcements.map((item) => (
+              {announcements
+                .filter(item => isClient ? item.type === 'client' : true)
+                .map((item) => (
                 <div key={item.id} className="p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:border-brand/30 transition-all group relative overflow-hidden">
-                  {item.priority === 'high' && (
-                    <div className="absolute top-0 right-0 w-1 h-full bg-rose-500"></div>
+                  {item.type === 'firm' && (
+                    <div className="absolute top-0 right-0 w-1 h-full bg-indigo-500"></div>
                   )}
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${item.priority === 'high' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                      {item.priority}
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                      item.type === 'firm'
+                        ? 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                        : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                    }`}>
+                      {item.type === 'firm' ? 'Firm' : 'Client'}
                     </span>
-                    <span className="text-[10px] text-slate-400">{item.date}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(item.created_at).toLocaleDateString()}
+                      </span>
+                      {isFirmOwner && (
+                        <button
+                          onClick={() => handleDeleteAnnouncement(item.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-rose-500 transition-all"
+                          title="Delete announcement"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <h5 className="text-sm font-bold text-slate-700 mb-1">{item.title}</h5>
                   <p className="text-xs text-slate-500 leading-relaxed">{item.content}</p>
                 </div>
               ))}
+              {announcements.filter(item => isClient ? item.type === 'client' : true).length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-8">No announcements yet.</p>
+              )}
             </div>
-            <button className="w-full mt-6 py-3 text-sm font-bold text-brand hover:bg-brand-light rounded-xl transition-colors flex items-center justify-center gap-2 border border-brand/10">
-              View All Updates
-              <ChevronRight size={14} />
-            </button>
           </div>
         )}
       </div>
