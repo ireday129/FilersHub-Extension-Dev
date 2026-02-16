@@ -27,11 +27,12 @@ interface ClientsProps {
   setActiveTab: (tab: NavItem) => void;
   firmId: string | null;
   refreshData: () => Promise<void>;
+  currentStaffName?: string;
 }
 
 type ClientView = 'My Clients' | 'Firm Clients';
 
-const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData }) => {
+const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData, currentStaffName }) => {
   const { isExtension } = useExtensionMode();
   const [activeView, setActiveView] = useState<ClientView>('My Clients');
   const [searchQuery, setSearchQuery] = useState('');
@@ -146,12 +147,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
     }
   };
 
-  const staffName = useMemo(() => {
-    if (role === UserRole.FirmOwner) return "Sarah Johnson";
-    if (role === UserRole.Manager) return "Marcus Aurelius";
-    if (role === UserRole.TaxPro) return "David Smith";
-    return "";
-  }, [role]);
+  const staffName = currentStaffName || '';
 
   const filteredReturns = useMemo(() => {
     let base = [...returns];

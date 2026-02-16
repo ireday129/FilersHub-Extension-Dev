@@ -11,6 +11,8 @@ export const useFirmData = () => {
     const [userAvatar, setUserAvatar] = useState<string | null>(null);
     const [availableFirms, setAvailableFirms] = useState<any[]>([]);
 
+    const [staffName, setStaffName] = useState<string>('');
+
     const [firmSettings, setFirmSettings] = useState({
         name: '',
         logo: '',
@@ -109,6 +111,7 @@ export const useFirmData = () => {
                         allFirmsMap.set(entry.firm_id, {
                             id: entry.firm_id,
                             role: entry.role,
+                            staffName: entry.full_name || '',
                             name: '', // Will fetch below
                             logo: '',
                             brandColor: '',
@@ -201,6 +204,7 @@ export const useFirmData = () => {
             if (!selectedFirm) throw new Error("Invalid firm selection");
 
             setFirmId(selectedId);
+            setStaffName(selectedFirm.staffName || '');
             setFirmSettings({
                 name: selectedFirm.name,
                 logo: selectedFirm.logo || '',
@@ -286,5 +290,5 @@ export const useFirmData = () => {
         }
     }, [user]);
 
-    return { returns, setReturns, loading, refresh: fetchData, firmId, firmSettings, setFirmSettings, userAvatar, setUserAvatar, availableFirms, selectFirm };
+    return { returns, setReturns, loading, refresh: fetchData, firmId, firmSettings, setFirmSettings, userAvatar, setUserAvatar, availableFirms, selectFirm, staffName };
 };

@@ -54,6 +54,7 @@ interface DashboardProps {
   refreshData: () => Promise<void>;
   firmId: string | null;
   isExtension?: boolean;
+  currentStaffName?: string;
 }
 
 const STATUS_EMOJIS: Record<TaxReturnStatus, string> = {
@@ -200,7 +201,7 @@ const StatusStepper = ({ currentStatus, paymentType, isClientWorkspace }: { curr
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, selectedReturnId, setSelectedReturnId, refreshData, firmId, isExtension }) => {
+const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, selectedReturnId, setSelectedReturnId, refreshData, firmId, isExtension, currentStaffName }) => {
   const isFirmOwner = role === UserRole.FirmOwner;
   const isManager = role === UserRole.Manager;
   const isTaxPro = role === UserRole.TaxPro;
@@ -241,6 +242,20 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'client' as 'client' | 'firm' });
   const [extensionStatusFilter, setExtensionStatusFilter] = useState<TaxReturnStatus>(TaxReturnStatus.IntakeReceived);
+
+  // Case task states (Manage Return view)
+  const [caseTasks, setCaseTasks] = useState<Task[]>([]);
+  const [showCaseTaskForm, setShowCaseTaskForm] = useState(false);
+  const [creatingCaseTask, setCreatingCaseTask] = useState(false);
+  const [newCaseTask, setNewCaseTask] = useState({
+    title: '',
+    description: '',
+    type: 'client' as 'firm' | 'client',
+    priority: 'Medium' as 'Low' | 'Medium' | 'High',
+    assigned_to: '',
+    due_date: '',
+  });
+  const [staffListWithIds, setStaffListWithIds] = useState<{ id: string; name: string }[]>([]);
 
   // "New" badge tracking: compare current return IDs per status against last-visit snapshot
   const [prevSnapshot] = useState<Record<string, string[]> | null>(() => {
@@ -297,12 +312,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     return groups;
   }, []);
 
-  const staffName = useMemo(() => {
-    if (isFirmOwner) return "Sarah Johnson";
-    if (isManager) return "Marcus Aurelius";
-    if (isTaxPro) return "David Smith";
-    return "";
-  }, [isFirmOwner, isManager, isTaxPro]);
+  const staffName = currentStaffName || '';
 
   // Fetch actual staff members for the firm (for the Tax Pro filter)
   const [staffMembers, setStaffMembers] = useState<string[]>([]);
@@ -316,6 +326,20 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
       .then(({ data }) => {
         if (data) {
           setStaffMembers(data.map((s: any) => s.full_name).filter(Boolean).sort());
+        }
+      });
+  }, [firmId, isStaff]);
+
+  useEffect(() => {
+    if (!firmId || !isStaff) return;
+    supabase
+      .from('staff')
+      .select('staff_id, full_name')
+      .eq('firm_id', firmId)
+      .eq('is_active', true)
+      .then(({ data }) => {
+        if (data) {
+          setStaffListWithIds(data.map((s: any) => ({ id: s.staff_id, name: s.full_name })));
         }
       });
   }, [firmId, isStaff]);
@@ -437,13 +461,14 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     fetchAnnouncements();
   }, [firmId]);
 
-  // Client tasks fetch (RLS auto-scopes to tasks assigned to the logged-in client)
+  // Client tasks fetch — filter to client-type tasks only
   const fetchClientTasks = async () => {
     if (!firmId) return;
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
       .eq('firm_id', firmId)
+      .eq('type', 'client')
       .order('created_at', { ascending: false });
     if (error) console.error('Failed to fetch client tasks:', error);
     if (data) setClientTasks(data);
@@ -473,6 +498,97 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
       );
     }
   };
+
+  // Case tasks (Manage Return view)
+  const fetchCaseTasks = async (clientId: string) => {
+    if (!firmId) return;
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('firm_id', firmId)
+      .eq('type', 'client')
+      .eq('assigned_to', clientId)
+      .order('created_at', { ascending: false });
+    if (error) console.error('Failed to fetch case tasks:', error);
+    if (data) setCaseTasks(data);
+  };
+
+  const handleCreateCaseTask = async () => {
+    if (!newCaseTask.title || !firmId || !selectedReturn) return;
+    setCreatingCaseTask(true);
+
+    const { data: userData } = await supabase.auth.getUser();
+
+    let assignedTo = '';
+    let assignedToName = '';
+
+    if (newCaseTask.type === 'client') {
+      assignedTo = selectedReturn.id;
+      assignedToName = selectedReturn.clientName;
+    } else {
+      assignedTo = newCaseTask.assigned_to;
+      assignedToName = staffListWithIds.find(s => s.id === newCaseTask.assigned_to)?.name || '';
+    }
+
+    if (!assignedTo) {
+      setCreatingCaseTask(false);
+      return;
+    }
+
+    const { error } = await supabase.from('tasks').insert({
+      firm_id: firmId,
+      title: newCaseTask.title,
+      description: newCaseTask.description || null,
+      type: newCaseTask.type,
+      priority: newCaseTask.priority,
+      assigned_to: assignedTo,
+      assigned_to_name: assignedToName,
+      due_date: newCaseTask.due_date || null,
+      created_by: userData.user?.id || null,
+    });
+
+    if (error) {
+      console.error('Failed to create task:', error);
+      setCreatingCaseTask(false);
+      return;
+    }
+
+    setShowCaseTaskForm(false);
+    setNewCaseTask({ title: '', description: '', type: 'client', priority: 'Medium', assigned_to: '', due_date: '' });
+    setCreatingCaseTask(false);
+    await fetchCaseTasks(selectedReturn.id);
+  };
+
+  const handleToggleCaseTask = async (task: Task) => {
+    const nowCompleted = !task.is_completed;
+    const { error } = await supabase
+      .from('tasks')
+      .update({
+        is_completed: nowCompleted,
+        completed_at: nowCompleted ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('task_id', task.task_id);
+    if (!error) {
+      setCaseTasks(prev =>
+        prev.map(t =>
+          t.task_id === task.task_id
+            ? { ...t, is_completed: nowCompleted, completed_at: nowCompleted ? new Date().toISOString() : undefined }
+            : t
+        )
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (selectedReturnId && firmId && isStaff) {
+      fetchCaseTasks(selectedReturnId);
+    } else {
+      setCaseTasks([]);
+    }
+    setShowCaseTaskForm(false);
+    setNewCaseTask({ title: '', description: '', type: 'client', priority: 'Medium', assigned_to: '', due_date: '' });
+  }, [selectedReturnId, firmId]);
 
   const handleSaveAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.content || !firmId) return;
@@ -962,6 +1078,169 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
               </>
             )}
 
+            {/* Case Tasks */}
+            {isStaff && (
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <CheckSquare size={16} className="text-brand" />
+                    Client Tasks
+                    {caseTasks.filter(t => !t.is_completed).length > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+                        {caseTasks.filter(t => !t.is_completed).length}
+                      </span>
+                    )}
+                  </h3>
+                  <button
+                    onClick={() => setShowCaseTaskForm(!showCaseTaskForm)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all shadow-sm ${
+                      showCaseTaskForm ? 'bg-slate-200 text-slate-600' : 'bg-brand text-white hover:opacity-90'
+                    }`}
+                  >
+                    {showCaseTaskForm ? <X size={14} /> : <Plus size={14} />}
+                    {showCaseTaskForm ? 'Cancel' : 'Add Task'}
+                  </button>
+                </div>
+
+                {showCaseTaskForm && (
+                  <div className={`${isExtension ? 'p-3' : 'p-4'} bg-brand-light/30 border-b border-brand/10 animate-in slide-in-from-top-2 duration-300 space-y-3`}>
+                    <input
+                      type="text"
+                      placeholder="Task title"
+                      value={newCaseTask.title}
+                      onChange={(e) => setNewCaseTask(prev => ({ ...prev, title: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none"
+                    />
+                    <textarea
+                      placeholder="Description (optional)"
+                      rows={2}
+                      value={newCaseTask.description}
+                      onChange={(e) => setNewCaseTask(prev => ({ ...prev, description: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-brand outline-none resize-none"
+                    />
+                    <div className={`grid ${isExtension ? 'grid-cols-1' : 'grid-cols-2'} gap-3`}>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Assign To</label>
+                        <select
+                          value={newCaseTask.type}
+                          onChange={(e) => setNewCaseTask(prev => ({ ...prev, type: e.target.value as 'firm' | 'client', assigned_to: '' }))}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:ring-2 focus:ring-brand outline-none"
+                        >
+                          <option value="client">Client ({selectedReturn.clientName})</option>
+                          <option value="firm">Staff Member</option>
+                        </select>
+                      </div>
+                      {newCaseTask.type === 'firm' && (
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Staff Member</label>
+                          <select
+                            value={newCaseTask.assigned_to}
+                            onChange={(e) => setNewCaseTask(prev => ({ ...prev, assigned_to: e.target.value }))}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:ring-2 focus:ring-brand outline-none"
+                          >
+                            <option value="">Select staff...</option>
+                            {staffListWithIds.map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Priority</label>
+                        <select
+                          value={newCaseTask.priority}
+                          onChange={(e) => setNewCaseTask(prev => ({ ...prev, priority: e.target.value as 'Low' | 'Medium' | 'High' }))}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:ring-2 focus:ring-brand outline-none"
+                        >
+                          <option value="Low">Low</option>
+                          <option value="Medium">Medium</option>
+                          <option value="High">High</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Due Date</label>
+                        <input
+                          type="date"
+                          value={newCaseTask.due_date}
+                          onChange={(e) => setNewCaseTask(prev => ({ ...prev, due_date: e.target.value }))}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 focus:ring-2 focus:ring-brand outline-none"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCreateCaseTask}
+                      disabled={creatingCaseTask || !newCaseTask.title || (newCaseTask.type === 'firm' && !newCaseTask.assigned_to)}
+                      className="w-full py-2.5 bg-brand text-white text-sm font-bold rounded-xl hover:bg-brand/90 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {creatingCaseTask ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      Create Task
+                    </button>
+                  </div>
+                )}
+
+                <div className="divide-y divide-slate-50">
+                  {caseTasks.filter(t => !t.is_completed).length > 0 ? (
+                    caseTasks.filter(t => !t.is_completed).map(task => (
+                      <div key={task.task_id} className="p-4 flex items-start gap-3 hover:bg-slate-50/50 transition-colors group">
+                        <button
+                          onClick={() => handleToggleCaseTask(task)}
+                          className="mt-0.5 text-slate-300 hover:text-brand transition-colors shrink-0"
+                        >
+                          <Circle size={18} />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="text-sm font-semibold text-slate-700">{task.title}</p>
+                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                              task.priority === 'High' ? 'text-rose-500 bg-rose-50 border-rose-100'
+                                : task.priority === 'Medium' ? 'text-amber-500 bg-amber-50 border-amber-100'
+                                : 'text-slate-400 bg-slate-50 border-slate-100'
+                            }`}>
+                              {task.priority}
+                            </span>
+                          </div>
+                          {task.description && <p className="text-xs text-slate-400 mb-1 line-clamp-1">{task.description}</p>}
+                          <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                            {task.due_date && (
+                              <span className="flex items-center gap-1">
+                                <Calendar size={10} />
+                                {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    !showCaseTaskForm && (
+                      <div className="p-8 text-center text-slate-400 text-sm">No active tasks for this client.</div>
+                    )
+                  )}
+
+                  {caseTasks.filter(t => t.is_completed).length > 0 && (
+                    <div className="bg-slate-50/50">
+                      <div className="px-4 py-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Completed ({caseTasks.filter(t => t.is_completed).length})
+                        </span>
+                      </div>
+                      {caseTasks.filter(t => t.is_completed).map(task => (
+                        <div key={task.task_id} className="px-4 py-3 flex items-start gap-3 border-t border-slate-100">
+                          <button
+                            onClick={() => handleToggleCaseTask(task)}
+                            className="mt-0.5 text-brand shrink-0"
+                          >
+                            <CheckCircle2 size={18} />
+                          </button>
+                          <p className="text-sm font-medium text-slate-400 line-through">{task.title}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {isStaff && (
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6 relative">
                 <h3 className="text-sm font-bold text-slate-800 border-b border-slate-50 pb-2 flex items-center gap-2">
@@ -1402,45 +1681,44 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
         <div className={`${isExtension ? 'col-span-1' : 'lg:col-span-2'} space-y-6`}>
           {isStaff ? (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className={`${isExtension ? 'p-3' : 'p-6'} border-b border-slate-100 space-y-3`}>
-                <div>
+              <div className={`${isExtension ? 'p-3' : 'px-6 py-4'} border-b border-slate-100 ${isExtension ? '' : 'flex items-center justify-between gap-4'}`}>
+                <div className="shrink-0">
                   <h4 className={`font-bold text-slate-800 ${isExtension ? 'text-sm' : ''}`}>
                     Workflow Management
                   </h4>
                   {!isExtension && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      Filter and manage the status of your client tax returns.
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Filter and manage client tax returns.
                     </p>
                   )}
                 </div>
                 {!isExtension && (
-                  <div className={`flex items-center gap-3 ${isTaxPro ? 'justify-center' : ''}`}>
-                    <div className="relative flex items-center">
-                      <Filter size={14} className="absolute left-3 text-slate-400" />
+                  <div className="flex items-center gap-2 flex-nowrap overflow-hidden">
+                    <div className="relative flex items-center flex-shrink min-w-0">
+                      <Filter size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
                       <select
                         value={sortStatus}
                         onChange={(e) => setSortStatus(e.target.value)}
-                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                        className="pl-9 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer max-w-[170px]"
                       >
-                        <option value="Default">All Workflow Stages</option>
+                        <option value="Default">All Stages</option>
                         {STATUS_ORDER.map(s => (
                           <option key={s} value={s}>{STATUS_EMOJIS[s]} {s}</option>
                         ))}
-                        <hr className="my-1" />
-                        <option value="Workflow">Sort: Workflow Order</option>
+                        <option value="Workflow">Sort: Workflow</option>
                         <option value="Client">Sort: Client Name</option>
                       </select>
-                      <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                      <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
                     </div>
 
-                    <div className="relative flex items-center">
-                      <FileText size={14} className="absolute left-3 text-slate-400" />
+                    <div className="relative flex items-center flex-shrink min-w-0">
+                      <FileText size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
                       <select
                         value={filterType}
                         onChange={(e) => setFilterType(e.target.value)}
-                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                        className="pl-9 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer max-w-[160px]"
                       >
-                        <option value="All">All Return Types</option>
+                        <option value="All">All Types</option>
                         {Object.entries(groupedReturnTypes).map(([category, items]) => (
                           <optgroup key={category} label={category}>
                             {(items as any[]).map(item => (
@@ -1449,38 +1727,38 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                           </optgroup>
                         ))}
                       </select>
-                      <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                      <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
                     </div>
 
-                    <div className="relative flex items-center">
-                      <Calendar size={14} className="absolute left-3 text-slate-400" />
+                    <div className="relative flex items-center flex-shrink min-w-0">
+                      <Calendar size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
                       <select
                         value={filterYear}
                         onChange={(e) => setFilterYear(e.target.value)}
-                        className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                        className="pl-9 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer max-w-[130px]"
                       >
                         <option value="All">All Years</option>
                         {Object.values(TAX_YEARS).map(y => (
                           <option key={y.label} value={y.label}>{y.label}</option>
                         ))}
                       </select>
-                      <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                      <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
                     </div>
 
                     {canToggleView && (
-                      <div className="relative flex items-center">
-                        <User size={14} className="absolute left-3 text-slate-400" />
+                      <div className="relative flex items-center flex-shrink min-w-0">
+                        <User size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
                         <select
                           value={filterPreparer}
                           onChange={(e) => setFilterPreparer(e.target.value)}
-                          className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                          className="pl-9 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer max-w-[140px]"
                         >
                           <option value="All">All Staff</option>
                           {staffMembers.map(name => (
                             <option key={name} value={name}>{name}</option>
                           ))}
                         </select>
-                        <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                        <ChevronDown size={12} className="absolute right-2 text-slate-400 pointer-events-none" />
                       </div>
                     )}
                   </div>

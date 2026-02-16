@@ -105,7 +105,7 @@ import FirmSelection from './components/FirmSelection';
 
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
-  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, userAvatar, availableFirms, selectFirm } = useFirmData();
+  const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, userAvatar, availableFirms, selectFirm, staffName } = useFirmData();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null); // TODO: fetch from user profile
   const [activeTab, setActiveTab] = useState<NavItem>(NavItem.Dashboard);
   // const [returns, setReturns] = useState<TaxReturn[]>(initialTaxReturns);
@@ -209,6 +209,7 @@ const AuthenticatedApp: React.FC = () => {
             refreshData={refresh}
             firmId={firmId}
             isExtension={isExtension}
+            currentStaffName={staffName}
           />
         );
       case NavItem.Clients:
@@ -220,6 +221,7 @@ const AuthenticatedApp: React.FC = () => {
             setActiveTab={setActiveTab}
             firmId={firmId}
             refreshData={refresh}
+            currentStaffName={staffName}
           />
         );
       case NavItem.Documents:
@@ -247,6 +249,7 @@ const AuthenticatedApp: React.FC = () => {
             refreshData={refresh}
             firmId={firmId}
             isExtension={isExtension}
+            currentStaffName={staffName}
           />
         );
     }
