@@ -138,8 +138,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     setShowGHLModal(true);
     setGhlError('');
     try {
-      const { data, error } = await supabase.functions.invoke('crm-users?action=list', {
-        method: 'GET'
+      const { data, error } = await supabase.functions.invoke('crm-users', {
+        body: { action: 'list' }
       });
 
       if (error) throw error;
@@ -157,9 +157,9 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     const role = selectedRoles[user.id] || 'Tax Pro';
     setGrantStatus(prev => ({ ...prev, [user.id]: 'granting' }));
     try {
-      const { data, error } = await supabase.functions.invoke('crm-users?action=grant', {
-        method: 'POST',
+      const { data, error } = await supabase.functions.invoke('crm-users', {
         body: {
+          action: 'grant',
           ghlUserId: user.id,
           email: user.email,
           name: user.name || `${user.firstName} ${user.lastName}`,
@@ -204,9 +204,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
   const revokeAccess = async (staffId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('crm-users?action=revoke', {
-        method: 'POST',
-        body: { staffId }
+      const { data, error } = await supabase.functions.invoke('crm-users', {
+        body: { action: 'revoke', staffId }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

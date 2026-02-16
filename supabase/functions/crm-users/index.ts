@@ -29,8 +29,11 @@ serve(async (req) => {
         const { data: { user } } = await supabaseClient.auth.getUser()
         if (!user) throw new Error('Unauthorized')
 
+        // Parse body for action + payload (always POST from client)
+        let body: any = {};
+        try { body = await req.json(); } catch (_) { /* no body */ }
         const url = new URL(req.url)
-        const action = url.searchParams.get('action')
+        const action = body.action || url.searchParams.get('action')
 
         // 1. Get staff record + firm's GHL tokens
         const { data: staffData, error: staffError } = await supabaseAdmin
@@ -184,7 +187,7 @@ serve(async (req) => {
 
         // GRANT ACCESS: Create auth user + staff record
         if (action === 'grant') {
-            const { ghlUserId, email, name, role } = await req.json();
+            const { ghlUserId, email, name, role } = body;
 
             if (!email) throw new Error('Email is required');
 
@@ -246,7 +249,7 @@ serve(async (req) => {
 
         // REVOKE ACCESS: Deactivate staff record
         if (action === 'revoke') {
-            const { staffId } = await req.json();
+            const { staffId } = body;
             if (!staffId) throw new Error('staffId is required');
 
             const { error } = await supabaseAdmin

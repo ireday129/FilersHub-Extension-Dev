@@ -9,7 +9,7 @@ import Settings from './components/Settings';
 import Profile from './components/Profile';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LogOut, ChevronDown, Loader2 } from 'lucide-react';
+import { LogOut, Loader2 } from 'lucide-react';
 import { useFirmData } from './hooks/useFirmData';
 const initialTaxReturns: TaxReturn[] = [
   {
@@ -261,25 +261,6 @@ const AuthenticatedApp: React.FC = () => {
   const isClient = selectedRole === UserRole.Client;
   const isSuperAdmin = selectedRole === UserRole.SuperAdmin;
 
-  const ProfileBubble = ({ name, subtext, avatarSeed, avatarUrl }: any) => (
-    <button className="flex items-center gap-3 bg-white p-1.5 pr-4 rounded-full border border-slate-200 shadow-sm hover:shadow-md transition-shadow group shrink-0">
-      <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200">
-        <img
-          src={avatarUrl ? `${avatarUrl}?t=${Date.now()}` : `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`}
-          alt={name}
-          className="w-full h-full object-cover"
-        />
-      </div>
-      {!isExtension && (
-        <div className="text-left">
-          <p className="text-[11px] font-bold text-slate-800 leading-tight">{name}</p>
-          <p className="text-[9px] text-slate-500 font-medium">{subtext}</p>
-        </div>
-      )}
-      <ChevronDown size={14} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
-    </button>
-  );
-
   return (
     <div className={`flex flex-col min-h-screen bg-slate-50 ${isExtension ? 'text-sm overflow-x-hidden max-w-[100vw]' : ''}`}>
       {!isSuperAdmin && (
@@ -342,14 +323,6 @@ const AuthenticatedApp: React.FC = () => {
                 </div>
               )}
 
-              {!isExtension && (
-                <ProfileBubble
-                  name={user?.user_metadata?.full_name || "User"}
-                  subtext={isSuperAdmin ? "FilersHub HQ" : isClient ? "Applewood LLC" : (selectedRole === UserRole.FirmOwner ? "Owner & CEO" : "Tax Professional")}
-                  avatarSeed={user?.email || "User"}
-                  avatarUrl={userAvatar}
-                />
-              )}
               {isExtension && (
                 <button
                   onClick={handleExitSession}

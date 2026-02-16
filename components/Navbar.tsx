@@ -97,21 +97,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
 
         {/* Right Section: Brand Logo and Name (Always Visible) */}
         <div className="flex-1 flex items-center justify-end gap-3">
-          {compact ? (
-            <button
-              onClick={() => setActiveTab(NavItem.Profile)}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-              title="My Profile"
-            >
-              <span className="text-base font-bold text-slate-800 tracking-tight hidden sm:block">{firmName}</span>
-              {firmLogo && <img src={firmLogo} alt={`${firmName} Logo`} className="h-7 w-auto object-contain" />}
-            </button>
-          ) : (
-            <>
-              <span className="text-xl font-bold text-slate-800 tracking-tight hidden sm:block">{firmName}</span>
-              {firmLogo && <img src={firmLogo} alt={`${firmName} Logo`} className="h-9 w-auto object-contain" />}
-            </>
-          )}
+          <button
+            onClick={() => setActiveTab(NavItem.Profile)}
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            title="My Profile"
+          >
+            <span className={`${compact ? 'text-base' : 'text-xl'} font-bold text-slate-800 tracking-tight hidden sm:block`}>{firmName}</span>
+            {firmLogo && <img src={firmLogo} alt={`${firmName} Logo`} className={`${compact ? 'h-7' : 'h-9'} w-auto object-contain`} />}
+          </button>
         </div>
       </div>
 
