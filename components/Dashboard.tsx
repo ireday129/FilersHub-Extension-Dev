@@ -1681,8 +1681,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
         <div className={`${isExtension ? 'col-span-1' : 'lg:col-span-2'} space-y-6`}>
           {isStaff ? (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className={`${isExtension ? 'p-3' : 'px-6 py-4'} border-b border-slate-100 ${isExtension ? '' : 'flex items-center justify-between gap-4'}`}>
-                <div className="shrink-0">
+              <div className={`${isExtension ? 'p-3' : 'px-6 py-4'} border-b border-slate-100 space-y-3`}>
+                <div>
                   <h4 className={`font-bold text-slate-800 ${isExtension ? 'text-sm' : ''}`}>
                     Workflow Management
                   </h4>
