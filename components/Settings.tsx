@@ -446,19 +446,19 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
       {/* Firm Profile & Branding Section */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className={`${isExtension ? 'p-4' : 'p-6'} border-b border-slate-100 ${isExtension ? 'space-y-3' : 'flex items-center justify-between'}`}>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-brand-light text-brand rounded-lg">
               <Building2 size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800">Firm Profile & Branding</h2>
+              <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold text-slate-800`}>Firm Profile & Branding</h2>
               <p className="text-xs text-slate-500">Manage your firm identity and portal aesthetics.</p>
             </div>
           </div>
           <button
             onClick={handleSave}
-            className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-opacity-90 transition-colors shadow-sm"
+            className={`flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-opacity-90 transition-colors shadow-sm ${isExtension ? 'w-full justify-center' : ''}`}
           >
             <Save size={16} />
             Save Changes
@@ -491,9 +491,23 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                     <span className="truncate">{portalUrl}</span>
                   </div>
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`https://${portalUrl}`);
-                      setCopiedPortalUrl(true);
+                    onClick={async () => {
+                      const url = `https://${portalUrl}`;
+                      try {
+                        await navigator.clipboard.writeText(url);
+                        setCopiedPortalUrl(true);
+                      } catch {
+                        // Fallback for iframe/non-secure contexts
+                        const textarea = document.createElement('textarea');
+                        textarea.value = url;
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        setCopiedPortalUrl(true);
+                      }
                       setTimeout(() => setCopiedPortalUrl(false), 2000);
                     }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-brand text-white text-[10px] font-bold rounded-lg hover:bg-brand/90 transition-all"
@@ -598,15 +612,15 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
       {/* Staff Management Section */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className={`${isExtension ? 'p-4' : 'p-6'} border-b border-slate-100 ${isExtension ? 'space-y-3' : 'flex items-center justify-between'}`}>
           <div className="flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
               <Users size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-3">
+              <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold text-slate-800 flex items-center gap-3 flex-wrap`}>
                 Team & Permissions
-                <span className="text-sm font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg">
+                <span className={`${isExtension ? 'text-xs' : 'text-sm'} font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg`}>
                   {assignedStaff} / {staffLimit} Staff Seats
                 </span>
               </h2>
@@ -615,7 +629,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           </div>
           <button
             onClick={fetchGHLUsers}
-            className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-brand/90 transition-colors shadow-sm"
+            className={`flex items-center gap-2 px-4 py-2 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-brand/90 transition-colors shadow-sm ${isExtension ? 'w-full justify-center' : ''}`}
           >
             <Users size={16} />
             Manage CRM Staff

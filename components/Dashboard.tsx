@@ -208,6 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const [sortStatus, setSortStatus] = useState<string>('Default');
   const [filterYear, setFilterYear] = useState<string>('All');
   const [filterType, setFilterType] = useState<string>('All');
+  const [filterPreparer, setFilterPreparer] = useState<string>('All');
   const [viewScope, setViewScope] = useState<'My' | 'Firm'>(isTaxPro ? 'My' : 'Firm');
 
   const [orderedStatuses, setOrderedStatuses] = useState<TaxReturnStatus[]>(() => {
@@ -265,6 +266,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     return "";
   }, [isFirmOwner, isManager, isTaxPro]);
 
+  const uniquePreparers = useMemo(() =>
+    [...new Set(returns.map(r => r.preparer).filter(Boolean))].sort(),
+    [returns]
+  );
+
   const selectedReturn = returns.find(r => r.id === selectedReturnId);
 
   const displayedReturns = useMemo(() => {
@@ -272,6 +278,10 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
 
     if (isTaxPro || (canToggleView && viewScope === 'My')) {
       base = base.filter(tr => tr.preparer === staffName);
+    }
+
+    if (filterPreparer !== 'All' && canToggleView) {
+      base = base.filter(tr => tr.preparer === filterPreparer);
     }
 
     if (filterYear !== 'All') {
@@ -294,7 +304,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
     }
 
     return base;
-  }, [returns, role, filterYear, filterType, sortStatus, isTaxPro, canToggleView, viewScope, staffName, isExtension, extensionStatusFilter]);
+  }, [returns, role, filterYear, filterType, filterPreparer, sortStatus, isTaxPro, canToggleView, viewScope, staffName, isExtension, extensionStatusFilter]);
 
   const statusCounts = useMemo(() => {
     const scopeReturns = (isTaxPro || (canToggleView && viewScope === 'My'))
@@ -1333,7 +1343,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   )}
                 </div>
                 {!isExtension && (
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className={`flex items-center gap-3 flex-wrap ${isTaxPro ? 'justify-center' : ''}`}>
                     <div className="relative flex items-center">
                       <Filter size={14} className="absolute left-3 text-slate-400" />
                       <select
@@ -1385,6 +1395,23 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       </select>
                       <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
                     </div>
+
+                    {canToggleView && (
+                      <div className="relative flex items-center">
+                        <User size={14} className="absolute left-3 text-slate-400" />
+                        <select
+                          value={filterPreparer}
+                          onChange={(e) => setFilterPreparer(e.target.value)}
+                          className="pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand/20 transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="All">All Tax Pros</option>
+                          {uniquePreparers.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 text-slate-400 pointer-events-none" />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
