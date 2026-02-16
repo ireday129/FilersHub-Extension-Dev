@@ -342,7 +342,9 @@ const AuthenticatedApp: React.FC = () => {
             </div>
           </header>
 
-          {renderContent()}
+          <div key={activeTab}>
+            {renderContent()}
+          </div>
         </div>
       </main>
     </div>
