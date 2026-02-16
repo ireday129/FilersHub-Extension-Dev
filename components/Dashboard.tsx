@@ -1378,7 +1378,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   </div>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
+                <div className={`mt-8 pt-6 border-t border-slate-50 ${isExtension ? 'flex flex-col items-center gap-3' : 'flex items-center justify-between'}`}>
                   {saveStatus === 'success' ? (
                     <div className="flex items-center gap-2 text-[#4aa936] text-xs font-bold animate-in fade-in slide-in-from-left-2 duration-300">
                       <CheckCircle size={16} />
@@ -1396,7 +1396,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                   <button
                     onClick={handleSaveCase}
                     disabled={isSaving}
-                    className={`flex items-center gap-2 px-8 py-3 bg-brand text-white text-sm font-bold rounded-xl hover:bg-brand/90 transition-all shadow-md disabled:opacity-70 ${isSaving ? 'cursor-wait' : 'cursor-pointer'}`}
+                    className={`flex items-center gap-2 ${isExtension ? 'w-full justify-center px-6' : 'px-8'} py-3 bg-brand text-white text-sm font-bold rounded-xl hover:bg-brand/90 transition-all shadow-md disabled:opacity-70 ${isSaving ? 'cursor-wait' : 'cursor-pointer'}`}
                   >
                     {isSaving ? (
                       <>
