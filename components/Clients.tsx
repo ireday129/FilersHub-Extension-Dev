@@ -6,18 +6,17 @@ import {
   Users,
   Search,
   ArrowRight,
-  CheckCircle,
+  ArrowLeft,
   Clock,
   Filter,
   UserCheck,
-  LayoutGrid,
-  List,
-  Mail,
-  MoreVertical,
   Plus,
   X,
   Loader2,
-  FileText
+  FileText,
+  ChevronRight,
+  Calendar,
+  User
 } from 'lucide-react';
 
 interface ClientsProps {
@@ -32,10 +31,19 @@ interface ClientsProps {
 
 type ClientView = 'My Clients' | 'Firm Clients';
 
+interface ClientGroup {
+  name: string;
+  returns: TaxReturn[];
+  returnCount: number;
+  preparer: string;
+  latestStatus: TaxReturnStatus;
+}
+
 const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData, currentStaffName }) => {
   const { isExtension } = useExtensionMode();
   const [activeView, setActiveView] = useState<ClientView>('My Clients');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClientName, setSelectedClientName] = useState<string | null>(null);
 
   // Add Client form state
   const [showAddClient, setShowAddClient] = useState(false);
@@ -155,7 +163,6 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
     if (activeView === 'My Clients' || role === UserRole.TaxPro) {
       base = base.filter(r => r.preparer === staffName);
     }
-    // 'Firm Clients' shows all, no filtering
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -168,13 +175,34 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
     return base;
   }, [returns, activeView, staffName, role, searchQuery]);
 
+  // Group returns by client name
+  const clientGroups = useMemo((): ClientGroup[] => {
+    const map: Record<string, TaxReturn[]> = {};
+    filteredReturns.forEach(r => {
+      if (!map[r.clientName]) map[r.clientName] = [];
+      map[r.clientName].push(r);
+    });
+    return Object.entries(map).map(([name, rets]) => ({
+      name,
+      returns: rets,
+      returnCount: rets.filter(r => r.year && r.type).length,
+      preparer: rets[0]?.preparer || '',
+      latestStatus: rets[0]?.status,
+    })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredReturns]);
+
+  const selectedClient = useMemo(() => {
+    if (!selectedClientName) return null;
+    return clientGroups.find(g => g.name === selectedClientName) || null;
+  }, [selectedClientName, clientGroups]);
+
   const stats = useMemo(() => {
     return {
-      total: filteredReturns.length,
+      total: clientGroups.length,
       highPriority: filteredReturns.filter(r => r.status === TaxReturnStatus.MissingDocuments).length,
       filed: filteredReturns.filter(r => r.status === TaxReturnStatus.Filed).length,
     };
-  }, [filteredReturns]);
+  }, [clientGroups, filteredReturns]);
 
   const handleManageReturn = (returnId: string) => {
     setSelectedReturnId(returnId);
@@ -189,7 +217,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
           {views.map(view => (
             <button
               key={view}
-              onClick={() => setActiveView(view)}
+              onClick={() => { setActiveView(view); setSelectedClientName(null); }}
               className={`${isExtension ? 'px-3 py-1.5 text-[10px]' : 'px-4 py-2 text-xs'} font-bold rounded-lg transition-all ${activeView === view ? 'bg-white text-brand shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
             >
@@ -209,205 +237,343 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
     return null;
   };
 
-  return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold text-slate-800">Client Management</h2>
-          <p className="text-xs text-slate-500">Manage your clients.</p>
-        </div>
-        {renderTabs()}
-      </div>
+  // Client Detail View
+  const renderClientDetail = () => {
+    if (!selectedClient) return null;
+    const clientReturns = selectedClient.returns;
+    const hasReturn = clientReturns.some(r => r.year && r.type);
+    const noReturnEntry = clientReturns.find(r => !r.year || !r.type);
 
-      <div className={`grid grid-cols-1 ${isExtension ? '' : 'lg:grid-cols-4'} gap-6`}>
-        {/* Left Sidebar: Filters & Quick Search (hidden in extension) */}
-        <div className={`${isExtension ? 'hidden' : 'lg:col-span-1'} space-y-6`}>
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Search Clients</label>
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Name or type..."
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand outline-none transition-all"
-                />
-              </div>
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+        {/* Back button + Client header */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setSelectedClientName(null)}
+            className="p-2 text-slate-400 hover:text-brand hover:bg-brand-light rounded-lg transition-all"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className={`${isExtension ? 'w-10 h-10' : 'w-14 h-14'} rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0`}>
+              <img
+                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedClient.name}`}
+                alt={selectedClient.name}
+              />
             </div>
-
-            <div className="space-y-4 pt-4 border-t border-slate-100">
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <Filter size={14} /> Quick Stats
-              </h4>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <span className="text-xs font-bold text-slate-600">Total in View</span>
-                  <span className="text-xs font-black text-slate-900">{stats.total}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-rose-50 border border-rose-100">
-                  <span className="text-xs font-bold text-rose-600">Docs Missing</span>
-                  <span className="text-xs font-black text-rose-700">{stats.highPriority}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 border border-emerald-100">
-                  <span className="text-xs font-bold text-emerald-600">Recently Filed</span>
-                  <span className="text-xs font-black text-emerald-700">{stats.filed}</span>
-                </div>
-              </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">{selectedClient.name}</h2>
+              <p className="text-xs text-slate-500">
+                {selectedClient.returnCount} {selectedClient.returnCount === 1 ? 'return' : 'returns'}
+                {selectedClient.preparer && ` • Assigned to ${selectedClient.preparer}`}
+              </p>
             </div>
           </div>
-
-          {canAddClients && (
-            <div className="bg-[#1e293b] p-6 rounded-2xl text-white relative overflow-hidden group">
-              <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                <Users size={120} />
-              </div>
-              {showAddClient ? (
-                <div className="relative z-10 space-y-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-bold">Add New Client</h4>
-                    <button onClick={() => { setShowAddClient(false); setAddError(null); setAddSuccess(false); }} className="text-slate-400 hover:text-white">
-                      <X size={16} />
-                    </button>
-                  </div>
-                  {addError && (
-                    <div className="bg-rose-500/20 text-rose-300 text-xs font-bold p-2 rounded-lg">{addError}</div>
-                  )}
-                  {addSuccess && (
-                    <div className="bg-emerald-500/20 text-emerald-300 text-xs font-bold p-2 rounded-lg">Client added successfully!</div>
-                  )}
-                  <input
-                    type="text"
-                    placeholder="Full Name"
-                    value={newClientName}
-                    onChange={(e) => setNewClientName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email Address"
-                    value={newClientEmail}
-                    onChange={(e) => setNewClientEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand"
-                  />
-                  <button
-                    onClick={handleAddClient}
-                    disabled={addingClient || !newClientName.trim() || !newClientEmail.trim()}
-                    className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {addingClient ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                    {addingClient ? 'Adding...' : 'Add Client'}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <h4 className="text-sm font-bold mb-2">Add a new client</h4>
-                  <p className="text-xs text-slate-400 mb-4 leading-relaxed">Add client details so they can access their portal.</p>
-                  <button
-                    onClick={() => setShowAddClient(true)}
-                    className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Plus size={14} />
-                    Add New Client
-                  </button>
-                </>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* Main List Area */}
-        <div className={isExtension ? 'col-span-1' : 'lg:col-span-3'}>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button className="p-1.5 text-brand bg-white rounded shadow-sm"><LayoutGrid size={16} /></button>
-                <button className="p-1.5 text-slate-400 hover:text-slate-600"><List size={16} /></button>
-              </div>
-              <span className="text-xs font-bold text-slate-400 uppercase">Viewing {activeView}</span>
-            </div>
+        {/* Returns list */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className={`${isExtension ? 'p-3' : 'px-6 py-4'} bg-slate-50 border-b border-slate-100 flex items-center justify-between`}>
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <FileText size={16} className="text-brand" />
+              Tax Returns
+            </h3>
+            {noReturnEntry && (
+              <button
+                onClick={() => { setCreateReturnClientId(noReturnEntry.id); setCreateReturnYear(''); setCreateReturnType(''); setCreateReturnError(null); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand text-white text-xs font-bold rounded-lg hover:bg-brand/90 transition-all"
+              >
+                <Plus size={14} />
+                New Return
+              </button>
+            )}
+          </div>
 
-            <div className="divide-y divide-slate-100">
-              {filteredReturns.length > 0 ? filteredReturns.map((client) => (
-                <div key={client.id} className={`${isExtension ? 'p-3' : 'p-6'} hover:bg-slate-50 transition-colors group`}>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`${isExtension ? 'w-8 h-8' : 'w-12 h-12'} rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0`}>
-                        <img
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${client.clientName}`}
-                          alt={client.clientName}
-                        />
+          <div className="divide-y divide-slate-100">
+            {clientReturns.filter(r => r.year && r.type).length > 0 ? (
+              clientReturns.filter(r => r.year && r.type).map(ret => (
+                <div key={ret.id} className={`${isExtension ? 'p-3' : 'p-5'} hover:bg-slate-50 transition-colors group`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-brand-light rounded-xl flex items-center justify-center shrink-0">
+                        <FileText size={18} className="text-brand" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-0.5">
-                          <h4 className="font-bold text-slate-800">{client.clientName}</h4>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${client.status === TaxReturnStatus.Accepted || client.status === TaxReturnStatus.Filed
+                          <h4 className="font-bold text-slate-800 text-sm">{ret.type}</h4>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            ret.status === TaxReturnStatus.Accepted || ret.status === TaxReturnStatus.Filed
                               ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-amber-100 text-amber-700'
-                            }`}>
-                            {client.status}
+                              : ret.status === TaxReturnStatus.MissingDocuments || ret.status === TaxReturnStatus.Rejected
+                                ? 'bg-rose-100 text-rose-700'
+                                : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {ret.status}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium">
-                          {client.year && client.type ? `${client.year} • ${client.type}` : 'No return created'}
-                        </p>
+                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} />
+                            {ret.year}
+                          </span>
+                          {ret.preparer && (
+                            <span className="flex items-center gap-1">
+                              <User size={12} />
+                              {ret.preparer}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} />
+                            {ret.date}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="text-right hidden sm:block">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assigned Pro</p>
-                        <p className="text-xs font-bold text-slate-700">{client.preparer}</p>
-                      </div>
-                      <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden sm:block"></div>
-                      <div className="flex items-center gap-2">
-                        <button className="p-2 text-slate-400 hover:text-brand hover:bg-brand-light rounded-lg transition-all" title="Message Client">
-                          <Mail size={18} />
-                        </button>
-                        {client.year && client.type ? (
-                          <button
-                            onClick={() => handleManageReturn(client.id)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-brand text-xs font-bold rounded-xl hover:bg-brand-light transition-all shadow-sm"
-                          >
-                            Manage Return
-                            <ArrowRight size={14} />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => { setCreateReturnClientId(client.id); setCreateReturnYear(''); setCreateReturnType(''); setCreateReturnError(null); }}
-                            className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand/90 transition-all shadow-sm"
-                          >
-                            <FileText size={14} />
-                            Create Return
-                          </button>
-                        )}
-                        <button className="p-2 text-slate-400 hover:text-slate-600">
-                          <MoreVertical size={18} />
-                        </button>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      {ret.files.length > 0 && (
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+                          {ret.files.length} {ret.files.length === 1 ? 'doc' : 'docs'}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleManageReturn(ret.id)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-brand text-xs font-bold rounded-xl hover:bg-brand-light transition-all shadow-sm"
+                      >
+                        Manage Return
+                        <ArrowRight size={14} />
+                      </button>
                     </div>
                   </div>
                 </div>
-              )) : (
-                <div className="p-20 text-center space-y-4">
-                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-300">
-                    <Users size={32} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-700">No clients found</h3>
-                    <p className="text-sm text-slate-400">Try adjusting your filters or search query.</p>
-                  </div>
+              ))
+            ) : (
+              <div className="p-12 text-center space-y-3">
+                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-300">
+                  <FileText size={24} />
                 </div>
-              )}
-            </div>
-
-            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-              <button className="text-xs font-bold text-slate-400 hover:text-brand transition-colors">Show more results</button>
-            </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700">No returns yet</h4>
+                  <p className="text-xs text-slate-400 mt-1">Create a tax return for this client to get started.</p>
+                </div>
+                {noReturnEntry && (
+                  <button
+                    onClick={() => { setCreateReturnClientId(noReturnEntry.id); setCreateReturnYear(''); setCreateReturnType(''); setCreateReturnError(null); }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand/90 transition-all shadow-sm mx-auto"
+                  >
+                    <Plus size={14} />
+                    Create Return
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {!selectedClientName && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold text-slate-800">Client Management</h2>
+            <p className="text-xs text-slate-500">Manage your clients.</p>
+          </div>
+          {renderTabs()}
+        </div>
+      )}
+
+      {selectedClientName ? renderClientDetail() : (
+        <div className={`grid grid-cols-1 ${isExtension ? '' : 'lg:grid-cols-4'} gap-6`}>
+          {/* Left Sidebar: Filters & Quick Search (hidden in extension) */}
+          <div className={`${isExtension ? 'hidden' : 'lg:col-span-1'} space-y-6`}>
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Search Clients</label>
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Name or type..."
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Filter size={14} /> Quick Stats
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-xs font-bold text-slate-600">Total Clients</span>
+                    <span className="text-xs font-black text-slate-900">{stats.total}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-rose-50 border border-rose-100">
+                    <span className="text-xs font-bold text-rose-600">Docs Missing</span>
+                    <span className="text-xs font-black text-rose-700">{stats.highPriority}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <span className="text-xs font-bold text-emerald-600">Recently Filed</span>
+                    <span className="text-xs font-black text-emerald-700">{stats.filed}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {canAddClients && (
+              <div className="bg-[#1e293b] p-6 rounded-2xl text-white relative overflow-hidden group">
+                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                  <Users size={120} />
+                </div>
+                {showAddClient ? (
+                  <div className="relative z-10 space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold">Add New Client</h4>
+                      <button onClick={() => { setShowAddClient(false); setAddError(null); setAddSuccess(false); }} className="text-slate-400 hover:text-white">
+                        <X size={16} />
+                      </button>
+                    </div>
+                    {addError && (
+                      <div className="bg-rose-500/20 text-rose-300 text-xs font-bold p-2 rounded-lg">{addError}</div>
+                    )}
+                    {addSuccess && (
+                      <div className="bg-emerald-500/20 text-emerald-300 text-xs font-bold p-2 rounded-lg">Client added successfully!</div>
+                    )}
+                    <input
+                      type="text"
+                      placeholder="Full Name"
+                      value={newClientName}
+                      onChange={(e) => setNewClientName(e.target.value)}
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email Address"
+                      value={newClientEmail}
+                      onChange={(e) => setNewClientEmail(e.target.value)}
+                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand"
+                    />
+                    <button
+                      onClick={handleAddClient}
+                      disabled={addingClient || !newClientName.trim() || !newClientEmail.trim()}
+                      className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {addingClient ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                      {addingClient ? 'Adding...' : 'Add Client'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <h4 className="text-sm font-bold mb-2">Add a new client</h4>
+                    <p className="text-xs text-slate-400 mb-4 leading-relaxed">Add client details so they can access their portal.</p>
+                    <button
+                      onClick={() => setShowAddClient(true)}
+                      className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Plus size={14} />
+                      Add New Client
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Main List Area */}
+          <div className={isExtension ? 'col-span-1' : 'lg:col-span-3'}>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase">
+                  {stats.total} {stats.total === 1 ? 'Client' : 'Clients'} • {activeView}
+                </span>
+                {isExtension && (
+                  <div className="relative">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search..."
+                      className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] w-36 focus:ring-2 focus:ring-brand outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="divide-y divide-slate-100">
+                {clientGroups.length > 0 ? clientGroups.map((client) => (
+                  <button
+                    key={client.name}
+                    onClick={() => setSelectedClientName(client.name)}
+                    className={`w-full ${isExtension ? 'p-3' : 'p-5'} hover:bg-slate-50 transition-colors group text-left`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`${isExtension ? 'w-8 h-8' : 'w-11 h-11'} rounded-full bg-slate-200 border-2 border-white shadow-sm overflow-hidden shrink-0`}>
+                          <img
+                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${client.name}`}
+                            alt={client.name}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className={`font-bold text-slate-800 truncate group-hover:text-brand transition-colors ${isExtension ? 'text-xs' : 'text-sm'}`}>
+                            {client.name}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {client.returnCount > 0 ? (
+                              <>
+                                <span className="text-[11px] text-slate-500 font-medium">
+                                  {client.returnCount} {client.returnCount === 1 ? 'return' : 'returns'}
+                                </span>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                  client.latestStatus === TaxReturnStatus.Accepted || client.latestStatus === TaxReturnStatus.Filed
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : client.latestStatus === TaxReturnStatus.MissingDocuments || client.latestStatus === TaxReturnStatus.Rejected
+                                      ? 'bg-rose-100 text-rose-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {client.latestStatus}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 font-medium">No return created</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {!isExtension && client.preparer && (
+                          <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Preparer</p>
+                            <p className="text-xs font-bold text-slate-600">{client.preparer}</p>
+                          </div>
+                        )}
+                        <ChevronRight size={16} className="text-slate-300 group-hover:text-brand transition-colors" />
+                      </div>
+                    </div>
+                  </button>
+                )) : (
+                  <div className="p-20 text-center space-y-4">
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-300">
+                      <Users size={32} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-700">No clients found</h3>
+                      <p className="text-sm text-slate-400">Try adjusting your filters or search query.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Return Modal */}
       {createReturnClientId && (
