@@ -224,7 +224,7 @@ const AuthenticatedApp: React.FC = () => {
       case NavItem.Documents:
         return <Documents role={currentRole} returns={returns} setReturns={setReturns} firmId={firmId} />;
       case NavItem.Tasks:
-        return <Tasks />;
+        return <Tasks firmId={firmId} role={currentRole} isExtension={isExtension} />;
       case NavItem.Settings:
         return (
           <Settings

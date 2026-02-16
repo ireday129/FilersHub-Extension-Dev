@@ -37,9 +37,11 @@ import {
   StickyNote,
   FileCheck,
   MousePointer2,
-  Hand
+  Hand,
+  CheckSquare,
+  Circle
 } from 'lucide-react';
-import { UserRole, TaxReturnStatus, FILE_UPLOAD_TYPES, TAX_RETURN_TYPES, isStaffRole, TAX_YEARS, TaxReturn, DocStatus } from '../types';
+import { UserRole, TaxReturnStatus, FILE_UPLOAD_TYPES, TAX_RETURN_TYPES, isStaffRole, TAX_YEARS, TaxReturn, DocStatus, Task } from '../types';
 import { uploadDocument } from '../services/documents';
 import { supabase } from '../services/supabase';
 
@@ -202,6 +204,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   const canToggleView = isFirmOwner || isManager;
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [clientTasks, setClientTasks] = useState<Task[]>([]);
   const [sortStatus, setSortStatus] = useState<string>('Default');
   const [filterYear, setFilterYear] = useState<string>('All');
   const [filterType, setFilterType] = useState<string>('All');
@@ -366,6 +369,43 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   useEffect(() => {
     fetchAnnouncements();
   }, [firmId]);
+
+  // Client tasks fetch (RLS auto-scopes to tasks assigned to the logged-in client)
+  const fetchClientTasks = async () => {
+    if (!firmId) return;
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('firm_id', firmId)
+      .order('created_at', { ascending: false });
+    if (error) console.error('Failed to fetch client tasks:', error);
+    if (data) setClientTasks(data);
+  };
+
+  useEffect(() => {
+    if (isClient && firmId) fetchClientTasks();
+  }, [firmId, isClient]);
+
+  const handleToggleClientTask = async (task: Task) => {
+    const nowCompleted = !task.is_completed;
+    const { error } = await supabase
+      .from('tasks')
+      .update({
+        is_completed: nowCompleted,
+        completed_at: nowCompleted ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('task_id', task.task_id);
+    if (!error) {
+      setClientTasks(prev =>
+        prev.map(t =>
+          t.task_id === task.task_id
+            ? { ...t, is_completed: nowCompleted, completed_at: nowCompleted ? new Date().toISOString() : undefined }
+            : t
+        )
+      );
+    }
+  };
 
   const handleSaveAnnouncement = async () => {
     if (!newAnnouncement.title || !newAnnouncement.content || !firmId) return;
@@ -1470,6 +1510,94 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
             </div>
           )}
         </div>
+
+        {/* Client Tasks Section */}
+        {isClient && clientTasks.length > 0 && (
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <CheckSquare size={18} className="text-brand" />
+              <h4 className="font-bold text-slate-800">Your Tasks</h4>
+            </div>
+
+            {/* Incomplete tasks */}
+            {clientTasks.filter(t => !t.is_completed).length > 0 && (
+              <div className="mb-4">
+                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  To Do
+                  <span className="ml-2 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[10px]">
+                    {clientTasks.filter(t => !t.is_completed).length}
+                  </span>
+                </h5>
+                <div className="space-y-2">
+                  {clientTasks.filter(t => !t.is_completed).map(task => (
+                    <div
+                      key={task.task_id}
+                      className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 hover:border-brand/30 transition-all group"
+                    >
+                      <button
+                        onClick={() => handleToggleClientTask(task)}
+                        className="mt-0.5 text-slate-300 hover:text-brand transition-colors shrink-0"
+                      >
+                        <Circle size={18} />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-700">{task.title}</p>
+                        {task.description && (
+                          <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{task.description}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-1.5">
+                          {task.due_date && (
+                            <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                              <Calendar size={10} />
+                              {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                            task.priority === 'High' ? 'text-rose-500 bg-rose-50 border-rose-100'
+                              : task.priority === 'Medium' ? 'text-amber-500 bg-amber-50 border-amber-100'
+                              : 'text-slate-400 bg-slate-50 border-slate-100'
+                          }`}>
+                            {task.priority}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Completed tasks */}
+            {clientTasks.filter(t => t.is_completed).length > 0 && (
+              <div>
+                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                  Completed
+                  <span className="ml-2 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px]">
+                    {clientTasks.filter(t => t.is_completed).length}
+                  </span>
+                </h5>
+                <div className="space-y-2">
+                  {clientTasks.filter(t => t.is_completed).map(task => (
+                    <div
+                      key={task.task_id}
+                      className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/50"
+                    >
+                      <button
+                        onClick={() => handleToggleClientTask(task)}
+                        className="mt-0.5 text-brand shrink-0"
+                      >
+                        <CheckCircle2 size={18} />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-400 line-through">{task.title}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {!isExtension && (
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col">

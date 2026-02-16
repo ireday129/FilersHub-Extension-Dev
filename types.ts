@@ -186,11 +186,20 @@ export interface TaxDocument {
 }
 
 export interface Task {
-  id: string;
+  task_id: string;
+  firm_id: string;
   title: string;
-  dueDate: string;
-  status: 'To Do' | 'In Progress' | 'Completed';
+  description?: string;
+  type: 'firm' | 'client';
   priority: 'Low' | 'Medium' | 'High';
+  assigned_to: string;
+  assigned_to_name?: string;
+  is_completed: boolean;
+  completed_at?: string;
+  due_date?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Message {
