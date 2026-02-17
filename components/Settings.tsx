@@ -307,35 +307,38 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   };
 
 
-  const syncLogoToCrm = async (logoUrl: string) => {
+  const syncBrandingToCrm = async (logoUrl: string | null) => {
     if (!firmId || !isPro) return;
 
     setLogoSyncStatus('syncing');
     setLogoSyncMessage('');
 
     try {
-      const token = await getFreshToken();
+      // If there's a logo, push it to GHL via crm-logo-sync
+      if (logoUrl) {
+        const token = await getFreshToken();
 
-      const { data, error } = await supabase.functions.invoke('crm-logo-sync', {
-        body: { firmId, logoUrl },
-        headers: { Authorization: `Bearer ${token}` }
-      });
+        const { data, error } = await supabase.functions.invoke('crm-logo-sync', {
+          body: { firmId, logoUrl },
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
-      if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        if (error) throw error;
 
-      setLogoSyncStatus('success');
-      setLogoSyncMessage(
-        data?.method === 'location_update'
-          ? 'Logo synced to CRM location'
-          : 'Logo saved to CRM media library'
-      );
+        setLogoSyncStatus('success');
+        setLogoSyncMessage('Branding synced to CRM');
+      } else {
+        // Brand color is already saved to DB — the GHL sidebar script picks it up automatically
+        setLogoSyncStatus('success');
+        setLogoSyncMessage('Branding synced to CRM');
+      }
 
       setTimeout(() => setLogoSyncStatus('idle'), 4000);
     } catch (err: any) {
-      console.error('Logo CRM sync failed:', err);
+      console.error('CRM branding sync failed:', err);
       setLogoSyncStatus('error');
-      setLogoSyncMessage(err.message || 'Failed to sync logo to CRM');
+      setLogoSyncMessage(err.message || 'Failed to sync branding to CRM');
       setTimeout(() => setLogoSyncStatus('idle'), 6000);
     }
   };
@@ -363,9 +366,9 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
       alert(`Firm branding updated to ${localSettings.name}`);
 
-      // Auto-sync logo to CRM for Pro firms
-      if (isPro && localSettings.logo) {
-        syncLogoToCrm(localSettings.logo);
+      // Auto-sync branding to CRM for Pro firms (logo + brand color)
+      if (isPro) {
+        syncBrandingToCrm(localSettings.logo || null);
       }
     } catch (error) {
       console.error('Error updating settings:', error);
@@ -619,12 +622,12 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 </div>
               </div>
 
-              {/* Pro CRM Logo Sync Indicator */}
+              {/* Pro CRM Branding Sync Indicator */}
               {isPro ? (
                 <div className="flex items-center gap-2">
                   <Sparkles size={12} className="text-indigo-500" />
                   <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                    Pro: Logo syncs to CRM
+                    Pro: Branding syncs to CRM
                   </span>
                   {logoSyncStatus === 'syncing' && (
                     <div className="flex items-center gap-1 text-[10px] text-slate-400">
@@ -647,7 +650,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 <div className="flex items-center gap-2 opacity-60">
                   <Sparkles size={12} className="text-slate-400" />
                   <span className="text-[10px] font-medium text-slate-400 italic">
-                    Upgrade to Pro to sync your logo to your CRM location
+                    Upgrade to Pro to sync branding to your CRM
                   </span>
                 </div>
               )}
