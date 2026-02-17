@@ -73,16 +73,17 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   // Staff seat limit from DB (fetched from firms.max_staff)
   const [staffLimit, setStaffLimit] = useState(10);
 
-  // Fetch max_staff from firms table
+  // Fetch max_staff and subscription_tier from firms table
   useEffect(() => {
     if (!firmId) return;
     supabase
       .from('firms')
-      .select('max_staff')
+      .select('max_staff, subscription_tier')
       .eq('firm_id', firmId)
       .single()
       .then(({ data }) => {
         if (data?.max_staff) setStaffLimit(data.max_staff);
+        if (data?.subscription_tier) setSubscriptionTier(data.subscription_tier);
       });
   }, [firmId]);
 
@@ -128,6 +129,12 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [ghlError, setGhlError] = useState('');
   const [copiedPortalUrl, setCopiedPortalUrl] = useState(false);
+
+  // Pro plan logo sync state
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('starter');
+  const [logoSyncStatus, setLogoSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [logoSyncMessage, setLogoSyncMessage] = useState('');
+  const isPro = ['pro', 'growth', 'enterprise'].includes(subscriptionTier?.toLowerCase());
 
   const refreshStaff = async () => {
     if (!firmId) return;
@@ -300,6 +307,39 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   };
 
 
+  const syncLogoToCrm = async (logoUrl: string) => {
+    if (!firmId || !isPro) return;
+
+    setLogoSyncStatus('syncing');
+    setLogoSyncMessage('');
+
+    try {
+      const token = await getFreshToken();
+
+      const { data, error } = await supabase.functions.invoke('crm-logo-sync', {
+        body: { firmId, logoUrl },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (data?.error) throw new Error(data.error);
+      if (error) throw error;
+
+      setLogoSyncStatus('success');
+      setLogoSyncMessage(
+        data?.method === 'location_update'
+          ? 'Logo synced to CRM location'
+          : 'Logo saved to CRM media library'
+      );
+
+      setTimeout(() => setLogoSyncStatus('idle'), 4000);
+    } catch (err: any) {
+      console.error('Logo CRM sync failed:', err);
+      setLogoSyncStatus('error');
+      setLogoSyncMessage(err.message || 'Failed to sync logo to CRM');
+      setTimeout(() => setLogoSyncStatus('idle'), 6000);
+    }
+  };
+
   const handleSave = async () => {
     if (!firmId) return;
 
@@ -322,6 +362,11 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       if (error) throw error;
 
       alert(`Firm branding updated to ${localSettings.name}`);
+
+      // Auto-sync logo to CRM for Pro firms
+      if (isPro && localSettings.logo) {
+        syncLogoToCrm(localSettings.logo);
+      }
     } catch (error) {
       console.error('Error updating settings:', error);
       alert('Failed to save settings');
@@ -573,6 +618,39 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <p className="text-[10px] text-slate-400 max-w-[180px]">Transparent PNG recommended.</p>
                 </div>
               </div>
+
+              {/* Pro CRM Logo Sync Indicator */}
+              {isPro ? (
+                <div className="flex items-center gap-2">
+                  <Sparkles size={12} className="text-indigo-500" />
+                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                    Pro: Logo syncs to CRM
+                  </span>
+                  {logoSyncStatus === 'syncing' && (
+                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                      <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      Syncing...
+                    </div>
+                  )}
+                  {logoSyncStatus === 'success' && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+                      <CheckCircle2 size={12} /> {logoSyncMessage}
+                    </span>
+                  )}
+                  {logoSyncStatus === 'error' && (
+                    <span className="text-[10px] font-medium text-rose-500">
+                      {logoSyncMessage}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 opacity-60">
+                  <Sparkles size={12} className="text-slate-400" />
+                  <span className="text-[10px] font-medium text-slate-400 italic">
+                    Upgrade to Pro to sync your logo to your CRM location
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
