@@ -270,7 +270,6 @@ const AppContent: React.FC = () => {
     firm_id: string; name: string; logo: string; color: string; portalMessage: string;
   } | null>(null);
   const [isFirmLoading, setIsFirmLoading] = useState(false);
-  const [launchpadUrl, setLaunchpadUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const handlePathChange = () => {
@@ -312,79 +311,6 @@ const AppContent: React.FC = () => {
 
     checkPortalPath();
   }, [path]);
-
-  // GHL SSO Trigger
-  useEffect(() => {
-    // 1. Check if we're not logged in and not loading
-    if (loading || user) return;
-
-    // 2. Check if we are inside an iframe (GHL context)
-    const inIframe = window.self !== window.top;
-    if (!inIframe) return;
-
-    // 3. Extract GHL Params
-    const params = new URLSearchParams(window.location.search);
-    const locationId = params.get('location_id') || params.get('locationId');
-    const userId = params.get('user_id') || params.get('userId');
-    const userEmail = params.get('user_email') || params.get('userEmail'); // New: Support email
-
-    // 4. Trigger SSO if we have enough info
-    if (locationId && (userId || userEmail)) {
-      console.log("CRM Context Detected: Initiating SSO...");
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      let ssoUrl = `${supabaseUrl}/functions/v1/crm-auth/init?action=sso&locationId=${locationId}`;
-
-      if (userId) ssoUrl += `&userId=${userId}`;
-      if (userEmail) ssoUrl += `&userEmail=${encodeURIComponent(userEmail)}`;
-
-      // Check if we've been told to show launchpad (silent SSO failed)
-      const showLaunchpad = params.get('show_launchpad');
-      if (showLaunchpad) {
-        // Silent SSO already failed — show OAuth launchpad
-        setLaunchpadUrl(ssoUrl);
-      } else {
-        // Try silent SSO first by navigating iframe directly
-        // If it works: redirects to /dashboard#tokens
-        // If it fails: redirects back with ?show_launchpad=true
-        console.log("Attempting silent SSO in iframe...");
-        window.location.href = ssoUrl + '&iframe=1';
-        return;
-      }
-    } else {
-      // 5. Fallback: If in iframe but missing params (locationId/userId), redirect to home (Staff Login)
-      if (window.location.pathname !== '/') {
-        console.log("CRM Context: Missing params, redirecting to Staff Login");
-        window.location.href = '/';
-      }
-    }
-  }, [loading, user]);
-
-  if (launchpadUrl) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-sm w-full text-center">
-          <h1 className="text-xl font-bold text-slate-800 mb-2">Connect to CRM</h1>
-          <p className="text-slate-500 mb-6 text-sm">
-            To securely access FilersHub within your CRM, please authorize the connection once.
-          </p>
-          <a
-            href={launchpadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors w-full mb-4"
-          >
-            Connect Now
-          </a>
-          <button
-            onClick={() => { window.location.href = launchpadUrl!; }}
-            className="text-sm text-slate-400 hover:text-slate-600 underline"
-          >
-            I've connected, refresh page
-          </button>
-        </div>
-      </div>
-    );
-  }
 
 
   if (loading || isFirmLoading || (isExtension && ghlLoading)) {
