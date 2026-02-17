@@ -721,6 +721,8 @@ serve(async (req) => {
                 // For CRM login flow, resolve userId from token response
                 const resolvedUserId = isLogin ? tokenData.userId : userId;
 
+                console.log("Token data keys:", Object.keys(tokenData), "| userId:", tokenData.userId, "| locationId:", tokenData.locationId);
+
                 // Always try GHL API if we have userId (gets verified email + name)
                 if (resolvedUserId) {
                     const userResp = await fetch(`https://services.leadconnectorhq.com/users/${resolvedUserId}`, {
@@ -742,10 +744,45 @@ serve(async (req) => {
                     }
                 }
 
+                // Fallback: if no email yet, search location users via GHL API
+                if ((!email || !email.includes('@')) && tokenData.access_token) {
+                    const searchLocationId = tokenData.locationId || locationId;
+                    if (searchLocationId) {
+                        console.log("Fallback: searching GHL users for location", searchLocationId);
+                        try {
+                            const usersResp = await fetch(`https://services.leadconnectorhq.com/users/search`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${tokenData.access_token}`,
+                                    'Version': '2021-07-28',
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ companyId: tokenData.companyId, locationId: searchLocationId })
+                            });
+
+                            if (usersResp.ok) {
+                                const usersData = await usersResp.json();
+                                const users = usersData.users || [];
+                                // Pick first admin user, or first user with an email
+                                const adminUser = users.find((u: any) => u.role === 'admin' && u.email) || users.find((u: any) => u.email);
+                                if (adminUser) {
+                                    email = adminUser.email.trim();
+                                    name = `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || name;
+                                    console.log("Fallback resolved user:", email, name);
+                                }
+                            } else {
+                                console.error("Users search failed:", usersResp.status, await usersResp.text());
+                            }
+                        } catch (searchErr) {
+                            console.error("Users search error:", searchErr);
+                        }
+                    }
+                }
+
                 console.log("SSO/Login email resolved:", email, "| from state:", userEmail, "| userId:", resolvedUserId);
 
                 if (!email || !email.includes('@')) {
-                    return new Response("User has no valid email (state: " + userEmail + ", userId: " + userId + ")", { status: 400 });
+                    return new Response("User has no valid email (state: " + userEmail + ", userId: " + resolvedUserId + ", tokenKeys: " + Object.keys(tokenData).join(',') + ")", { status: 400 });
                 }
 
                 // 2. Find/Create Auth User (Robust Pattern)
