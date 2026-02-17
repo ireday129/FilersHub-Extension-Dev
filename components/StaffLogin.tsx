@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, ShieldCheck, Building2 } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, Building2, Send, CheckCircle2 } from 'lucide-react';
 import { WatermarkBackground } from './WatermarkBackground';
 import { supabase } from '../services/supabase';
 import { GhlContext } from '../hooks/useGhlContext';
@@ -23,6 +23,8 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
     const [crmError, setCrmError] = useState('');
     const [showPasswordLogin, setShowPasswordLogin] = useState(!ghlContext);
     const [firmChoices, setFirmChoices] = useState<FirmChoice[]>([]);
+    const [magicLinkLoading, setMagicLinkLoading] = useState(false);
+    const [magicLinkSent, setMagicLinkSent] = useState(false);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -84,6 +86,29 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
             setCrmError(err.message || 'CRM login failed');
         } finally {
             setCrmLoading(false);
+        }
+    };
+
+    const handleMagicLink = async () => {
+        if (!email) {
+            setCrmError('Please enter your email address first.');
+            return;
+        }
+        setCrmError('');
+        setMagicLinkLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    emailRedirectTo: window.location.origin,
+                },
+            });
+            if (error) throw error;
+            setMagicLinkSent(true);
+        } catch (err: any) {
+            setCrmError(err.message || 'Failed to send magic link');
+        } finally {
+            setMagicLinkLoading(false);
         }
     };
 
@@ -197,14 +222,45 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                                 <p className="text-sm text-red-500 text-center">{crmError}</p>
                             )}
 
-                            {!showPasswordLogin && (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPasswordLogin(true)}
-                                    className="w-full text-center text-xs text-slate-400 hover:text-slate-600 py-2"
-                                >
-                                    Use password instead
-                                </button>
+                            {magicLinkSent && (
+                                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
+                                    <CheckCircle2 className="text-emerald-600 mx-auto" size={24} />
+                                    <p className="text-sm font-bold text-emerald-800">Magic link sent!</p>
+                                    <p className="text-xs text-emerald-600">Check your email and click the link to sign in.</p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMagicLinkSent(false)}
+                                        className="text-xs text-slate-400 hover:text-slate-600 mt-2"
+                                    >
+                                        Didn't receive it? Try again
+                                    </button>
+                                </div>
+                            )}
+
+                            {!showPasswordLogin && !magicLinkSent && (
+                                <div className="flex items-center justify-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={handleMagicLink}
+                                        disabled={magicLinkLoading}
+                                        className="text-xs text-slate-400 hover:text-indigo-600 py-2 flex items-center gap-1"
+                                    >
+                                        {magicLinkLoading ? (
+                                            <span className="w-3 h-3 border border-slate-300 border-t-slate-500 rounded-full animate-spin"></span>
+                                        ) : (
+                                            <Send size={12} />
+                                        )}
+                                        Email me a link
+                                    </button>
+                                    <span className="text-slate-300">|</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswordLogin(true)}
+                                        className="text-xs text-slate-400 hover:text-slate-600 py-2"
+                                    >
+                                        Use password instead
+                                    </button>
+                                </div>
                             )}
                         </>
                     )}
@@ -243,8 +299,24 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                         </>
                     )}
 
-                    {/* No GHL context: CRM login is secondary */}
-                    {!ghlContext && (
+                    {/* Magic link sent confirmation */}
+                    {magicLinkSent && (
+                        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
+                            <CheckCircle2 className="text-emerald-600 mx-auto" size={24} />
+                            <p className="text-sm font-bold text-emerald-800">Magic link sent!</p>
+                            <p className="text-xs text-emerald-600">Check your email and click the link to sign in.</p>
+                            <button
+                                type="button"
+                                onClick={() => setMagicLinkSent(false)}
+                                className="text-xs text-slate-400 hover:text-slate-600 mt-2"
+                            >
+                                Didn't receive it? Try again
+                            </button>
+                        </div>
+                    )}
+
+                    {/* No GHL context: alternative login methods */}
+                    {!ghlContext && !magicLinkSent && (
                         <>
                             <div className="relative my-5">
                                 <div className="absolute inset-0 flex items-center">
@@ -254,6 +326,22 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                                     <span className="px-3 bg-white text-slate-400 text-xs font-medium">Or</span>
                                 </div>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={handleMagicLink}
+                                disabled={isLoading || magicLinkLoading}
+                                className="w-full py-3 bg-white border-2 border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-600 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                            >
+                                {magicLinkLoading ? (
+                                    <span className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></span>
+                                ) : (
+                                    <>
+                                        <Send size={16} />
+                                        Email me a login link
+                                    </>
+                                )}
+                            </button>
 
                             <button
                                 type="button"

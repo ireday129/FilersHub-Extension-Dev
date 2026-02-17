@@ -26,9 +26,9 @@ jobs:
           supabase functions deploy crm-auth --project-ref $PROJECT_ID --no-verify-jwt
           supabase functions deploy crm-webhook --project-ref $PROJECT_ID --no-verify-jwt
           supabase functions deploy crm-logo-lookup --project-ref $PROJECT_ID --no-verify-jwt
+          supabase functions deploy crm-users --project-ref $PROJECT_ID --no-verify-jwt
 
       - name: Deploy Protected Functions (Require JWT)
         run: |
-          supabase functions deploy crm-users --project-ref $PROJECT_ID
           supabase functions deploy crm-update --project-ref $PROJECT_ID
           supabase functions deploy crm-logo-sync --project-ref $PROJECT_ID
