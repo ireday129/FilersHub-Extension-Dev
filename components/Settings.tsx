@@ -191,10 +191,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           const ctx = await error.context?.json();
           if (ctx?.error) detail = ctx.error;
         } catch (_) { /* no parseable context */ }
-        // Detect gateway 401 specifically
-        if (error.message?.includes('non-2xx') || error.message?.includes('401')) {
-          throw new Error('Authentication failed. The edge function may need to be redeployed with --no-verify-jwt. Please contact your administrator.');
-        }
         throw new Error(detail || error.message || 'Edge function error');
       }
       setGhlUsers(data?.users || []);
