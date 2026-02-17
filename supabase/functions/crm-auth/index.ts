@@ -744,11 +744,47 @@ serve(async (req) => {
                     }
                 }
 
-                // Fallback: if no email yet, search location users via GHL API
+                // Fallback 1: List location users via GET /users/ (most reliable for location tokens)
                 if ((!email || !email.includes('@')) && tokenData.access_token) {
                     const searchLocationId = tokenData.locationId || locationId;
                     if (searchLocationId) {
-                        console.log("Fallback: searching GHL users for location", searchLocationId);
+                        console.log("Fallback 1: listing GHL users for location", searchLocationId, "companyId:", tokenData.companyId);
+                        try {
+                            const usersResp = await fetch(
+                                `https://services.leadconnectorhq.com/users/?locationId=${searchLocationId}`,
+                                {
+                                    headers: {
+                                        'Authorization': `Bearer ${tokenData.access_token}`,
+                                        'Version': '2021-07-28',
+                                    }
+                                }
+                            );
+
+                            console.log("Fallback 1 response status:", usersResp.status);
+                            if (usersResp.ok) {
+                                const usersData = await usersResp.json();
+                                const users = usersData.users || [];
+                                console.log("Fallback 1 found", users.length, "users");
+                                const adminUser = users.find((u: any) => u.role === 'admin' && u.email) || users.find((u: any) => u.email);
+                                if (adminUser) {
+                                    email = adminUser.email.trim();
+                                    name = `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || name;
+                                    console.log("Fallback 1 resolved user:", email, name);
+                                }
+                            } else {
+                                console.error("Fallback 1 failed:", usersResp.status, await usersResp.text());
+                            }
+                        } catch (searchErr) {
+                            console.error("Fallback 1 error:", searchErr);
+                        }
+                    }
+                }
+
+                // Fallback 2: Search users via POST /users/search
+                if ((!email || !email.includes('@')) && tokenData.access_token && tokenData.companyId) {
+                    const searchLocationId = tokenData.locationId || locationId;
+                    if (searchLocationId) {
+                        console.log("Fallback 2: POST /users/search for location", searchLocationId);
                         try {
                             const usersResp = await fetch(`https://services.leadconnectorhq.com/users/search`, {
                                 method: 'POST',
@@ -760,29 +796,48 @@ serve(async (req) => {
                                 body: JSON.stringify({ companyId: tokenData.companyId, locationId: searchLocationId })
                             });
 
+                            console.log("Fallback 2 response status:", usersResp.status);
                             if (usersResp.ok) {
                                 const usersData = await usersResp.json();
                                 const users = usersData.users || [];
-                                // Pick first admin user, or first user with an email
+                                console.log("Fallback 2 found", users.length, "users");
                                 const adminUser = users.find((u: any) => u.role === 'admin' && u.email) || users.find((u: any) => u.email);
                                 if (adminUser) {
                                     email = adminUser.email.trim();
                                     name = `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || name;
-                                    console.log("Fallback resolved user:", email, name);
+                                    console.log("Fallback 2 resolved user:", email, name);
                                 }
                             } else {
-                                console.error("Users search failed:", usersResp.status, await usersResp.text());
+                                console.error("Fallback 2 failed:", usersResp.status, await usersResp.text());
                             }
                         } catch (searchErr) {
-                            console.error("Users search error:", searchErr);
+                            console.error("Fallback 2 error:", searchErr);
                         }
+                    }
+                }
+
+                // Fallback 3: Check existing staff in our DB for this firm
+                if ((!email || !email.includes('@')) && firmId) {
+                    console.log("Fallback 3: checking existing staff for firm", firmId);
+                    const { data: existingStaff } = await supabaseAdmin
+                        .from('staff')
+                        .select('email, full_name')
+                        .eq('firm_id', firmId)
+                        .eq('is_active', true)
+                        .eq('role', 'Firm Owner')
+                        .maybeSingle();
+
+                    if (existingStaff?.email) {
+                        email = existingStaff.email;
+                        name = existingStaff.full_name || name;
+                        console.log("Fallback 3 resolved user from staff table:", email, name);
                     }
                 }
 
                 console.log("SSO/Login email resolved:", email, "| from state:", userEmail, "| userId:", resolvedUserId);
 
                 if (!email || !email.includes('@')) {
-                    return new Response("User has no valid email (state: " + userEmail + ", userId: " + resolvedUserId + ", tokenKeys: " + Object.keys(tokenData).join(',') + ")", { status: 400 });
+                    return new Response("User has no valid email (state: " + userEmail + ", userId: " + resolvedUserId + ", locationId: " + (tokenData.locationId || 'null') + ", companyId: " + (tokenData.companyId || 'null') + ", firmId: " + (firmId || 'null') + ")", { status: 400 });
                 }
 
                 // 2. Find/Create Auth User (Robust Pattern)
