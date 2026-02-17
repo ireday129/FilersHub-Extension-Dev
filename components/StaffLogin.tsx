@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Mail, ArrowRight, ShieldCheck, Building2, Send, CheckCircle2 } from 'lucide-react';
 import { WatermarkBackground } from './WatermarkBackground';
 import { supabase } from '../services/supabase';
@@ -25,6 +25,38 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
     const [firmChoices, setFirmChoices] = useState<FirmChoice[]>([]);
     const [magicLinkLoading, setMagicLinkLoading] = useState(false);
     const [magicLinkSent, setMagicLinkSent] = useState(false);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Poll for session after magic link is sent (handles cross-tab login)
+    useEffect(() => {
+        if (!magicLinkSent) {
+            if (pollRef.current) {
+                clearInterval(pollRef.current);
+                pollRef.current = null;
+            }
+            return;
+        }
+
+        pollRef.current = setInterval(async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                clearInterval(pollRef.current!);
+                pollRef.current = null;
+                // Force auth state refresh so the app re-renders
+                await supabase.auth.setSession({
+                    access_token: session.access_token,
+                    refresh_token: session.refresh_token,
+                });
+            }
+        }, 2000);
+
+        return () => {
+            if (pollRef.current) {
+                clearInterval(pollRef.current);
+                pollRef.current = null;
+            }
+        };
+    }, [magicLinkSent]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
