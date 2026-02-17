@@ -30,15 +30,27 @@ serve(async (req) => {
             Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
-        const { data: firm } = await supabaseAdmin
+        console.log('crm-logo-lookup: looking up locationId =', locationId);
+
+        const { data: firm, error: dbError } = await supabaseAdmin
             .from('firms')
             .select('logo_url, brand_color, subscription_tier')
             .eq('ghl_location_id', locationId)
             .maybeSingle();
 
+        if (dbError) {
+            console.error('crm-logo-lookup DB error:', dbError.message, dbError.code);
+            return new Response(
+                JSON.stringify({ logoUrl: null, brandColor: null, debug: dbError.message }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
+        console.log('crm-logo-lookup: firm result =', JSON.stringify(firm));
+
         if (!firm) {
             return new Response(
-                JSON.stringify({ logoUrl: null, brandColor: null }),
+                JSON.stringify({ logoUrl: null, brandColor: null, debug: 'no firm found for locationId' }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
@@ -46,9 +58,10 @@ serve(async (req) => {
         // Only return branding for Pro plan firms
         const tier = firm.subscription_tier?.toLowerCase();
         const isPro = tier === 'pro' || tier === 'growth' || tier === 'enterprise';
+        console.log('crm-logo-lookup: tier =', tier, 'isPro =', isPro);
         if (!isPro) {
             return new Response(
-                JSON.stringify({ logoUrl: null, brandColor: null }),
+                JSON.stringify({ logoUrl: null, brandColor: null, debug: 'not pro tier: ' + tier }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
