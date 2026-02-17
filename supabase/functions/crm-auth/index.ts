@@ -486,7 +486,7 @@ serve(async (req) => {
             }
 
             const clientId = Deno.env.get('GHL_CLIENT_ID')
-            const redirectUri = `${Deno.env.get('SUPABASE_URL') || Deno.env.get('URL') || 'https://sb.filershub.com'}/functions/v1/crm-auth/callback`
+            const redirectUri = 'https://sb.filershub.com/functions/v1/crm-auth/callback'
 
             // Scopes: contacts.readonly, locations.readonly is a good start
             const scopes = 'contacts.readonly contacts.write locations.readonly users.readonly'
@@ -544,7 +544,7 @@ serve(async (req) => {
             // Exchange Code for Token
             const clientId = Deno.env.get('GHL_CLIENT_ID')
             const clientSecret = Deno.env.get('GHL_CLIENT_SECRET')
-            const redirectUri = `${Deno.env.get('SUPABASE_URL') || Deno.env.get('URL') || 'https://sb.filershub.com'}/functions/v1/crm-auth/callback`
+            const redirectUri = 'https://sb.filershub.com/functions/v1/crm-auth/callback'
 
             const tokenResponse = await fetch('https://services.leadconnectorhq.com/oauth/token', {
                 method: 'POST',

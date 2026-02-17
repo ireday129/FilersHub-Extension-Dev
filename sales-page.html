@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FilersHub - Tax Practice Management for GoHighLevel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --brand: #42ab31;
+    --brand-dark: #358a27;
+    --brand-light: #e8f5e6;
+    --dark: #0f172a;
+    --gray-900: #1e293b;
+    --gray-700: #334155;
+    --gray-500: #64748b;
+    --gray-300: #cbd5e1;
+    --gray-100: #f1f5f9;
+    --white: #ffffff;
+    --radius: 16px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--gray-900);
+    line-height: 1.6;
+    background: var(--white);
+    overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    z-index: 100;
+    padding: 14px 0;
+  }
+  .nav .container {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-logo {
+    font-weight: 900; font-size: 22px; color: var(--brand);
+    text-decoration: none; letter-spacing: -0.5px;
+  }
+  .nav-logo span { color: var(--dark); }
+  .nav-cta {
+    background: var(--brand); color: white; border: none;
+    padding: 10px 24px; border-radius: 10px; font-weight: 700;
+    font-size: 14px; cursor: pointer; text-decoration: none;
+    transition: all 0.2s;
+  }
+  .nav-cta:hover { background: var(--brand-dark); transform: translateY(-1px); }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 140px 0 80px;
+    background: linear-gradient(180deg, #f0fdf0 0%, var(--white) 100%);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+    width: 800px; height: 800px;
+    background: radial-gradient(circle, rgba(66,171,49,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--brand-light); color: var(--brand-dark);
+    padding: 8px 20px; border-radius: 100px;
+    font-size: 13px; font-weight: 700;
+    margin-bottom: 28px; letter-spacing: 0.3px;
+  }
+  .hero h1 {
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 900; line-height: 1.08;
+    color: var(--dark); letter-spacing: -1.5px;
+    max-width: 800px; margin: 0 auto 20px;
+  }
+  .hero h1 .gradient-text {
+    background: linear-gradient(135deg, var(--brand) 0%, #2dd4bf 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-sub {
+    font-size: clamp(16px, 2vw, 20px);
+    color: var(--gray-500); max-width: 600px;
+    margin: 0 auto 40px; line-height: 1.6;
+  }
+  .hero-buttons {
+    display: flex; gap: 16px; justify-content: center;
+    flex-wrap: wrap; margin-bottom: 60px;
+  }
+  .btn-primary {
+    background: var(--brand); color: white; border: none;
+    padding: 16px 36px; border-radius: 12px; font-weight: 700;
+    font-size: 16px; cursor: pointer; text-decoration: none;
+    transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 20px rgba(66,171,49,0.3);
+  }
+  .btn-primary:hover { background: var(--brand-dark); transform: translateY(-2px); box-shadow: 0 6px 28px rgba(66,171,49,0.4); }
+  .btn-secondary {
+    background: var(--white); color: var(--gray-900); border: 2px solid var(--gray-300);
+    padding: 14px 36px; border-radius: 12px; font-weight: 700;
+    font-size: 16px; cursor: pointer; text-decoration: none;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--brand); color: var(--brand); }
+
+  /* Screenshot mockup frame */
+  .screenshot-frame {
+    max-width: 1000px; margin: 0 auto;
+    background: var(--dark);
+    border-radius: 16px; padding: 8px;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
+    position: relative;
+  }
+  .screenshot-frame .browser-dots {
+    display: flex; gap: 6px; padding: 8px 12px 6px;
+  }
+  .screenshot-frame .browser-dots span {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .screenshot-frame .browser-dots span:nth-child(1) { background: #ff5f57; }
+  .screenshot-frame .browser-dots span:nth-child(2) { background: #febc2e; }
+  .screenshot-frame .browser-dots span:nth-child(3) { background: #28c840; }
+
+  .screenshot-img {
+    width: 100%; border-radius: 0 0 10px 10px; display: block;
+  }
+  /* Placeholder for when no image is added yet */
+  .screenshot-placeholder {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border-radius: 0 0 10px 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gray-300); font-size: 14px; font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    padding: 48px 0;
+    background: var(--gray-100);
+    border-top: 1px solid rgba(0,0,0,0.04);
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 32px; text-align: center;
+  }
+  .stat-item h3 {
+    font-size: 36px; font-weight: 900;
+    color: var(--brand); letter-spacing: -1px;
+  }
+  .stat-item p {
+    font-size: 13px; font-weight: 600;
+    color: var(--gray-500); margin-top: 4px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* ── SECTION ── */
+  .section {
+    padding: 100px 0;
+  }
+  .section-label {
+    display: inline-block;
+    font-size: 12px; font-weight: 800;
+    color: var(--brand); text-transform: uppercase;
+    letter-spacing: 1.5px; margin-bottom: 12px;
+  }
+  .section-title {
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 900; color: var(--dark);
+    letter-spacing: -1px; line-height: 1.15;
+    margin-bottom: 16px;
+  }
+  .section-desc {
+    font-size: 17px; color: var(--gray-500);
+    max-width: 600px; line-height: 1.7;
+  }
+  .section-center { text-align: center; }
+  .section-center .section-desc { margin: 0 auto 48px; }
+
+  /* ── FEATURES GRID ── */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px; margin-top: 48px;
+  }
+  .feature-card {
+    background: var(--white);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: var(--radius);
+    padding: 36px;
+    transition: all 0.3s;
+  }
+  .feature-card:hover {
+    border-color: var(--brand);
+    box-shadow: 0 8px 32px rgba(66,171,49,0.08);
+    transform: translateY(-4px);
+  }
+  .feature-icon {
+    width: 48px; height: 48px;
+    background: var(--brand-light);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; margin-bottom: 20px;
+  }
+  .feature-card h3 {
+    font-size: 18px; font-weight: 800;
+    color: var(--dark); margin-bottom: 10px;
+  }
+  .feature-card p {
+    font-size: 14px; color: var(--gray-500);
+    line-height: 1.7;
+  }
+
+  /* ── SPLIT SECTION ── */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px; align-items: center;
+  }
+  .split-reverse { direction: rtl; }
+  .split-reverse > * { direction: ltr; }
+  .split-text { max-width: 500px; }
+  .split-text .section-label { margin-bottom: 12px; }
+  .split-text .section-title { margin-bottom: 16px; }
+  .split-text .section-desc { margin-bottom: 32px; }
+
+  .check-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+  .check-list li {
+    display: flex; align-items: flex-start; gap: 12px;
+    font-size: 15px; font-weight: 500; color: var(--gray-700);
+  }
+  .check-icon {
+    width: 22px; height: 22px; min-width: 22px;
+    background: var(--brand-light);
+    border-radius: 50%; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 12px; color: var(--brand); font-weight: 900;
+    margin-top: 2px;
+  }
+
+  .split-visual {
+    position: relative;
+  }
+  .split-visual .screenshot-frame {
+    max-width: 100%;
+  }
+
+  /* ── EXTENSION MOCKUP ── */
+  .extension-mockup {
+    width: 360px; margin: 0 auto;
+    background: var(--dark);
+    border-radius: 12px; padding: 6px;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.2);
+  }
+  .extension-mockup .browser-dots {
+    display: flex; gap: 5px; padding: 6px 10px 4px;
+  }
+  .extension-mockup .browser-dots span {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .extension-mockup .browser-dots span:nth-child(1) { background: #ff5f57; }
+  .extension-mockup .browser-dots span:nth-child(2) { background: #febc2e; }
+  .extension-mockup .browser-dots span:nth-child(3) { background: #28c840; }
+
+  .extension-mockup .screenshot-placeholder,
+  .extension-mockup .screenshot-img {
+    aspect-ratio: 4/5;
+    border-radius: 0 0 8px 8px;
+  }
+
+  /* ── WORKFLOW VISUAL ── */
+  .workflow-section {
+    background: var(--dark);
+    padding: 100px 0;
+    color: white;
+    overflow: hidden;
+  }
+  .workflow-section .section-label { color: #4ade80; }
+  .workflow-section .section-title { color: white; }
+  .workflow-section .section-desc { color: rgba(255,255,255,0.6); }
+  .workflow-track {
+    display: flex; gap: 0; overflow-x: auto;
+    padding: 48px 0 24px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .workflow-track::-webkit-scrollbar { display: none; }
+  .workflow-step {
+    display: flex; flex-direction: column; align-items: center;
+    min-width: 130px; position: relative;
+    flex-shrink: 0;
+  }
+  .workflow-step::after {
+    content: '';
+    position: absolute; top: 18px; left: 50%; right: -50%;
+    height: 2px; background: rgba(255,255,255,0.15);
+  }
+  .workflow-step:last-child::after { display: none; }
+  .workflow-dot {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 2px solid rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; position: relative; z-index: 1;
+    margin-bottom: 12px;
+  }
+  .workflow-step.active .workflow-dot {
+    background: var(--brand);
+    border-color: var(--brand);
+    box-shadow: 0 0 20px rgba(66,171,49,0.4);
+  }
+  .workflow-step-label {
+    font-size: 11px; font-weight: 700;
+    text-align: center; max-width: 100px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.3;
+  }
+  .workflow-step.active .workflow-step-label { color: white; }
+
+  /* ── GHL INTEGRATION ── */
+  .ghl-section {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 100px 0; color: white;
+  }
+  .ghl-section .section-label { color: #38bdf8; }
+  .ghl-section .section-title { color: white; }
+  .ghl-section .section-desc { color: rgba(255,255,255,0.6); }
+  .ghl-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px; margin-top: 48px;
+  }
+  .ghl-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px; padding: 28px;
+    transition: all 0.3s;
+  }
+  .ghl-card:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(56,189,248,0.3);
+    transform: translateY(-2px);
+  }
+  .ghl-card-icon {
+    font-size: 28px; margin-bottom: 16px;
+  }
+  .ghl-card h4 {
+    font-size: 16px; font-weight: 700;
+    margin-bottom: 8px; color: white;
+  }
+  .ghl-card p {
+    font-size: 13px; color: rgba(255,255,255,0.5);
+    line-height: 1.6;
+  }
+
+  /* ── PRICING ── */
+  .pricing-section {
+    padding: 100px 0;
+    background: var(--gray-100);
+  }
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 24px; margin-top: 48px;
+    max-width: 780px; margin-left: auto; margin-right: auto;
+  }
+  .pricing-card {
+    background: var(--white);
+    border: 2px solid rgba(0,0,0,0.06);
+    border-radius: 20px; padding: 40px;
+    position: relative; overflow: hidden;
+    transition: all 0.3s;
+  }
+  .pricing-card:hover { transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,0.08); }
+  .pricing-card.featured {
+    border-color: var(--brand);
+    box-shadow: 0 20px 60px rgba(66,171,49,0.12);
+  }
+  .pricing-popular {
+    position: absolute; top: 16px; right: -32px;
+    background: var(--brand); color: white;
+    padding: 4px 40px; font-size: 11px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    transform: rotate(45deg);
+  }
+  .pricing-tier {
+    font-size: 13px; font-weight: 800;
+    color: var(--gray-500); text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 8px;
+  }
+  .pricing-card.featured .pricing-tier { color: var(--brand); }
+  .pricing-price {
+    font-size: 48px; font-weight: 900;
+    color: var(--dark); letter-spacing: -2px;
+    margin-bottom: 4px;
+  }
+  .pricing-price span { font-size: 16px; font-weight: 600; color: var(--gray-500); letter-spacing: 0; }
+  .pricing-subtitle {
+    font-size: 14px; color: var(--gray-500);
+    margin-bottom: 28px; padding-bottom: 28px;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .pricing-features {
+    list-style: none; display: flex; flex-direction: column; gap: 12px;
+    margin-bottom: 32px;
+  }
+  .pricing-features li {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 500; color: var(--gray-700);
+  }
+  .pricing-features li .check-icon { width: 18px; height: 18px; min-width: 18px; font-size: 10px; }
+  .pricing-btn {
+    display: block; width: 100%; text-align: center;
+    padding: 14px; border-radius: 12px;
+    font-weight: 700; font-size: 15px;
+    text-decoration: none; transition: all 0.2s;
+    cursor: pointer; border: none;
+  }
+  .pricing-btn-outline {
+    background: var(--gray-100); color: var(--gray-900);
+    border: 2px solid var(--gray-300);
+  }
+  .pricing-btn-outline:hover { border-color: var(--brand); color: var(--brand); }
+  .pricing-btn-filled {
+    background: var(--brand); color: white;
+    box-shadow: 0 4px 16px rgba(66,171,49,0.3);
+  }
+  .pricing-btn-filled:hover { background: var(--brand-dark); transform: translateY(-1px); }
+
+  /* ── FAQ ── */
+  .faq-section { padding: 100px 0; }
+  .faq-grid {
+    max-width: 700px; margin: 48px auto 0;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .faq-item {
+    background: var(--gray-100);
+    border-radius: 14px; padding: 24px 28px;
+    cursor: pointer; transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+  .faq-item:hover { border-color: var(--gray-300); }
+  .faq-item.open { background: var(--white); border-color: var(--gray-300); }
+  .faq-q {
+    font-size: 15px; font-weight: 700;
+    color: var(--dark);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .faq-q .arrow { font-size: 18px; color: var(--gray-500); transition: transform 0.2s; }
+  .faq-item.open .faq-q .arrow { transform: rotate(180deg); }
+  .faq-a {
+    font-size: 14px; color: var(--gray-500);
+    line-height: 1.7; margin-top: 12px;
+    display: none;
+  }
+  .faq-item.open .faq-a { display: block; }
+
+  /* ── FINAL CTA ── */
+  .final-cta {
+    padding: 100px 0;
+    background: linear-gradient(135deg, #0f172a 0%, #1a3a1a 100%);
+    text-align: center; color: white;
+    position: relative; overflow: hidden;
+  }
+  .final-cta::before {
+    content: '';
+    position: absolute; top: -300px; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(66,171,49,0.15) 0%, transparent 70%);
+  }
+  .final-cta h2 {
+    font-size: clamp(28px, 4vw, 48px);
+    font-weight: 900; letter-spacing: -1px;
+    margin-bottom: 16px; position: relative;
+  }
+  .final-cta p {
+    font-size: 18px; color: rgba(255,255,255,0.6);
+    max-width: 500px; margin: 0 auto 40px;
+    position: relative;
+  }
+  .final-cta .hero-buttons { position: relative; }
+
+  /* ── FOOTER ── */
+  .footer {
+    background: var(--dark);
+    padding: 32px 0;
+    text-align: center;
+    color: rgba(255,255,255,0.4);
+    font-size: 13px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .split { grid-template-columns: 1fr; gap: 40px; }
+    .split-reverse { direction: ltr; }
+    .hero { padding: 120px 0 60px; }
+    .section { padding: 64px 0; }
+    .workflow-section, .ghl-section, .pricing-section, .faq-section, .final-cta { padding: 64px 0; }
+    .pricing-grid { grid-template-columns: 1fr; max-width: 400px; }
+    .features-grid { grid-template-columns: 1fr; }
+    .extension-mockup { width: 280px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ NAV ════════════════ -->
+<nav class="nav">
+  <div class="container">
+    <a href="#" class="nav-logo">Filers<span>Hub</span></a>
+    <a href="#pricing" class="nav-cta">Get Early Access</a>
+  </div>
+</nav>
+
+<!-- ════════════════ HERO ════════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">Built for GoHighLevel</div>
+    <h1>The Tax Practice OS <br>That Lives Inside <span class="gradient-text">Your CRM</span></h1>
+    <p class="hero-sub">Manage clients, track returns, collect documents, and automate your workflow &mdash; all without leaving GoHighLevel.</p>
+    <div class="hero-buttons">
+      <a href="#pricing" class="btn-primary">Get Early Access &rarr;</a>
+      <a href="#features" class="btn-secondary">See How It Works</a>
+    </div>
+
+    <!-- HERO SCREENSHOT -->
+    <div class="screenshot-frame">
+      <div class="browser-dots"><span></span><span></span><span></span></div>
+      <!-- Replace the placeholder div below with: <img src="YOUR_DASHBOARD_SCREENSHOT.png" class="screenshot-img" alt="FilersHub Dashboard"> -->
+      <div class="screenshot-placeholder">SCREENSHOT: Dashboard with status cards and client list</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ STATS ════════════════ -->
+<section class="stats-bar">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-item">
+        <h3>10</h3>
+        <p>Return Stages</p>
+      </div>
+      <div class="stat-item">
+        <h3>70+</h3>
+        <p>Document Categories</p>
+      </div>
+      <div class="stat-item">
+        <h3>12</h3>
+        <p>Return Types</p>
+      </div>
+      <div class="stat-item">
+        <h3>100%</h3>
+        <p>White-Label</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ FEATURES ════════════════ -->
+<section class="section section-center" id="features">
+  <div class="container">
+    <span class="section-label">Why FilersHub</span>
+    <h2 class="section-title">Everything your tax firm needs. <br>Nothing it doesn't.</h2>
+    <p class="section-desc">Stop duct-taping spreadsheets, shared drives, and email threads together. FilersHub gives your entire team one place to manage tax season.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">&#128203;</div>
+        <h3>10-Stage Return Pipeline</h3>
+        <p>Track every return from Intake Received through IRS Accepted with a visual drag-and-drop dashboard. Know exactly where every return stands at a glance.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#128194;</div>
+        <h3>Smart Document Collection</h3>
+        <p>70+ tax-specific document categories across W-2s, 1099s, business expenses, and more. Clients upload on their schedule and you review in one click.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#127912;</div>
+        <h3>White-Label Client Portal</h3>
+        <p>Your logo, your colors, your URL. Clients see your brand and track their return status 24/7 &mdash; reducing "where's my refund?" calls to nearly zero.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#9889;</div>
+        <h3>GHL Workflow Automation</h3>
+        <p>Trigger workflows when a status changes, a document is uploaded, or a return is filed. Build automations that eliminate manual follow-ups.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#128101;</div>
+        <h3>Role-Based Team Access</h3>
+        <p>Firm Owner, Manager, and Tax Pro roles give everyone the right level of access. "My Clients" vs. "Firm Clients" views keep everyone focused.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#128295;</div>
+        <h3>Chrome Extension</h3>
+        <p>Access FilersHub from anywhere with our Chrome extension. It even detects which GHL location you're in and auto-connects to the right firm.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ DASHBOARD SPLIT ════════════════ -->
+<section class="section" style="background: var(--gray-100);">
+  <div class="container">
+    <div class="split">
+      <div class="split-text">
+        <span class="section-label">Dashboard</span>
+        <h2 class="section-title">Your entire tax season at a glance</h2>
+        <p class="section-desc">A customizable command center that shows you exactly what needs attention. Drag, drop, and rearrange to match your workflow.</p>
+        <ul class="check-list">
+          <li><span class="check-icon">&#10003;</span>Real-time status counts across all 10 stages</li>
+          <li><span class="check-icon">&#10003;</span>Drag-and-drop to reorder status cards</li>
+          <li><span class="check-icon">&#10003;</span>New return alerts so nothing slips through</li>
+          <li><span class="check-icon">&#10003;</span>Filter by year, type, preparer, or status</li>
+          <li><span class="check-icon">&#10003;</span>Switch between "My Clients" and "Firm Clients" instantly</li>
+        </ul>
+      </div>
+      <div class="split-visual">
+        <div class="screenshot-frame">
+          <div class="browser-dots"><span></span><span></span><span></span></div>
+          <!-- Replace with: <img src="YOUR_DASHBOARD_DETAIL_SCREENSHOT.png" class="screenshot-img" alt="FilersHub Dashboard"> -->
+          <div class="screenshot-placeholder">SCREENSHOT: Dashboard with drag-and-drop status cards</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ CLIENT PORTAL SPLIT ════════════════ -->
+<section class="section">
+  <div class="container">
+    <div class="split split-reverse">
+      <div class="split-text">
+        <span class="section-label">Client Portal</span>
+        <h2 class="section-title">Your clients will think you built an app</h2>
+        <p class="section-desc">A branded portal where clients track their return, upload documents, and complete tasks &mdash; all under your firm's name and colors.</p>
+        <ul class="check-list">
+          <li><span class="check-icon">&#10003;</span>Custom logo, brand color, and welcome message</li>
+          <li><span class="check-icon">&#10003;</span>Visual progress stepper so clients see where their return stands</li>
+          <li><span class="check-icon">&#10003;</span>Self-service document upload with 70+ categories</li>
+          <li><span class="check-icon">&#10003;</span>Client task assignments for document requests</li>
+          <li><span class="check-icon">&#10003;</span>Shareable portal URL for onboarding</li>
+        </ul>
+      </div>
+      <div class="split-visual">
+        <div class="screenshot-frame">
+          <div class="browser-dots"><span></span><span></span><span></span></div>
+          <!-- Replace with: <img src="YOUR_CLIENT_PORTAL_SCREENSHOT.png" class="screenshot-img" alt="Client Portal"> -->
+          <div class="screenshot-placeholder">SCREENSHOT: Client portal with branded status stepper</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ CHROME EXTENSION ════════════════ -->
+<section class="section" style="background: var(--gray-100);">
+  <div class="container">
+    <div class="split">
+      <div class="split-text">
+        <span class="section-label">Chrome Extension</span>
+        <h2 class="section-title">Your tax dashboard, one click away</h2>
+        <p class="section-desc">Install the Chrome extension and access FilersHub from any browser tab. When you're in GoHighLevel, it automatically connects to the right location.</p>
+        <ul class="check-list">
+          <li><span class="check-icon">&#10003;</span>Quick-access popup from any browser tab</li>
+          <li><span class="check-icon">&#10003;</span>Auto-detects your GHL location &mdash; no manual switching</li>
+          <li><span class="check-icon">&#10003;</span>Full client management in a compact view</li>
+          <li><span class="check-icon">&#10003;</span>Add clients, create returns, update statuses on the fly</li>
+          <li><span class="check-icon">&#10003;</span>Same power as the full app, just smaller</li>
+        </ul>
+      </div>
+      <div class="split-visual" style="display: flex; justify-content: center;">
+        <div class="extension-mockup">
+          <div class="browser-dots"><span></span><span></span><span></span></div>
+          <!-- Replace with: <img src="YOUR_EXTENSION_SCREENSHOT.png" class="screenshot-img" alt="Chrome Extension"> -->
+          <div class="screenshot-placeholder" style="aspect-ratio: 4/5;">SCREENSHOT: Chrome extension popup</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ WORKFLOW STAGES ════════════════ -->
+<section class="workflow-section">
+  <div class="container section-center">
+    <span class="section-label">Tax Return Pipeline</span>
+    <h2 class="section-title">10 stages. Zero guesswork.</h2>
+    <p class="section-desc">Every return follows a clear path from first contact to IRS acceptance. Your team always knows what's next.</p>
+    <div class="workflow-track">
+      <div class="workflow-step active"><div class="workflow-dot">1</div><div class="workflow-step-label">Intake Received</div></div>
+      <div class="workflow-step"><div class="workflow-dot">2</div><div class="workflow-step-label">Compliance Review</div></div>
+      <div class="workflow-step"><div class="workflow-dot">3</div><div class="workflow-step-label">In Preparation</div></div>
+      <div class="workflow-step"><div class="workflow-dot">4</div><div class="workflow-step-label">Missing Documents</div></div>
+      <div class="workflow-step"><div class="workflow-dot">5</div><div class="workflow-step-label">Ready for Signature</div></div>
+      <div class="workflow-step"><div class="workflow-dot">6</div><div class="workflow-step-label">Invoice Sent</div></div>
+      <div class="workflow-step"><div class="workflow-dot">7</div><div class="workflow-step-label">Bank Product</div></div>
+      <div class="workflow-step"><div class="workflow-dot">8</div><div class="workflow-step-label">Filed</div></div>
+      <div class="workflow-step"><div class="workflow-dot">9</div><div class="workflow-step-label">Rejected</div></div>
+      <div class="workflow-step"><div class="workflow-dot">&#10003;</div><div class="workflow-step-label">Accepted</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ GHL INTEGRATION ════════════════ -->
+<section class="ghl-section">
+  <div class="container section-center">
+    <span class="section-label">GoHighLevel Native</span>
+    <h2 class="section-title">Deep GHL integration. <br>Not just another iframe.</h2>
+    <p class="section-desc">FilersHub connects to your GHL account with OAuth, syncs contacts, updates tags, and exposes custom workflow actions your automations can call.</p>
+    <div class="ghl-features">
+      <div class="ghl-card">
+        <div class="ghl-card-icon">&#128260;</div>
+        <h4>Two-Way Contact Sync</h4>
+        <p>Create FilersHub clients directly from GHL contacts. Status changes sync back as tags and custom fields automatically.</p>
+      </div>
+      <div class="ghl-card">
+        <div class="ghl-card-icon">&#9881;&#65039;</div>
+        <h4>4 Custom Workflow Actions</h4>
+        <p>Create clients, create returns, search returns, and update statuses &mdash; all from your GHL workflows. Build any automation you can imagine.</p>
+      </div>
+      <div class="ghl-card">
+        <div class="ghl-card-icon">&#128278;</div>
+        <h4>Status Tag Automation</h4>
+        <p>Every status change adds an <code style="background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:4px; font-size:12px;">fh-status:filed</code> tag to the GHL contact. Use it to trigger emails, SMS, and pipeline moves.</p>
+      </div>
+      <div class="ghl-card">
+        <div class="ghl-card-icon">&#128101;</div>
+        <h4>One-Click Staff Provisioning</h4>
+        <p>Grant your GHL team members FilersHub access in one click. No separate sign-ups, no duplicate user management.</p>
+      </div>
+      <div class="ghl-card">
+        <div class="ghl-card-icon">&#127919;</div>
+        <h4>Custom Fields Group</h4>
+        <p>Dedicated "FilersHub" custom field group on every contact. Return status, preparer, tax year &mdash; all visible in the contact record.</p>
+      </div>
+      <div class="ghl-card">
+        <div class="ghl-card-icon">&#128736;&#65039;</div>
+        <h4>Marketplace App</h4>
+        <p>Install FilersHub from the GHL Marketplace. It loads right inside your GHL dashboard as a native app &mdash; no tab-switching required.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ PRICING ════════════════ -->
+<section class="pricing-section" id="pricing">
+  <div class="container section-center">
+    <span class="section-label">Early Access Pricing</span>
+    <h2 class="section-title">Lock in your rate <br>before launch.</h2>
+    <p class="section-desc">Join during pre-sale and keep your early adopter pricing for life. No price increases, ever.</p>
+    <div class="pricing-grid">
+
+      <!-- CORE -->
+      <div class="pricing-card">
+        <div class="pricing-tier">Core</div>
+        <!-- UPDATE the price to match your funnel product -->
+        <div class="pricing-price">$97<span>/mo</span></div>
+        <div class="pricing-subtitle">For solo preparers and small firms</div>
+        <ul class="pricing-features">
+          <li><span class="check-icon">&#10003;</span>Up to 10 staff seats</li>
+          <li><span class="check-icon">&#10003;</span>Unlimited clients</li>
+          <li><span class="check-icon">&#10003;</span>White-label client portal</li>
+          <li><span class="check-icon">&#10003;</span>10-stage return pipeline</li>
+          <li><span class="check-icon">&#10003;</span>Document management (70+ categories)</li>
+          <li><span class="check-icon">&#10003;</span>Task management</li>
+          <li><span class="check-icon">&#10003;</span>Chrome extension</li>
+          <li><span class="check-icon">&#10003;</span>GHL integration &amp; workflow actions</li>
+        </ul>
+        <!-- UPDATE href to your GHL funnel Core product checkout link -->
+        <a href="#" class="pricing-btn pricing-btn-outline">Get Core Access</a>
+      </div>
+
+      <!-- PRO -->
+      <div class="pricing-card featured">
+        <div class="pricing-popular">Popular</div>
+        <div class="pricing-tier">Pro</div>
+        <!-- UPDATE the price to match your funnel product -->
+        <div class="pricing-price">$197<span>/mo</span></div>
+        <div class="pricing-subtitle">For growing firms with teams</div>
+        <ul class="pricing-features">
+          <li><span class="check-icon">&#10003;</span>Up to 25 staff seats</li>
+          <li><span class="check-icon">&#10003;</span>Unlimited clients</li>
+          <li><span class="check-icon">&#10003;</span>Everything in Core</li>
+          <li><span class="check-icon">&#10003;</span>Advanced GHL workflow triggers</li>
+          <li><span class="check-icon">&#10003;</span>Priority support</li>
+          <li><span class="check-icon">&#10003;</span>Custom feature requests</li>
+          <li><span class="check-icon">&#10003;</span>Dedicated onboarding</li>
+          <li><span class="check-icon">&#10003;</span>Early access to new features</li>
+        </ul>
+        <!-- UPDATE href to your GHL funnel Pro product checkout link -->
+        <a href="#" class="pricing-btn pricing-btn-filled">Get Pro Access</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ FAQ ════════════════ -->
+<section class="faq-section">
+  <div class="container section-center">
+    <span class="section-label">FAQ</span>
+    <h2 class="section-title">Questions? We've got answers.</h2>
+    <div class="faq-grid">
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">Do I need GoHighLevel to use FilersHub?<span class="arrow">&#9660;</span></div>
+        <div class="faq-a">FilersHub is built specifically for GoHighLevel users. The GHL integration is what makes it powerful &mdash; syncing contacts, automating workflows, and embedding right in your GHL dashboard. You'll need an active GHL account to get the full experience.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">Will my clients see "FilersHub" anywhere?<span class="arrow">&#9660;</span></div>
+        <div class="faq-a">No. The client portal is 100% white-labeled with your firm's logo, brand color, and custom URL. Your clients will think you built a custom app just for them.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">What tax return types are supported?<span class="arrow">&#9660;</span></div>
+        <div class="faq-a">We support 12 return types including Individual (1040), Joint, Separate, Head of Household, Amended (1040-X), Partnership (1065), S-Corp (1120-S), C-Corp (1120), Fiduciary (1041), Nonprofit (990), State Only, and Local returns.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">How does the Chrome extension work?<span class="arrow">&#9660;</span></div>
+        <div class="faq-a">Install it once from the Chrome Web Store. Click the icon to open FilersHub in a compact popup. When you're browsing a GHL location page, the extension automatically detects which location you're in and connects to the right firm &mdash; no manual switching needed.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">Can I automate status-based workflows in GHL?<span class="arrow">&#9660;</span></div>
+        <div class="faq-a">Absolutely. Every time a return status changes in FilersHub, a tag like <code>fh-status:filed</code> is added to the GHL contact. You can trigger any GHL workflow based on these tags &mdash; send emails, SMS, move pipeline stages, assign tasks, and more.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">What happens to my price after launch?<span class="arrow">&#9660;</span></div>
+        <div class="faq-a">Early access customers keep their rate for life. When we officially launch and raise prices, your subscription stays at the pre-sale rate as long as you remain active.</div>
+      </div>
+      <div class="faq-item" onclick="this.classList.toggle('open')">
+        <div class="faq-q">How many clients can I manage?<span class="arrow">&#9660;</span></div>
+        <div class="faq-a">Unlimited. Both Core and Pro plans include unlimited clients. The only difference is the number of staff seats (team members who can log in and manage returns).</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ FINAL CTA ════════════════ -->
+<section class="final-cta">
+  <div class="container">
+    <h2>Ready to run tax season <br>like a tech company?</h2>
+    <p>Join the firms that are trading spreadsheets and email chains for a real practice management system.</p>
+    <div class="hero-buttons">
+      <a href="#pricing" class="btn-primary">Get Early Access &rarr;</a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ FOOTER ════════════════ -->
+<footer class="footer">
+  <div class="container">
+    &copy; 2026 FilersHub. All rights reserved.
+  </div>
+</footer>
+
+</body>
+</html>
