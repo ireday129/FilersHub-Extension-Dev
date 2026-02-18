@@ -32,7 +32,7 @@ serve(async (req) => {
 
         const { data: firm, error: dbError } = await supabaseAdmin
             .from('firms')
-            .select('logo_url, brand_color, subscription_tier')
+            .select('logo_url, brand_color')
             .eq('ghl_location_id', locationId)
             .maybeSingle();
 
@@ -45,16 +45,6 @@ serve(async (req) => {
         }
 
         if (!firm) {
-            return new Response(
-                JSON.stringify({ logoUrl: null, brandColor: null }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
-
-        // Only return branding for Pro plan firms
-        const tier = firm.subscription_tier?.toLowerCase();
-        const isPro = tier === 'pro' || tier === 'growth' || tier === 'enterprise';
-        if (!isPro) {
             return new Response(
                 JSON.stringify({ logoUrl: null, brandColor: null }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

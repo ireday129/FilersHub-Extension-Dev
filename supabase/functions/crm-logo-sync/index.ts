@@ -124,23 +124,14 @@ serve(async (req) => {
             throw new Error('Only firm owners can sync logos to CRM');
         }
 
-        // 2. Verify Pro plan + get location ID
+        // 2. Get location ID
         const { data: firmData } = await supabaseAdmin
             .from('firms')
-            .select('subscription_tier, ghl_location_id')
+            .select('ghl_location_id')
             .eq('firm_id', firmId)
             .single();
 
         if (!firmData) throw new Error('Firm not found');
-
-        const tier = firmData.subscription_tier?.toLowerCase();
-        const isPro = tier === 'pro' || tier === 'growth' || tier === 'enterprise';
-        if (!isPro) {
-            return new Response(
-                JSON.stringify({ error: 'Logo sync to CRM is a Pro feature', code: 'PRO_REQUIRED' }),
-                { status: 403, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } }
-            );
-        }
 
         if (!firmData.ghl_location_id) {
             throw new Error('Firm is not connected to a CRM location. Please connect GHL in Settings.');

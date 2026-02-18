@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: '0.0.0.0',
       headers: {
-        'Content-Security-Policy': "frame-ancestors *"
+        'Content-Security-Policy': "frame-ancestors * chrome-extension://*"
       }
     },
     plugins: [tailwindcss(), react()],

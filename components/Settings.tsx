@@ -313,7 +313,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
 
   const syncBrandingToCrm = async (logoUrl: string | null, brandColor: string | null) => {
-    if (!firmId || !isPro) return;
+    if (!firmId) return;
     if (!logoUrl && !brandColor) return;
 
     setLogoSyncStatus('syncing');
@@ -328,7 +328,17 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       });
 
       if (data?.error) throw new Error(data.error);
-      if (error) throw error;
+      if (error) {
+        // FunctionsHttpError wraps the actual response in error.context
+        const ctx = error?.context;
+        if (ctx?.success) {
+          // Function succeeded despite non-2xx wrapper — treat as success
+        } else if (typeof ctx?.error === 'string') {
+          throw new Error(ctx.error);
+        } else {
+          throw error;
+        }
+      }
 
       setLogoSyncStatus('success');
       setLogoSyncMessage('Synced to CRM Successfully');
@@ -364,10 +374,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
       alert(`Firm branding updated to ${localSettings.name}`);
 
-      // Auto-sync branding to CRM for Pro firms (logo + brand color)
-      if (isPro) {
-        syncBrandingToCrm(localSettings.logo || null, localSettings.color || null);
-      }
+      // Auto-sync branding to CRM (logo + brand color)
+      syncBrandingToCrm(localSettings.logo || null, localSettings.color || null);
     } catch (error: any) {
       console.error('Error updating settings:', error);
       alert('Failed to save settings: ' + (error?.message || error));
@@ -626,38 +634,29 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                 </div>
               </div>
 
-              {/* Pro CRM Branding Sync Indicator */}
-              {isPro ? (
-                <div className="flex items-center gap-2">
-                  <Sparkles size={12} className="text-indigo-500" />
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                    Pro: Branding syncs to CRM
+              {/* CRM Branding Sync Indicator */}
+              <div className="flex items-center gap-2">
+                <Sparkles size={12} className="text-indigo-500" />
+                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                  Branding syncs to CRM
+                </span>
+                {logoSyncStatus === 'syncing' && (
+                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    Syncing...
+                  </div>
+                )}
+                {logoSyncStatus === 'success' && (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+                    <CheckCircle2 size={12} /> {logoSyncMessage}
                   </span>
-                  {logoSyncStatus === 'syncing' && (
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                      <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                      Syncing...
-                    </div>
-                  )}
-                  {logoSyncStatus === 'success' && (
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600">
-                      <CheckCircle2 size={12} /> {logoSyncMessage}
-                    </span>
-                  )}
-                  {logoSyncStatus === 'error' && (
-                    <span className="text-[10px] font-medium text-rose-500">
-                      {logoSyncMessage}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 opacity-60">
-                  <Sparkles size={12} className="text-slate-400" />
-                  <span className="text-[10px] font-medium text-slate-400 italic">
-                    Upgrade to Pro to sync branding to your CRM
+                )}
+                {logoSyncStatus === 'error' && (
+                  <span className="text-[10px] font-medium text-rose-500">
+                    {logoSyncMessage}
                   </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
