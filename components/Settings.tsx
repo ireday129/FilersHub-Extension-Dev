@@ -417,24 +417,14 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <p className="text-sm text-red-500 font-medium">{ghlError}</p>
                   {(ghlError.toLowerCase().includes('token') && ghlError.toLowerCase().includes('expired')) || ghlError.toLowerCase().includes('reconnect') ? (
                     <>
-                      <button
-                        onClick={async () => {
-                          try {
-                            const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-auth/init?firmId=${firmId}`);
-                            const data = await resp.json();
-                            if (data?.url) {
-                              window.open(data.url, '_blank');
-                            } else {
-                              setGhlError('Failed to get reconnect URL. Please try again.');
-                            }
-                          } catch (err) {
-                            setGhlError('Failed to initiate reconnect. Please try again.');
-                          }
-                        }}
-                        className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors"
+                      <a
+                        href={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-auth/init?action=reconnect&firmId=${firmId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors"
                       >
                         Reconnect CRM
-                      </button>
+                      </a>
                       <p className="text-xs text-slate-400 mt-2">After reconnecting, close that tab and click Try Again below.</p>
                       <button onClick={fetchGHLUsers} className="text-xs font-bold text-brand hover:underline">Try Again</button>
                     </>

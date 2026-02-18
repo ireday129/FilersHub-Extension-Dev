@@ -271,6 +271,17 @@ const AppContent: React.FC = () => {
   } | null>(null);
   const [isFirmLoading, setIsFirmLoading] = useState(false);
 
+  // Capture GHL iframe params for email pre-fill (no auto-SSO, just convenience)
+  const [iframeEmail, setIframeEmail] = useState<string | null>(null);
+  useEffect(() => {
+    const inIframe = window.self !== window.top;
+    if (inIframe && !user) {
+      const params = new URLSearchParams(window.location.search);
+      const email = params.get('user_email') || params.get('userEmail');
+      if (email) setIframeEmail(email);
+    }
+  }, [user]);
+
   useEffect(() => {
     const handlePathChange = () => {
       setPath(window.location.pathname);
@@ -376,7 +387,7 @@ const AppContent: React.FC = () => {
     }
 
     // Home page: Staff Login (default landing page)
-    return <StaffLogin ghlContext={isExtension ? ghlContext : null} />;
+    return <StaffLogin ghlContext={isExtension ? ghlContext : null} prefillEmail={iframeEmail} />;
   }
 
   return <AuthenticatedApp />;

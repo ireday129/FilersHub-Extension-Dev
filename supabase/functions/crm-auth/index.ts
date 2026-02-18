@@ -479,6 +479,9 @@ serve(async (req) => {
             } else if (action === 'login') {
                 // Generic CRM login — user will choose their GHL location during OAuth
                 state = 'login';
+            } else if (action === 'reconnect' && firmId) {
+                // Reconnect: refresh tokens for a specific firm
+                state = `reconnect:${firmId}`;
             } else if (firmId) {
                 state = firmId;
             } else {
@@ -493,8 +496,8 @@ serve(async (req) => {
 
             const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`
 
-            // CRM Login: redirect directly to GHL OAuth
-            if (action === 'login') {
+            // CRM Login or Reconnect: redirect directly to GHL OAuth
+            if (action === 'login' || action === 'reconnect') {
                 return Response.redirect(authUrl, 302);
             }
 
@@ -529,9 +532,10 @@ serve(async (req) => {
                 return new Response("Missing code or state", { status: 400 })
             }
 
-            // Parse State: sso:locationId:userId:userEmail OR 'login' OR firmId
+            // Parse State: sso:locationId:userId:userEmail OR 'login' OR reconnect:firmId OR firmId
             const isSso = state.startsWith('sso:');
             const isLogin = state === 'login';
+            const isReconnect = state.startsWith('reconnect:');
             const parts = state.split(':');
             const locationId = isSso ? parts[1] : null;
             const userId = isSso && parts[2] !== 'null' ? parts[2] : null;
@@ -539,7 +543,7 @@ serve(async (req) => {
             // Decode in case of URL encoding artifacts from OAuth round-trip
             try { if (rawEmail) rawEmail = decodeURIComponent(rawEmail).trim(); } catch (_) { }
             const userEmail = rawEmail && rawEmail.includes('@') ? rawEmail : null;
-            const firmIdParam = (isSso || isLogin) ? null : state;
+            const firmIdParam = isReconnect ? parts[1] : (isSso || isLogin) ? null : state;
 
             // Exchange Code for Token
             const clientId = Deno.env.get('GHL_CLIENT_ID')

@@ -7,6 +7,7 @@ import { FILERSHUB_LOGO_URL } from '../constants';
 
 interface StaffLoginProps {
     ghlContext?: GhlContext | null;
+    prefillEmail?: string | null;
 }
 
 interface FirmChoice {
@@ -15,8 +16,8 @@ interface FirmChoice {
     logo_url: string | null;
 }
 
-const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
-    const [email, setEmail] = useState('');
+const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => {
+    const [email, setEmail] = useState(prefillEmail || '');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [crmLoading, setCrmLoading] = useState(false);
