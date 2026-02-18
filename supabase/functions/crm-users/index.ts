@@ -180,13 +180,13 @@ serve(async (req) => {
             let ghlUsers: any[] = [];
             let source = 'database';
 
-            // Try GHL API first for live data
-            const accessToken = await getAccessToken(supabaseAdmin, firmId);
-            if (accessToken) {
+            // Try agency API key first (never expires)
+            const agencyApiKey = Deno.env.get('GHL_AGENCY_API_KEY');
+            if (agencyApiKey) {
                 try {
                     const response = await fetch(
                         `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}`,
-                        { headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': '2021-07-28' } }
+                        { headers: { 'Authorization': `Bearer ${agencyApiKey}`, 'Version': '2021-07-28' } }
                     );
                     if (response.ok) {
                         const data = await response.json();
@@ -200,32 +200,65 @@ serve(async (req) => {
                             type: u.type,
                         }));
                         source = 'ghl_api';
-                        console.log(`Fetched ${ghlUsers.length} users live from GHL API`);
-
-                        // Sync live data back to our users table for future fallback
-                        for (const u of data.users || []) {
-                            const payload: Record<string, any> = {
-                                id: u.id,
-                                email: u.email,
-                                firstName: u.firstName,
-                                lastName: u.lastName,
-                                name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-                                locationId: ghlLocationId,
-                            };
-                            if (u.phone) payload.phone = u.phone;
-                            if (u.roles) payload.roles = u.roles;
-                            if (u.companyId) payload.companyId = u.companyId;
-                            await supabaseAdmin.from('users').upsert(payload, { onConflict: 'id' });
-                        }
+                        console.log(`Fetched ${ghlUsers.length} users live from GHL (agency key)`);
                     } else {
-                        console.warn("GHL API call failed, falling back to database:", response.status);
+                        console.warn("GHL API (agency key) failed:", response.status);
                     }
                 } catch (apiErr) {
-                    console.warn("GHL API error, falling back to database:", apiErr.message);
+                    console.warn("GHL API (agency key) error:", apiErr.message);
                 }
             }
 
-            // Fallback: read from our own users table (populated by webhooks)
+            // Fallback: try OAuth token if agency key failed
+            if (source === 'database') {
+                const accessToken = await getAccessToken(supabaseAdmin, firmId);
+                if (accessToken) {
+                    try {
+                        const response = await fetch(
+                            `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}`,
+                            { headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': '2021-07-28' } }
+                        );
+                        if (response.ok) {
+                            const data = await response.json();
+                            ghlUsers = (data.users || []).map((u: any) => ({
+                                id: u.id,
+                                name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+                                firstName: u.firstName,
+                                lastName: u.lastName,
+                                email: u.email,
+                                role: u.role,
+                                type: u.type,
+                            }));
+                            source = 'ghl_api';
+                            console.log(`Fetched ${ghlUsers.length} users live from GHL (OAuth token)`);
+                        } else {
+                            console.warn("GHL API (OAuth) failed:", response.status);
+                        }
+                    } catch (apiErr) {
+                        console.warn("GHL API (OAuth) error:", apiErr.message);
+                    }
+                }
+            }
+
+            // Sync live GHL data back to users table for future fallback
+            if (source === 'ghl_api') {
+                for (const u of ghlUsers) {
+                    const payload: Record<string, any> = {
+                        id: u.id,
+                        email: u.email,
+                        firstName: u.firstName,
+                        lastName: u.lastName,
+                        name: u.name,
+                        locationId: ghlLocationId,
+                    };
+                    if (u.phone) payload.phone = u.phone;
+                    if (u.roles) payload.roles = u.roles;
+                    if (u.companyId) payload.companyId = u.companyId;
+                    await supabaseAdmin.from('users').upsert(payload, { onConflict: 'id' });
+                }
+            }
+
+            // Last resort: read from our own users table
             if (source === 'database') {
                 const { data: dbUsers, error: usersError } = await supabaseAdmin
                     .from('users')

@@ -8,10 +8,7 @@ import {
   Globe,
   Building2,
   Hash,
-  CreditCard,
-  Check,
   Sparkles,
-  Zap,
   CheckCircle2,
 } from 'lucide-react';
 import { UserRole } from '../types';
@@ -366,20 +363,11 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       if (isPro) {
         syncBrandingToCrm(localSettings.logo || null);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating settings:', error);
-      alert('Failed to save settings');
+      alert('Failed to save settings: ' + (error?.message || error));
     }
   };
-
-  const PlanFeature = ({ text }: { text: string }) => (
-    <div className="flex items-start gap-2 group">
-      <div className="mt-1 p-0.5 rounded-full bg-brand-light text-brand group-hover:bg-brand group-hover:text-white transition-colors">
-        <Check size={10} strokeWidth={3} />
-      </div>
-      <span className="text-xs text-slate-600 font-medium leading-relaxed">{text}</span>
-    </div>
-  );
 
   return (
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -832,128 +820,24 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
         </div>
       </section>
 
-      {/* Firm Plan Area */}
-      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-              <CreditCard size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Firm Plan</h2>
-              <p className="text-xs text-slate-500">Overview of FilersHub billing tiers and capabilities.</p>
+      {/* Upgrade to Pro */}
+      {!isPro && (
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className={`${isExtension ? 'p-4' : 'p-6'} flex items-center justify-between`}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold text-slate-800`}>Upgrade to Pro</h2>
+                <p className="text-xs text-slate-500">
+                  Email <a href="mailto:support@filershub.com?subject=Upgrade to Pro" className="text-indigo-600 font-semibold hover:underline">support@filershub.com</a> with the subject line <span className="font-semibold text-slate-700">"Upgrade to Pro"</span> to get started.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div className="p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Core Plan */}
-            <div className="relative p-6 rounded-2xl border-2 border-slate-100 bg-slate-50/30 flex flex-col group hover:border-brand/20 transition-all">
-              <div className="absolute -top-3 left-6 px-3 py-1 bg-brand text-white text-[10px] font-bold rounded-full uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-                <CheckCircle2 size={12} /> Active Plan
-              </div>
-
-              <div className="mb-6">
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                  Firm Core
-                  <Zap size={18} className="text-amber-500" />
-                </h3>
-                <p className="text-xs text-slate-500 font-medium mt-1">For solo pros and small teams who want power without chaos.</p>
-              </div>
-
-              <div className="space-y-6 flex-1">
-                <div>
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">User Limits</h4>
-                  <ul className="space-y-2">
-                    <PlanFeature text="1 Firm Owner" />
-                    <PlanFeature text={`Up to ${staffLimit} staff users (${assignedStaff}/${staffLimit} used)`} />
-                    <PlanFeature text="Unlimited clients" />
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Core Features</h4>
-                  <div className="grid grid-cols-1 gap-y-2">
-                    <PlanFeature text="Multi-tenant firm setup" />
-                    <PlanFeature text="Firm branded client portal" />
-                    <PlanFeature text="Secure document uploads" />
-                    <PlanFeature text="Missing document tracking" />
-                    <PlanFeature text="Tax return pipeline stages" />
-                    <PlanFeature text="Activity log per client" />
-                    <PlanFeature text="Role-based access control" />
-                    <PlanFeature text="Firebase Storage folders" />
-                    <PlanFeature text="Basic reporting (Open cases)" />
-                    <PlanFeature text="Standard support" />
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100">
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Who this is for</h4>
-                  <p className="text-xs font-semibold text-slate-600 bg-white p-3 rounded-lg border border-slate-100 italic">
-                    "Solo EAs and CPAs, Small firms, and first-time CRM users."
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Pro Plan */}
-            <div className="relative p-6 rounded-2xl border-2 border-indigo-100 bg-indigo-50/10 flex flex-col group hover:border-indigo-400 transition-all overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity -mr-4 -mt-4">
-                <Sparkles size={120} className="text-indigo-600" />
-              </div>
-
-              <div className="mb-6">
-                <h3 className="text-xl font-black text-indigo-900 flex items-center gap-2">
-                  Firm Pro
-                  <Sparkles size={18} className="text-indigo-500" />
-                </h3>
-                <p className="text-xs text-indigo-600 font-medium mt-1">For growth mode firms that need control, visibility, and scale.</p>
-              </div>
-
-              <div className="space-y-6 flex-1">
-                <div>
-                  <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-3">User Limits</h4>
-                  <ul className="space-y-2">
-                    <PlanFeature text="1 Firm Owner" />
-                    <PlanFeature text="Up to 20 staff users" />
-                    <PlanFeature text="Unlimited clients" />
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-3 italic">Everything in Core, plus:</h4>
-                  <div className="grid grid-cols-1 gap-y-2">
-                    <PlanFeature text="Advanced role permissions" />
-                    <PlanFeature text="Staff workload visibility" />
-                    <PlanFeature text="Internal only statuses (On Hold, Review)" />
-                    <PlanFeature text="Case reassignment history" />
-                    <PlanFeature text="Staff activity tracking" />
-                    <PlanFeature text="Bulk document requests" />
-                    <PlanFeature text="Advanced reporting & Bottlenecks" />
-                    <PlanFeature text="Priority file handling flags" />
-                    <PlanFeature text="Custom internal notes per case" />
-                    <PlanFeature text="Branded email notifications" />
-                    <PlanFeature text="Priority support queue" />
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-indigo-100">
-                  <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Who this is for</h4>
-                  <p className="text-xs font-semibold text-indigo-900 bg-white p-3 rounded-lg border border-indigo-100 italic">
-                    "Established tax firms, multi-preparer offices, and firms wanting visibility."
-                  </p>
-                </div>
-              </div>
-
-              <button className="mt-8 w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2">
-                <Zap size={16} />
-                Upgrade to Pro
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 };
