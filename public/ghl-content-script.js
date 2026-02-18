@@ -67,6 +67,7 @@
   // =====================================================
 
   var sidebarStyleEl = null;
+  var sidebarObserver = null;
 
   function injectSidebarCSS() {
     if (sidebarStyleEl) return; // Already injected
@@ -80,27 +81,64 @@
       '  flex-flow: column nowrap !important;',
       '}',
       '',
+      // Give all nav items a default order
+      '#sidebar-v2 .hl_nav-header > nav > a {',
+      '  order: 1;',
+      '}',
+      '',
       // Hide Launchpad
       '#sidebar-v2 .hl_nav-header > nav > a#sb_launchpad,',
       '.hl_navItem[data-id="launchpad"] {',
       '  display: none !important;',
       '}',
-      '',
-      // Pin FilersHub CML to the very top (order: -99)
-      '#sidebar-v2 .hl_nav-header > nav > a[href*="filershub"] {',
-      '  order: -99 !important;',
-      '}',
-      '#sidebar-v2 .hl_nav-header > nav > a[meta*="filershub"] {',
-      '  order: -99 !important;',
-      '}',
     ].join('\n');
     document.head.appendChild(sidebarStyleEl);
+
+    // CML links use a meta attribute with a UUID, not "filershub" in href.
+    // We need JS to find the FilersHub link by its text and pin it to the top.
+    pinFilersHubLink();
+    startSidebarObserver();
+  }
+
+  function pinFilersHubLink() {
+    var nav = document.querySelector('#sidebar-v2 .hl_nav-header > nav');
+    if (!nav) return;
+
+    var links = nav.querySelectorAll('a');
+    for (var i = 0; i < links.length; i++) {
+      var link = links[i];
+      // Match by visible text or title/aria-label containing "FilersHub"
+      var text = (link.textContent || '').trim();
+      var title = link.getAttribute('title') || '';
+      if (text.toLowerCase().indexOf('filershub') !== -1 ||
+          title.toLowerCase().indexOf('filershub') !== -1) {
+        link.style.setProperty('order', '-99', 'important');
+        return; // Found it, done
+      }
+    }
+  }
+
+  function startSidebarObserver() {
+    if (sidebarObserver) return; // Already observing
+
+    // GHL is a SPA — the sidebar may re-render. Watch for changes and re-pin.
+    var sidebar = document.querySelector('#sidebar-v2');
+    if (!sidebar) return;
+
+    sidebarObserver = new MutationObserver(function () {
+      pinFilersHubLink();
+    });
+    sidebarObserver.observe(sidebar, { childList: true, subtree: true });
   }
 
   function removeSidebarCSS() {
     if (sidebarStyleEl) {
       sidebarStyleEl.remove();
       sidebarStyleEl = null;
+    }
+    if (sidebarObserver) {
+      sidebarObserver.disconnect();
+      sidebarObserver = null;
     }
   }
 
