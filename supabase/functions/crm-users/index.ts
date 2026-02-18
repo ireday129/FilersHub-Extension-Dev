@@ -315,21 +315,21 @@ serve(async (req) => {
             )
         }
 
-        // GRANT ACCESS: Create auth user + staff record
+        // GRANT ACCESS: Create auth user + staff record (or reactivate)
         if (action === 'grant') {
             const { ghlUserId, email, name, role } = body;
 
             if (!email) throw new Error('Email is required');
 
-            // Check if staff already exists at this firm
+            // Check if staff already exists at this firm (active or inactive)
             const { data: existingStaff } = await supabaseAdmin
                 .from('staff')
-                .select('staff_id')
+                .select('staff_id, is_active')
                 .eq('email', email.toLowerCase())
                 .eq('firm_id', firmId)
                 .maybeSingle();
 
-            if (existingStaff) {
+            if (existingStaff?.is_active) {
                 return new Response(
                     JSON.stringify({ error: 'This user already has access to the app' }),
                     { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -355,21 +355,38 @@ serve(async (req) => {
                 userRecord = newUser.user;
             }
 
-            // Create staff record
-            const { error: staffInsertError } = await supabaseAdmin
-                .from('staff')
-                .insert({
-                    firm_id: firmId,
-                    email: email.toLowerCase(),
-                    full_name: name,
-                    role: (role && role !== 'Firm Owner') ? role : 'Tax Pro',
-                    auth_user_id: userRecord?.id || null,
-                    is_active: true,
-                    ghl_user_id: ghlUserId || null,
-                    ghl_location_id: ghlLocationId,
-                });
+            if (existingStaff) {
+                // Reactivate the previously revoked staff record
+                const { error: reactivateError } = await supabaseAdmin
+                    .from('staff')
+                    .update({
+                        is_active: true,
+                        full_name: name,
+                        role: (role && role !== 'Firm Owner') ? role : 'Tax Pro',
+                        auth_user_id: userRecord?.id || null,
+                        ghl_user_id: ghlUserId || null,
+                        ghl_location_id: ghlLocationId,
+                    })
+                    .eq('staff_id', existingStaff.staff_id);
 
-            if (staffInsertError) throw staffInsertError;
+                if (reactivateError) throw reactivateError;
+            } else {
+                // Create new staff record
+                const { error: staffInsertError } = await supabaseAdmin
+                    .from('staff')
+                    .insert({
+                        firm_id: firmId,
+                        email: email.toLowerCase(),
+                        full_name: name,
+                        role: (role && role !== 'Firm Owner') ? role : 'Tax Pro',
+                        auth_user_id: userRecord?.id || null,
+                        is_active: true,
+                        ghl_user_id: ghlUserId || null,
+                        ghl_location_id: ghlLocationId,
+                    });
+
+                if (staffInsertError) throw staffInsertError;
+            }
 
             return new Response(
                 JSON.stringify({ message: 'Access granted successfully' }),
