@@ -32,3 +32,4 @@ jobs:
         run: |
           supabase functions deploy crm-update --project-ref $PROJECT_ID
           supabase functions deploy crm-logo-sync --project-ref $PROJECT_ID
+          supabase functions deploy crm-sidebar-pin --project-ref $PROJECT_ID

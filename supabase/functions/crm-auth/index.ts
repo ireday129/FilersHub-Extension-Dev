@@ -492,7 +492,7 @@ serve(async (req) => {
             const redirectUri = 'https://sb.filershub.com/functions/v1/crm-auth/callback'
 
             // Scopes: contacts.readonly, locations.readonly is a good start
-            const scopes = 'contacts.readonly contacts.write locations.readonly users.readonly'
+            const scopes = 'contacts.readonly contacts.write locations.readonly users.readonly custom-menu-link.write custom-menu-link.readonly'
 
             const authUrl = `https://marketplace.gohighlevel.com/oauth/chooselocation?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}`
 

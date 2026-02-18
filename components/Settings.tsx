@@ -351,6 +351,24 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     }
   };
 
+  const pinToGhlSidebar = async () => {
+    if (!firmId) return;
+    try {
+      const token = await getFreshToken();
+      const { data, error } = await supabase.functions.invoke('crm-sidebar-pin', {
+        body: { firmId, action: 'pin' },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (data?.error) console.error('Sidebar pin failed:', data.error);
+      if (error) {
+        const ctx = error?.context;
+        if (!ctx?.success) console.error('Sidebar pin failed:', error.message);
+      }
+    } catch (err: any) {
+      console.error('Sidebar pin failed:', err);
+    }
+  };
+
   const handleSave = async () => {
     if (!firmId) return;
 
@@ -376,6 +394,11 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
       // Auto-sync branding to CRM (logo + brand color)
       syncBrandingToCrm(localSettings.logo || null, localSettings.color || null);
+
+      // Auto-pin to GHL sidebar for Pro firms
+      if (isPro) {
+        pinToGhlSidebar();
+      }
     } catch (error: any) {
       console.error('Error updating settings:', error);
       alert('Failed to save settings: ' + (error?.message || error));
@@ -759,7 +782,11 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                     No staff members found.
                   </td>
                 </tr>
-              ) : staff.map((member) => (
+              ) : [...staff].sort((a, b) => {
+                if (a.role === UserRole.FirmOwner) return -1;
+                if (b.role === UserRole.FirmOwner) return 1;
+                return 0;
+              }).map((member) => (
                 <tr key={member.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
                     <div className="flex items-center gap-2 min-w-0">

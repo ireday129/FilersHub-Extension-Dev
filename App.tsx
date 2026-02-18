@@ -13,6 +13,7 @@ import { LogOut, Loader2 } from 'lucide-react';
 import { useFirmData } from './hooks/useFirmData';
 import { useExtensionMode } from './hooks/useExtensionMode';
 import FirmSelection from './components/FirmSelection';
+import GhlWidget from './components/GhlWidget';
 
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -314,6 +315,11 @@ const AppContent: React.FC = () => {
     checkPortalPath();
   }, [path]);
 
+
+  // GHL Dashboard Widget (no auth required — uses widget_token)
+  if (path === '/widget') {
+    return <GhlWidget />;
+  }
 
   if (loading || isFirmLoading || (isExtension && ghlLoading)) {
     return (
