@@ -1,9 +1,12 @@
 // Content script injected into GHL pages to:
 // 1. Detect the current location context (locationId)
-// 2. Customize the GHL sidebar (hide Launchpad, pin FilersHub to top)
+// 2. Customize the GHL sidebar for active FilersHub locations only
 
 (function () {
   'use strict';
+
+  var APP_URL = 'https://app.filershub.com';
+  var CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   // =====================================================
   // LOCATION CONTEXT DETECTION
@@ -24,6 +27,9 @@
           timestamp: Date.now(),
         },
       });
+
+      // Check if this location uses FilersHub and apply sidebar CSS
+      applySidebarIfActive(locationId);
     }
   }
 
@@ -57,67 +63,87 @@
   }
 
   // =====================================================
-  // SIDEBAR CUSTOMIZATION
+  // SIDEBAR CUSTOMIZATION (only for active FilersHub locations)
   // =====================================================
 
-  // Inject CSS to hide Launchpad
-  var style = document.createElement('style');
-  style.textContent =
-    '.hl_navItem[data-id="launchpad"] { display: none !important; }';
-  document.head.appendChild(style);
+  var sidebarStyleEl = null;
 
-  // Move FilersHub CML to the top of the sidebar nav
-  function pinFilersHubToTop() {
-    // Find all sidebar nav items
-    var navItems = document.querySelectorAll('.hl_navItem');
-    var sidebar = null;
-    var filershubItem = null;
+  function injectSidebarCSS() {
+    if (sidebarStyleEl) return; // Already injected
 
-    for (var i = 0; i < navItems.length; i++) {
-      var item = navItems[i];
-      // Match by link text or URL containing filershub
-      var text = item.textContent || '';
-      var link = item.querySelector('a');
-      var href = link ? link.getAttribute('href') || '' : '';
+    sidebarStyleEl = document.createElement('style');
+    sidebarStyleEl.id = 'filershub-sidebar-css';
+    sidebarStyleEl.textContent = [
+      // Make the sidebar nav a flex column so CSS order works
+      '#sidebar-v2 .hl_nav-header > nav {',
+      '  display: flex !important;',
+      '  flex-flow: column nowrap !important;',
+      '}',
+      '',
+      // Hide Launchpad
+      '#sidebar-v2 .hl_nav-header > nav > a#sb_launchpad,',
+      '.hl_navItem[data-id="launchpad"] {',
+      '  display: none !important;',
+      '}',
+      '',
+      // Pin FilersHub CML to the very top (order: -99)
+      '#sidebar-v2 .hl_nav-header > nav > a[href*="filershub"] {',
+      '  order: -99 !important;',
+      '}',
+      '#sidebar-v2 .hl_nav-header > nav > a[meta*="filershub"] {',
+      '  order: -99 !important;',
+      '}',
+    ].join('\n');
+    document.head.appendChild(sidebarStyleEl);
+  }
 
-      if (
-        text.toLowerCase().indexOf('filershub') !== -1 ||
-        href.toLowerCase().indexOf('filershub') !== -1
-      ) {
-        filershubItem = item;
-        sidebar = item.parentElement;
-        break;
-      }
-    }
-
-    if (filershubItem && sidebar) {
-      // Move to first position in the sidebar
-      sidebar.insertBefore(filershubItem, sidebar.firstChild);
+  function removeSidebarCSS() {
+    if (sidebarStyleEl) {
+      sidebarStyleEl.remove();
+      sidebarStyleEl = null;
     }
   }
 
-  // GHL sidebar loads dynamically — retry until found
-  var pinAttempts = 0;
-  var pinInterval = setInterval(function () {
-    pinFilersHubToTop();
-    pinAttempts++;
-    // Stop after 30 seconds (60 attempts at 500ms)
-    if (pinAttempts > 60) {
-      clearInterval(pinInterval);
-    }
-  }, 500);
+  function applySidebarIfActive(locationId) {
+    if (!locationId) return;
 
-  // Also re-run on SPA navigation in case sidebar re-renders
-  var origOnUrlChange = onUrlChange;
-  onUrlChange = function () {
-    origOnUrlChange();
-    pinAttempts = 0;
-    pinInterval = setInterval(function () {
-      pinFilersHubToTop();
-      pinAttempts++;
-      if (pinAttempts > 60) {
-        clearInterval(pinInterval);
+    var cacheKey = 'fh_location_' + locationId;
+
+    // Check cache first
+    chrome.storage.local.get(cacheKey, function (result) {
+      var cached = result[cacheKey];
+
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        // Use cached result
+        if (cached.active) {
+          injectSidebarCSS();
+        } else {
+          removeSidebarCSS();
+        }
+        return;
       }
-    }, 500);
-  };
+
+      // No cache or expired — check the API
+      fetch(APP_URL + '/api/check-location?locationId=' + encodeURIComponent(locationId))
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          var isActive = data.active === true;
+
+          // Cache the result
+          var cacheObj = {};
+          cacheObj[cacheKey] = { active: isActive, timestamp: Date.now() };
+          chrome.storage.local.set(cacheObj);
+
+          if (isActive) {
+            injectSidebarCSS();
+          } else {
+            removeSidebarCSS();
+          }
+        })
+        .catch(function () {
+          // On network error, don't inject CSS (safe default)
+          removeSidebarCSS();
+        });
+    });
+  }
 })();
