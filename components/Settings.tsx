@@ -312,39 +312,32 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   };
 
 
-  const syncBrandingToCrm = async (logoUrl: string | null) => {
+  const syncBrandingToCrm = async (logoUrl: string | null, brandColor: string | null) => {
     if (!firmId || !isPro) return;
+    if (!logoUrl && !brandColor) return;
 
     setLogoSyncStatus('syncing');
     setLogoSyncMessage('');
 
     try {
-      // If there's a logo, push it to GHL via crm-logo-sync
-      if (logoUrl) {
-        const token = await getFreshToken();
+      const token = await getFreshToken();
 
-        const { data, error } = await supabase.functions.invoke('crm-logo-sync', {
-          body: { firmId, logoUrl },
-          headers: { Authorization: `Bearer ${token}` }
-        });
+      const { data, error } = await supabase.functions.invoke('crm-logo-sync', {
+        body: { firmId, logoUrl, brandColor },
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-        if (data?.error) throw new Error(data.error);
-        if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (error) throw error;
 
-        setLogoSyncStatus('success');
-        setLogoSyncMessage('Synced to CRM Successfully');
-      } else {
-        // Brand color is already saved to DB — the GHL sidebar script picks it up automatically
-        setLogoSyncStatus('success');
-        setLogoSyncMessage('Synced to CRM Successfully');
-      }
-
+      setLogoSyncStatus('success');
+      setLogoSyncMessage('Synced to CRM Successfully');
       setTimeout(() => setLogoSyncStatus('idle'), 4000);
     } catch (err: any) {
       console.error('CRM branding sync failed:', err);
       setLogoSyncStatus('error');
       setLogoSyncMessage(err.message || 'Failed to sync branding to CRM');
-      setTimeout(() => setLogoSyncStatus('idle'), 6000);
+      setTimeout(() => setLogoSyncStatus('idle'), 10000);
     }
   };
 
@@ -373,7 +366,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
       // Auto-sync branding to CRM for Pro firms (logo + brand color)
       if (isPro) {
-        syncBrandingToCrm(localSettings.logo || null);
+        syncBrandingToCrm(localSettings.logo || null, localSettings.color || null);
       }
     } catch (error: any) {
       console.error('Error updating settings:', error);

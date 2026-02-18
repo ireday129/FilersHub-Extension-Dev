@@ -95,10 +95,17 @@ serve(async (req) => {
         const { data: { user } } = await supabaseClient.auth.getUser();
         if (!user) throw new Error('Unauthorized — no active session');
 
-        const { firmId, logoUrl } = await req.json();
-        if (!firmId || !logoUrl) {
+        const { firmId, logoUrl, brandColor } = await req.json();
+        if (!firmId) {
             return new Response(
-                JSON.stringify({ error: 'firmId and logoUrl are required' }),
+                JSON.stringify({ error: 'firmId is required' }),
+                { status: 400, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+
+        if (!logoUrl && !brandColor) {
+            return new Response(
+                JSON.stringify({ error: 'logoUrl or brandColor is required' }),
                 { status: 400, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } }
             );
         }
@@ -142,13 +149,26 @@ serve(async (req) => {
         const locationId = firmData.ghl_location_id;
 
         // Strip cache-busting param for a clean URL
-        const cleanLogoUrl = logoUrl.split('?')[0];
+        const cleanLogoUrl = logoUrl ? logoUrl.split('?')[0] : null;
 
         // 3. Primary path: PUT /locations/{locationId} with agency API key
         const agencyApiKey = Deno.env.get('GHL_AGENCY_API_KEY');
         if (!agencyApiKey) {
             throw new Error('Agency API key not configured. Contact support.');
         }
+
+        // Build the location update payload
+        const locationPayload: Record<string, any> = {};
+        if (cleanLogoUrl) locationPayload.logoUrl = cleanLogoUrl;
+
+        // Build settings object for brand color
+        if (brandColor) {
+            locationPayload.settings = {
+                primaryColor: brandColor,
+            };
+        }
+
+        console.log(`Syncing to GHL location ${locationId}:`, JSON.stringify(locationPayload));
 
         const putResp = await fetch(`${GHL_API_BASE}/locations/${locationId}`, {
             method: 'PUT',
@@ -157,122 +177,59 @@ serve(async (req) => {
                 'Version': GHL_API_VERSION,
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ logoUrl: cleanLogoUrl }),
+            body: JSON.stringify(locationPayload),
         });
 
         if (putResp.ok) {
-            console.log(`Logo synced to GHL location ${locationId} via PUT /locations`);
+            const result = await putResp.json();
+            console.log(`Branding synced to GHL location ${locationId} via PUT /locations`);
             return new Response(
                 JSON.stringify({
                     success: true,
                     method: 'location_update',
-                    message: 'Logo synced to CRM location',
+                    message: 'Branding synced to CRM location',
                 }),
                 { headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
-        // 4. Fallback: Upload to GHL Media Library + set as Custom Value
-        console.warn(`PUT /locations failed (${putResp.status}), trying media upload fallback...`);
-        const putError = await putResp.text();
-        console.warn('PUT error detail:', putError);
+        // Primary PUT failed — surface the actual error
+        const putErrorText = await putResp.text();
+        console.error(`PUT /locations/${locationId} failed (${putResp.status}):`, putErrorText);
 
-        // Get sub-account OAuth token for media upload
-        const { accessToken } = await getValidToken(supabaseAdmin, firmId);
-
-        // 4a. Download logo from Supabase Storage
-        const logoResp = await fetch(cleanLogoUrl);
-        if (!logoResp.ok) throw new Error('Failed to fetch logo from storage');
-        const logoBlob = await logoResp.blob();
-
-        // 4b. Upload to GHL Media Library
-        const formData = new FormData();
-        formData.append('file', logoBlob, 'firm-logo.png');
-        formData.append('name', 'FilersHub Firm Logo');
-
-        const mediaResp = await fetch(
-            `${GHL_API_BASE}/medias/upload-file?locationId=${locationId}`,
-            {
-                method: 'POST',
+        // Try with OAuth token as fallback auth method
+        try {
+            const { accessToken } = await getValidToken(supabaseAdmin, firmId);
+            const oauthResp = await fetch(`${GHL_API_BASE}/locations/${locationId}`, {
+                method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Version': GHL_API_VERSION,
+                    'Content-Type': 'application/json',
                 },
-                body: formData,
+                body: JSON.stringify(locationPayload),
+            });
+
+            if (oauthResp.ok) {
+                console.log(`Branding synced to GHL location ${locationId} via OAuth token`);
+                return new Response(
+                    JSON.stringify({
+                        success: true,
+                        method: 'oauth_location_update',
+                        message: 'Branding synced to CRM location',
+                    }),
+                    { headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } }
+                );
             }
-        );
 
-        let mediaUrl = cleanLogoUrl;
-        if (mediaResp.ok) {
-            const mediaData = await mediaResp.json();
-            mediaUrl = mediaData.url || mediaData.fileUrl || cleanLogoUrl;
-            console.log('Logo uploaded to GHL media library:', mediaUrl);
-        } else {
-            console.warn('Media upload failed:', mediaResp.status, await mediaResp.text());
+            const oauthErrorText = await oauthResp.text();
+            console.error(`OAuth PUT /locations failed (${oauthResp.status}):`, oauthErrorText);
+        } catch (oauthErr) {
+            console.error('OAuth fallback failed:', oauthErr.message);
         }
 
-        // 4c. Store logo URL as a Custom Value
-        // First check if the custom value already exists
-        const listResp = await fetch(
-            `${GHL_API_BASE}/locations/${locationId}/customValues`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Version': GHL_API_VERSION,
-                },
-            }
-        );
-
-        let existingValueId = null;
-        if (listResp.ok) {
-            const listData = await listResp.json();
-            const existing = (listData.customValues || []).find(
-                (cv) => cv.name === 'firm_logo_url'
-            );
-            if (existing) existingValueId = existing.id;
-        }
-
-        if (existingValueId) {
-            // Update existing custom value
-            await fetch(
-                `${GHL_API_BASE}/locations/${locationId}/customValues/${existingValueId}`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Version': GHL_API_VERSION,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name: 'firm_logo_url', value: mediaUrl }),
-                }
-            );
-        } else {
-            // Create new custom value
-            await fetch(
-                `${GHL_API_BASE}/locations/${locationId}/customValues`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Version': GHL_API_VERSION,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name: 'firm_logo_url', value: mediaUrl }),
-                }
-            );
-        }
-
-        console.log('Logo URL stored as custom value for location', locationId);
-
-        return new Response(
-            JSON.stringify({
-                success: true,
-                method: 'media_upload_fallback',
-                message: 'Logo uploaded to CRM media library and stored as custom value',
-                mediaUrl,
-            }),
-            { headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Both methods failed — return the error
+        throw new Error(`Failed to sync branding to CRM (status ${putResp.status}). Please reconnect the CRM integration in Settings.`);
 
     } catch (error) {
         console.error('crm-logo-sync error:', error.message);
