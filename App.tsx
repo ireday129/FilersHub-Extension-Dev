@@ -259,6 +259,7 @@ import InstallSuccess from './components/InstallSuccess';
 
 import { getFirmBySlug } from './services/firms';
 import Login from './components/auth/Login';
+import ResetPassword from './components/auth/ResetPassword';
 import { useGhlContext } from './hooks/useGhlContext';
 
 const AppContent: React.FC = () => {
@@ -271,16 +272,6 @@ const AppContent: React.FC = () => {
   } | null>(null);
   const [isFirmLoading, setIsFirmLoading] = useState(false);
 
-  // Capture GHL iframe params for email pre-fill (no auto-SSO, just convenience)
-  const [iframeEmail, setIframeEmail] = useState<string | null>(null);
-  useEffect(() => {
-    const inIframe = window.self !== window.top;
-    if (inIframe && !user) {
-      const params = new URLSearchParams(window.location.search);
-      const email = params.get('user_email') || params.get('userEmail');
-      if (email) setIframeEmail(email);
-    }
-  }, [user]);
 
   useEffect(() => {
     const handlePathChange = () => {
@@ -365,6 +356,11 @@ const AppContent: React.FC = () => {
     );
   }
 
+  // Password reset page (user is authenticated via recovery token)
+  if (path === '/reset-password') {
+    return <ResetPassword />;
+  }
+
   if (!user) {
     // Dev-only role bypass tool
     if (path === '/dev') {
@@ -387,7 +383,7 @@ const AppContent: React.FC = () => {
     }
 
     // Home page: Staff Login (default landing page)
-    return <StaffLogin ghlContext={isExtension ? ghlContext : null} prefillEmail={iframeEmail} />;
+    return <StaffLogin ghlContext={isExtension ? ghlContext : null} />;
   }
 
   return <AuthenticatedApp />;

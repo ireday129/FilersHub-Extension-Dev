@@ -7,25 +7,16 @@ import { FILERSHUB_LOGO_URL } from '../constants';
 
 interface StaffLoginProps {
     ghlContext?: GhlContext | null;
-    prefillEmail?: string | null;
 }
 
-interface FirmChoice {
-    firm_id: string;
-    firm_name: string;
-    logo_url: string | null;
-}
-
-const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => {
-    const [email, setEmail] = useState(prefillEmail || '');
+const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [crmLoading, setCrmLoading] = useState(false);
-    const [crmError, setCrmError] = useState('');
-    const [showPasswordLogin, setShowPasswordLogin] = useState(!ghlContext);
-    const [firmChoices, setFirmChoices] = useState<FirmChoice[]>([]);
+    const [loginError, setLoginError] = useState('');
     const [magicLinkLoading, setMagicLinkLoading] = useState(false);
     const [magicLinkSent, setMagicLinkSent] = useState(false);
+    const [resetSent, setResetSent] = useState(false);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Magic link won't work in iframes due to third-party storage partitioning
@@ -65,6 +56,7 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+        setLoginError('');
 
         try {
             const { error } = await supabase.auth.signInWithPassword({
@@ -75,62 +67,17 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => 
             if (error) throw error;
         } catch (error: any) {
             console.error('Login error:', error);
-            setCrmError(error.message || 'Failed to sign in');
+            setLoginError(error.message || 'Failed to sign in');
             setIsLoading(false);
-        }
-    };
-
-    const handleCrmLogin = async (overrideFirmId?: string) => {
-        if (!email) {
-            setCrmError('Please enter your email address first.');
-            return;
-        }
-        setCrmError('');
-        setFirmChoices([]);
-        setCrmLoading(true);
-        try {
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-            const payload: Record<string, string> = { action: 'email-lookup', email };
-            if (overrideFirmId) {
-                payload.firmId = overrideFirmId;
-            } else if (ghlContext?.locationId) {
-                payload.locationId = ghlContext.locationId;
-            }
-            const resp = await fetch(`${supabaseUrl}/functions/v1/crm-auth`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const data = await resp.json();
-
-            // Handle multi-firm response
-            if (data.error === 'multiple_firms' && data.firms?.length) {
-                setFirmChoices(data.firms);
-                return;
-            }
-
-            if (!resp.ok) {
-                setCrmError(data.error || 'CRM login failed');
-                return;
-            }
-            const { error } = await supabase.auth.setSession({
-                access_token: data.access_token,
-                refresh_token: data.refresh_token,
-            });
-            if (error) throw error;
-        } catch (err: any) {
-            setCrmError(err.message || 'CRM login failed');
-        } finally {
-            setCrmLoading(false);
         }
     };
 
     const handleMagicLink = async () => {
         if (!email) {
-            setCrmError('Please enter your email address first.');
+            setLoginError('Please enter your email address first.');
             return;
         }
-        setCrmError('');
+        setLoginError('');
         setMagicLinkLoading(true);
         try {
             const { error } = await supabase.auth.signInWithOtp({
@@ -142,9 +89,27 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => 
             if (error) throw error;
             setMagicLinkSent(true);
         } catch (err: any) {
-            setCrmError(err.message || 'Failed to send magic link');
+            setLoginError(err.message || 'Failed to send magic link');
         } finally {
             setMagicLinkLoading(false);
+        }
+    };
+
+    const handleForgotPassword = async () => {
+        if (!email) {
+            setLoginError('Please enter your email address first.');
+            return;
+        }
+        setLoginError('');
+        setResetSent(false);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/reset-password`,
+            });
+            if (error) throw error;
+            setResetSent(true);
+        } catch (err: any) {
+            setLoginError(err.message || 'Failed to send reset email');
         }
     };
 
@@ -179,48 +144,9 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => 
                     </div>
                 )}
 
-                {/* Firm Selector — shown when user belongs to multiple firms */}
-                {firmChoices.length > 0 && (
-                    <div className="p-8 pt-6 space-y-4">
-                        <div className="text-center">
-                            <p className="text-sm font-bold text-slate-700">Select Your Firm</p>
-                            <p className="text-xs text-slate-500 mt-1">Your email is associated with multiple firms.</p>
-                        </div>
-                        <div className="space-y-2">
-                            {firmChoices.map((firm) => (
-                                <button
-                                    key={firm.firm_id}
-                                    type="button"
-                                    onClick={() => handleCrmLogin(firm.firm_id)}
-                                    disabled={crmLoading}
-                                    className="w-full p-3 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl flex items-center gap-3 transition-all text-left"
-                                >
-                                    {firm.logo_url ? (
-                                        <img src={firm.logo_url} alt="" className="w-8 h-8 rounded-lg object-cover" />
-                                    ) : (
-                                        <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-                                            <Building2 className="text-indigo-600" size={16} />
-                                        </div>
-                                    )}
-                                    <span className="text-sm font-semibold text-slate-700">{firm.firm_name}</span>
-                                    <ArrowRight className="ml-auto text-slate-400" size={16} />
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => { setFirmChoices([]); setCrmError(''); }}
-                            className="w-full text-center text-xs text-slate-400 hover:text-slate-600 py-2"
-                        >
-                            Back to login
-                        </button>
-                    </div>
-                )}
-
                 {/* Login Form */}
-                {firmChoices.length === 0 && (
                 <form onSubmit={handleLogin} className="p-8 pt-6 space-y-5">
-                    {/* Email field — always shown */}
+                    {/* Email field */}
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Email Address</label>
                         <div className="relative group">
@@ -236,72 +162,53 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => 
                         </div>
                     </div>
 
-                    {/* GHL detected: CRM login is primary */}
-                    {ghlContext && (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => handleCrmLogin()}
-                                disabled={isLoading || crmLoading}
-                                className="w-full py-3 bg-[#42ab31] hover:bg-[#3d9c2e] text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                            >
-                                {crmLoading ? (
-                                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                                ) : (
-                                    <>
-                                        <Building2 size={18} />
-                                        Sign in with CRM
-                                    </>
-                                )}
-                            </button>
-                            {crmError && (
-                                <p className="text-sm text-red-500 text-center">{crmError}</p>
-                            )}
+                    {/* Password field */}
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Password</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
+                                required
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleForgotPassword}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium mt-1"
+                        >
+                            Forgot password?
+                        </button>
+                    </div>
 
-                            {!showPasswordLogin && (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPasswordLogin(true)}
-                                    className="w-full text-center text-xs text-slate-400 hover:text-slate-600 py-2"
-                                >
-                                    Use password instead
-                                </button>
-                            )}
-                        </>
+                    {/* Reset password sent confirmation */}
+                    {resetSent && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                            <p className="text-sm font-bold text-blue-800">Password reset email sent!</p>
+                            <p className="text-xs text-blue-600 mt-1">Check your inbox for a link to reset your password.</p>
+                        </div>
                     )}
 
-                    {/* Password section: shown by default without GHL, toggleable with GHL */}
-                    {showPasswordLogin && (
-                        <>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Password</label>
-                                <div className="relative group">
-                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
-                                    <input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="••••••••"
-                                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all"
-                                        required={!ghlContext}
-                                    />
-                                </div>
-                            </div>
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 bg-[#42ab31] hover:bg-[#3d9c2e] text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                        {isLoading ? (
+                            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        ) : (
+                            <>
+                                Sign In to Workspace <ArrowRight size={18} />
+                            </>
+                        )}
+                    </button>
 
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full py-3 bg-[#42ab31] hover:bg-[#3d9c2e] text-white font-bold rounded-xl shadow-lg shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4"
-                            >
-                                {isLoading ? (
-                                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                                ) : (
-                                    <>
-                                        Sign In to Workspace <ArrowRight size={18} />
-                                    </>
-                                )}
-                            </button>
-                        </>
+                    {loginError && (
+                        <p className="text-sm text-red-500 text-center">{loginError}</p>
                     )}
 
                     {/* Magic link sent confirmation (not in iframe — storage partitioning prevents cross-tab sessions) */}
@@ -320,8 +227,8 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => 
                         </div>
                     )}
 
-                    {/* No GHL context: alternative login methods */}
-                    {!ghlContext && !magicLinkSent && (
+                    {/* Magic link option — hidden in iframe (third-party storage partitioning) */}
+                    {!inIframe && !magicLinkSent && (
                         <>
                             <div className="relative my-5">
                                 <div className="absolute inset-0 flex items-center">
@@ -332,47 +239,24 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext, prefillEmail }) => 
                                 </div>
                             </div>
 
-                            {/* Magic link — hidden in iframe (third-party storage partitioning) */}
-                            {!inIframe && (
-                                <button
-                                    type="button"
-                                    onClick={handleMagicLink}
-                                    disabled={isLoading || magicLinkLoading}
-                                    className="w-full py-3 bg-white border-2 border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-600 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                                >
-                                    {magicLinkLoading ? (
-                                        <span className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></span>
-                                    ) : (
-                                        <>
-                                            <Send size={16} />
-                                            Email me a login link
-                                        </>
-                                    )}
-                                </button>
-                            )}
-
                             <button
                                 type="button"
-                                onClick={() => handleCrmLogin()}
-                                disabled={isLoading || crmLoading}
-                                className="w-full py-3 bg-white border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                onClick={handleMagicLink}
+                                disabled={isLoading || magicLinkLoading}
+                                className="w-full py-3 bg-white border-2 border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-600 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                             >
-                                {crmLoading ? (
-                                    <span className="w-5 h-5 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></span>
+                                {magicLinkLoading ? (
+                                    <span className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></span>
                                 ) : (
                                     <>
-                                        <Building2 size={18} />
-                                        Sign in with CRM
+                                        <Send size={16} />
+                                        Email me a login link
                                     </>
                                 )}
                             </button>
-                            {crmError && (
-                                <p className="text-sm text-red-500 text-center">{crmError}</p>
-                            )}
                         </>
                     )}
                 </form>
-                )}
 
                 <div className="bg-slate-50 p-4 text-center border-t border-slate-100">
                     <p className="text-xs text-slate-400">
