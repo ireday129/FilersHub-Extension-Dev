@@ -27,6 +27,9 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
     const [magicLinkSent, setMagicLinkSent] = useState(false);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+    // Magic link won't work in iframes due to third-party storage partitioning
+    const inIframe = typeof window !== 'undefined' && window.self !== window.top;
+
     // Poll for session after magic link is sent (handles cross-tab login)
     useEffect(() => {
         if (!magicLinkSent) {
@@ -254,45 +257,14 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                                 <p className="text-sm text-red-500 text-center">{crmError}</p>
                             )}
 
-                            {magicLinkSent && (
-                                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
-                                    <CheckCircle2 className="text-emerald-600 mx-auto" size={24} />
-                                    <p className="text-sm font-bold text-emerald-800">Magic link sent!</p>
-                                    <p className="text-xs text-emerald-600">Check your email and click the link to sign in.</p>
-                                    <button
-                                        type="button"
-                                        onClick={() => setMagicLinkSent(false)}
-                                        className="text-xs text-slate-400 hover:text-slate-600 mt-2"
-                                    >
-                                        Didn't receive it? Try again
-                                    </button>
-                                </div>
-                            )}
-
-                            {!showPasswordLogin && !magicLinkSent && (
-                                <div className="flex items-center justify-center gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={handleMagicLink}
-                                        disabled={magicLinkLoading}
-                                        className="text-xs text-slate-400 hover:text-indigo-600 py-2 flex items-center gap-1"
-                                    >
-                                        {magicLinkLoading ? (
-                                            <span className="w-3 h-3 border border-slate-300 border-t-slate-500 rounded-full animate-spin"></span>
-                                        ) : (
-                                            <Send size={12} />
-                                        )}
-                                        Email me a link
-                                    </button>
-                                    <span className="text-slate-300">|</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPasswordLogin(true)}
-                                        className="text-xs text-slate-400 hover:text-slate-600 py-2"
-                                    >
-                                        Use password instead
-                                    </button>
-                                </div>
+                            {!showPasswordLogin && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPasswordLogin(true)}
+                                    className="w-full text-center text-xs text-slate-400 hover:text-slate-600 py-2"
+                                >
+                                    Use password instead
+                                </button>
                             )}
                         </>
                     )}
@@ -331,8 +303,8 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                         </>
                     )}
 
-                    {/* Magic link sent confirmation */}
-                    {magicLinkSent && (
+                    {/* Magic link sent confirmation (not in iframe — storage partitioning prevents cross-tab sessions) */}
+                    {!inIframe && magicLinkSent && (
                         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
                             <CheckCircle2 className="text-emerald-600 mx-auto" size={24} />
                             <p className="text-sm font-bold text-emerald-800">Magic link sent!</p>
@@ -359,21 +331,24 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ ghlContext }) => {
                                 </div>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={handleMagicLink}
-                                disabled={isLoading || magicLinkLoading}
-                                className="w-full py-3 bg-white border-2 border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-600 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                            >
-                                {magicLinkLoading ? (
-                                    <span className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></span>
-                                ) : (
-                                    <>
-                                        <Send size={16} />
-                                        Email me a login link
-                                    </>
-                                )}
-                            </button>
+                            {/* Magic link — hidden in iframe (third-party storage partitioning) */}
+                            {!inIframe && (
+                                <button
+                                    type="button"
+                                    onClick={handleMagicLink}
+                                    disabled={isLoading || magicLinkLoading}
+                                    className="w-full py-3 bg-white border-2 border-slate-300 text-slate-700 hover:border-indigo-400 hover:text-indigo-600 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                >
+                                    {magicLinkLoading ? (
+                                        <span className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></span>
+                                    ) : (
+                                        <>
+                                            <Send size={16} />
+                                            Email me a login link
+                                        </>
+                                    )}
+                                </button>
+                            )}
 
                             <button
                                 type="button"

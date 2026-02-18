@@ -413,9 +413,20 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <p className="text-sm font-medium">Fetching team from CRM...</p>
                 </div>
               ) : ghlError ? (
-                <div className="p-12 text-center">
+                <div className="p-12 text-center space-y-4">
                   <p className="text-sm text-red-500 font-medium">{ghlError}</p>
-                  <button onClick={fetchGHLUsers} className="mt-4 text-xs font-bold text-brand hover:underline">Try Again</button>
+                  {(ghlError.toLowerCase().includes('token') && ghlError.toLowerCase().includes('expired')) || ghlError.toLowerCase().includes('reconnect') ? (
+                    <a
+                      href={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-auth/init?action=login&firmId=${firmId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors"
+                    >
+                      Reconnect CRM
+                    </a>
+                  ) : (
+                    <button onClick={fetchGHLUsers} className="text-xs font-bold text-brand hover:underline">Try Again</button>
+                  )}
                 </div>
               ) : ghlUsers.length > 0 ? (
                 <table className="w-full text-left border-collapse">
