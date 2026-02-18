@@ -150,7 +150,7 @@ serve(async (req) => {
         // Fetch firm details
         const { data: firmData, error: firmError } = await supabaseAdmin
             .from('firms')
-            .select('ghl_location_id, subscription_tier, name')
+            .select('ghl_location_id, subscription_tier, firm_name')
             .eq('firm_id', firmId)
             .single();
 

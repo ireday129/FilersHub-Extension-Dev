@@ -20,7 +20,7 @@ export default async function handler(req: any, res: any) {
         // Layer 1: Resolve firm by locationId
         const { data: firm, error: firmError } = await supabaseAdmin
             .from('firms')
-            .select('firm_id, name')
+            .select('firm_id, firm_name')
             .eq('ghl_location_id', locationId)
             .maybeSingle();
 
@@ -69,7 +69,7 @@ export default async function handler(req: any, res: any) {
         }
 
         return res.status(200).json({
-            firmName: firm.name,
+            firmName: firm.firm_name,
             stats: {
                 totalClients,
                 totalReturns,
