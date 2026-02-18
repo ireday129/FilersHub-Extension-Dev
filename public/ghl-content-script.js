@@ -91,6 +91,16 @@
       '.hl_navItem[data-id="launchpad"] {',
       '  display: none !important;',
       '}',
+      '',
+      // Hide App Marketplace
+      '#sidebar-v2 .hl_nav-header > nav > a#sb_app-marketplace {',
+      '  display: none !important;',
+      '}',
+      '',
+      // Hide AI Agents
+      '#sidebar-v2 .hl_nav-header > nav > a[id="sb_AI Agents"] {',
+      '  display: none !important;',
+      '}',
     ].join('\n');
     document.head.appendChild(sidebarStyleEl);
 
