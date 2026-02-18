@@ -150,7 +150,7 @@ serve(async (req) => {
         // Fetch firm details
         const { data: firmData, error: firmError } = await supabaseAdmin
             .from('firms')
-            .select('ghl_location_id, subscription_tier, widget_token, name')
+            .select('ghl_location_id, subscription_tier, name')
             .eq('firm_id', firmId)
             .single();
 
@@ -184,24 +184,13 @@ serve(async (req) => {
         }
 
         if (action === 'pin') {
-            // Generate widget_token if not set
-            let widgetToken = firmData.widget_token;
-            if (!widgetToken) {
-                widgetToken = crypto.randomUUID();
-                await supabaseAdmin
-                    .from('firms')
-                    .update({ widget_token: widgetToken })
-                    .eq('firm_id', firmId);
-            }
-
             // Idempotency: check if CML already exists
             const listResp = await ghlCustomMenuRequest('GET', '/custom-menus/', null, agencyApiKey, oauthToken);
             if (listResp.ok) {
                 const listData = await listResp.json();
                 const menus = listData.customMenus || listData.data || [];
                 const existing = menus.find((m: any) =>
-                    m.url?.includes('filershub.com/widget') &&
-                    (m.locationIds?.includes(locationId) || m.showOnAllLocations)
+                    m.url?.includes('filershub.com/widget')
                 );
                 if (existing) {
                     return new Response(
@@ -211,14 +200,14 @@ serve(async (req) => {
                 }
             }
 
-            // Create CML
+            // Create CML — single agency-level link, GHL injects location_id + email dynamically
             const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
             const cmlPayload = {
-                name: firmData.name || 'FilersHub',
-                url: `${appUrl}/widget?token=${widgetToken}&location_id={{location.id}}&email={{user.email}}`,
+                name: 'FilersHub',
+                url: `${appUrl}/widget?location_id={{location.id}}&email={{user.email}}`,
                 openIn: 'iframe',
                 showTo: 'all',
-                locationIds: [locationId],
+                showOnAllLocations: true,
             };
 
             console.log('Creating CML:', JSON.stringify(cmlPayload));
@@ -249,8 +238,7 @@ serve(async (req) => {
             const listData = await listResp.json();
             const menus = listData.customMenus || listData.data || [];
             const existing = menus.find((m: any) =>
-                m.url?.includes('filershub.com/widget') &&
-                (m.locationIds?.includes(locationId) || m.showOnAllLocations)
+                m.url?.includes('filershub.com/widget')
             );
 
             if (existing) {
@@ -261,12 +249,6 @@ serve(async (req) => {
                     throw new Error('Failed to remove sidebar link');
                 }
             }
-
-            // Clear widget token
-            await supabaseAdmin
-                .from('firms')
-                .update({ widget_token: null })
-                .eq('firm_id', firmId);
 
             return new Response(
                 JSON.stringify({ success: true, action: 'unpinned' }),

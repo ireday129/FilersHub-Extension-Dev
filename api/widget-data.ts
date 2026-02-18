@@ -5,10 +5,10 @@ export default async function handler(req: any, res: any) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { token, locationId, email } = req.body;
+    const { locationId, email } = req.body;
 
-    if (!token || !locationId || !email) {
-        return res.status(400).json({ error: 'Missing token, locationId, or email' });
+    if (!locationId || !email) {
+        return res.status(400).json({ error: 'Missing locationId or email' });
     }
 
     try {
@@ -17,11 +17,10 @@ export default async function handler(req: any, res: any) {
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        // Layer 1: Verify widget_token + locationId → resolve firm
+        // Layer 1: Resolve firm by locationId
         const { data: firm, error: firmError } = await supabaseAdmin
             .from('firms')
             .select('firm_id, name')
-            .eq('widget_token', token)
             .eq('ghl_location_id', locationId)
             .maybeSingle();
 

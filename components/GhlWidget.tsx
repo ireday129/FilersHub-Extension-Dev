@@ -35,11 +35,10 @@ const GhlWidget: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
     const locationId = params.get('location_id');
     const email = params.get('email');
 
-    if (!token || !locationId || !email) {
+    if (!locationId || !email) {
       setError('Missing required parameters');
       setLoading(false);
       return;
@@ -48,7 +47,7 @@ const GhlWidget: React.FC = () => {
     fetch('/api/widget-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, locationId, email }),
+      body: JSON.stringify({ locationId, email }),
     })
       .then(async (res) => {
         const json = await res.json();
