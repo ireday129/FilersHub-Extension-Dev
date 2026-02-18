@@ -92,38 +92,39 @@
       '  display: none !important;',
       '}',
       '',
-      // Hide App Marketplace
-      '#sidebar-v2 .hl_nav-header > nav > a#sb_app-marketplace {',
-      '  display: none !important;',
-      '}',
-      '',
-      // Hide AI Agents
-      '#sidebar-v2 .hl_nav-header > nav > a[id="sb_AI Agents"] {',
-      '  display: none !important;',
-      '}',
     ].join('\n');
     document.head.appendChild(sidebarStyleEl);
 
     // CML links use a meta attribute with a UUID, not "filershub" in href.
     // We need JS to find the FilersHub link by its text and pin it to the top.
-    pinFilersHubLink();
+    customizeSidebarLinks();
     startSidebarObserver();
   }
 
-  function pinFilersHubLink() {
+  // Sidebar items to hide (matched by visible text content)
+  var HIDDEN_ITEMS = ['app marketplace', 'ai agents'];
+
+  function customizeSidebarLinks() {
     var nav = document.querySelector('#sidebar-v2 .hl_nav-header > nav');
     if (!nav) return;
 
     var links = nav.querySelectorAll('a');
     for (var i = 0; i < links.length; i++) {
       var link = links[i];
-      // Match by visible text or title/aria-label containing "FilersHub"
-      var text = (link.textContent || '').trim();
-      var title = link.getAttribute('title') || '';
-      if (text.toLowerCase().indexOf('filershub') !== -1 ||
-          title.toLowerCase().indexOf('filershub') !== -1) {
+      var text = (link.textContent || '').trim().toLowerCase();
+      var title = (link.getAttribute('title') || '').toLowerCase();
+
+      // Pin FilersHub CML to the top
+      if (text.indexOf('filershub') !== -1 || title.indexOf('filershub') !== -1) {
         link.style.setProperty('order', '-99', 'important');
-        return; // Found it, done
+      }
+
+      // Hide unwanted sidebar items
+      for (var j = 0; j < HIDDEN_ITEMS.length; j++) {
+        if (text.indexOf(HIDDEN_ITEMS[j]) !== -1 || title.indexOf(HIDDEN_ITEMS[j]) !== -1) {
+          link.style.setProperty('display', 'none', 'important');
+          break;
+        }
       }
     }
   }
@@ -136,7 +137,7 @@
     if (!sidebar) return;
 
     sidebarObserver = new MutationObserver(function () {
-      pinFilersHubLink();
+      customizeSidebarLinks();
     });
     sidebarObserver.observe(sidebar, { childList: true, subtree: true });
   }
