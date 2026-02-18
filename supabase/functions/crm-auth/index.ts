@@ -682,8 +682,8 @@ serve(async (req) => {
             // Always update tokens
             const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString()
 
-            // Update integrations_ghl (for record keeping)
-            await supabaseAdmin.from('integrations_ghl').upsert({
+            // Update integrations_ghl (primary token store)
+            const { error: integUpsertErr } = await supabaseAdmin.from('integrations_ghl').upsert({
                 firm_id: firmId,
                 location_id: tokenData.locationId,
                 access_token: tokenData.access_token,
@@ -694,8 +694,21 @@ serve(async (req) => {
                 updated_at: new Date().toISOString()
             }, { onConflict: 'firm_id' })
 
-            // Update firms table metadata (no tokens — integrations_ghl is source of truth)
+            if (integUpsertErr) {
+                console.error("Failed to upsert integrations_ghl:", integUpsertErr.message, integUpsertErr.code);
+            }
+
+            // Also update firms table with fresh tokens (safety net for fallback reads)
             if (firmId) {
+                const firmTokenUpdate: Record<string, any> = {
+                    ghl_access_token: tokenData.access_token,
+                    ghl_refresh_token: tokenData.refresh_token,
+                    ghl_token_expires_at: expiresAt,
+                };
+                if (tokenData.locationId) {
+                    firmTokenUpdate.ghl_location_id = tokenData.locationId;
+                }
+
                 // Enrich placeholder firm names with real GHL location data
                 const { data: currentFirm } = await supabaseAdmin
                     .from('firms')
@@ -705,13 +718,11 @@ serve(async (req) => {
 
                 if (currentFirm?.firm_name?.startsWith('GHL Location ')) {
                     const locInfo = await fetchLocationInfo(tokenData.locationId, tokenData.access_token);
-                    const firmUpdate: Record<string, any> = {};
-                    if (locInfo.name) firmUpdate.firm_name = locInfo.name;
-                    if (locInfo.logoUrl) firmUpdate.logo_url = locInfo.logoUrl;
-                    if (Object.keys(firmUpdate).length > 0) {
-                        await supabaseAdmin.from('firms').update(firmUpdate).eq('firm_id', firmId);
-                    }
+                    if (locInfo.name) firmTokenUpdate.firm_name = locInfo.name;
+                    if (locInfo.logoUrl) firmTokenUpdate.logo_url = locInfo.logoUrl;
                 }
+
+                await supabaseAdmin.from('firms').update(firmTokenUpdate).eq('firm_id', firmId);
             }
 
             // HANDLE SSO LOGIC

@@ -319,17 +319,26 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           headers: { Authorization: `Bearer ${token}` }
         });
 
+        // Check for explicit error in response body
         if (data?.error) throw new Error(data.error);
-        if (error) throw error;
 
-        setLogoSyncStatus('success');
-        setLogoSyncMessage('Branding synced to CRM');
-      } else {
-        // Brand color is already saved to DB — the GHL sidebar script picks it up automatically
-        setLogoSyncStatus('success');
-        setLogoSyncMessage('Branding synced to CRM');
+        // Handle generic Supabase relay error — check actual response for success
+        if (error) {
+          let actualSuccess = false;
+          try {
+            const body = await error.context?.json();
+            if (body?.success) actualSuccess = true;
+            else if (body?.error) throw new Error(body.error);
+          } catch (parseErr: any) {
+            if (parseErr?.message && parseErr.message !== error.message) throw parseErr;
+          }
+          if (!actualSuccess) throw error;
+        }
       }
+      // Brand color is already saved to DB — the GHL sidebar script picks it up automatically
 
+      setLogoSyncStatus('success');
+      setLogoSyncMessage('Synced to CRM Successfully');
       setTimeout(() => setLogoSyncStatus('idle'), 4000);
     } catch (err: any) {
       console.error('CRM branding sync failed:', err);
