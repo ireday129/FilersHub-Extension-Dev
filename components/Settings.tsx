@@ -780,8 +780,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   <td className={`${isExtension ? 'px-3 py-3' : 'px-6 py-4'}`}>
                     <div className="flex items-center gap-1">
                       <Shield size={14} className="text-brand shrink-0" />
-                      {member.role === UserRole.FirmOwner ? (
-                        <span className="text-sm font-medium text-slate-700">Firm Owner</span>
+                      {member.email?.toLowerCase() === user?.email?.toLowerCase() ? (
+                        <span className="text-sm font-medium text-slate-700">{member.role}</span>
                       ) : (
                         <select
                           value={member.role}
@@ -794,6 +794,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                           }}
                           className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer focus:text-brand"
                         >
+                          <option value={UserRole.FirmOwner}>Firm Owner</option>
                           <option value={UserRole.Manager}>Manager</option>
                           <option value={UserRole.TaxPro}>Tax Pro</option>
                           {isExtension && <option value="__revoke__" className="text-rose-500">Revoke Access</option>}
@@ -803,7 +804,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   </td>
                   {!isExtension && (
                     <td className="px-6 py-4 text-right">
-                      {member.role !== UserRole.FirmOwner && (
+                      {member.email?.toLowerCase() !== user?.email?.toLowerCase() && (
                         <button
                           onClick={() => revokeAccess(member.id)}
                           className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline transition-all"

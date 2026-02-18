@@ -180,17 +180,60 @@ serve(async (req) => {
             let ghlUsers: any[] = [];
             let source = 'database';
 
+            // Helper: fetch all users from GHL (handles pagination, max 100 per page)
+            const fetchGhlUsers = async (token: string, label: string): Promise<any[] | null> => {
+                const allUsers: any[] = [];
+                let skip = 0;
+                const limit = 100;
+                try {
+                    while (true) {
+                        const response = await fetch(
+                            `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}&limit=${limit}&skip=${skip}`,
+                            { headers: { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' } }
+                        );
+                        if (!response.ok) {
+                            console.warn(`GHL API (${label}) failed: ${response.status}`);
+                            return null;
+                        }
+                        const data = await response.json();
+                        const users = data.users || [];
+                        allUsers.push(...users);
+                        console.log(`GHL (${label}): fetched ${users.length} users (skip=${skip}, total so far=${allUsers.length})`);
+                        if (users.length < limit) break; // No more pages
+                        skip += limit;
+                    }
+                    return allUsers;
+                } catch (err) {
+                    console.warn(`GHL API (${label}) error:`, err.message);
+                    return null;
+                }
+            };
+
             // Try agency API key first (never expires)
             const agencyApiKey = Deno.env.get('GHL_AGENCY_API_KEY');
             if (agencyApiKey) {
-                try {
-                    const response = await fetch(
-                        `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}`,
-                        { headers: { 'Authorization': `Bearer ${agencyApiKey}`, 'Version': '2021-07-28' } }
-                    );
-                    if (response.ok) {
-                        const data = await response.json();
-                        ghlUsers = (data.users || []).map((u: any) => ({
+                const rawUsers = await fetchGhlUsers(agencyApiKey, 'agency key');
+                if (rawUsers) {
+                    ghlUsers = rawUsers.map((u: any) => ({
+                        id: u.id,
+                        name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+                        firstName: u.firstName,
+                        lastName: u.lastName,
+                        email: u.email,
+                        role: u.role,
+                        type: u.type,
+                    }));
+                    source = 'ghl_api';
+                }
+            }
+
+            // Fallback: try OAuth token if agency key failed
+            if (source === 'database') {
+                const accessToken = await getAccessToken(supabaseAdmin, firmId);
+                if (accessToken) {
+                    const rawUsers = await fetchGhlUsers(accessToken, 'OAuth token');
+                    if (rawUsers) {
+                        ghlUsers = rawUsers.map((u: any) => ({
                             id: u.id,
                             name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
                             firstName: u.firstName,
@@ -200,42 +243,6 @@ serve(async (req) => {
                             type: u.type,
                         }));
                         source = 'ghl_api';
-                        console.log(`Fetched ${ghlUsers.length} users live from GHL (agency key)`);
-                    } else {
-                        console.warn("GHL API (agency key) failed:", response.status);
-                    }
-                } catch (apiErr) {
-                    console.warn("GHL API (agency key) error:", apiErr.message);
-                }
-            }
-
-            // Fallback: try OAuth token if agency key failed
-            if (source === 'database') {
-                const accessToken = await getAccessToken(supabaseAdmin, firmId);
-                if (accessToken) {
-                    try {
-                        const response = await fetch(
-                            `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}`,
-                            { headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': '2021-07-28' } }
-                        );
-                        if (response.ok) {
-                            const data = await response.json();
-                            ghlUsers = (data.users || []).map((u: any) => ({
-                                id: u.id,
-                                name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-                                firstName: u.firstName,
-                                lastName: u.lastName,
-                                email: u.email,
-                                role: u.role,
-                                type: u.type,
-                            }));
-                            source = 'ghl_api';
-                            console.log(`Fetched ${ghlUsers.length} users live from GHL (OAuth token)`);
-                        } else {
-                            console.warn("GHL API (OAuth) failed:", response.status);
-                        }
-                    } catch (apiErr) {
-                        console.warn("GHL API (OAuth) error:", apiErr.message);
                     }
                 }
             }
