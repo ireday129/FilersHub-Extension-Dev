@@ -337,10 +337,11 @@ Deno.serve(async (req) => {
             }
 
             // 4. Upsert Staff — multi-firm safe
-            const appRole = (role === 'admin' || role === 'owner') ? 'Firm Owner' : 'Tax Pro';
+            // Only the INSTALL event sets Firm Owner. UserCreate/UserUpdate always defaults to Tax Pro.
+            const appRole = 'Tax Pro';
 
             const { data: existingStaff } = await supabaseClient.from('staff')
-                .select('staff_id').eq('email', email).eq('firm_id', firm.firm_id).maybeSingle();
+                .select('staff_id, role').eq('email', email).eq('firm_id', firm.firm_id).maybeSingle();
 
             if (!existingStaff) {
                 const { error: staffError } = await supabaseClient.from('staff').insert({
@@ -355,10 +356,10 @@ Deno.serve(async (req) => {
                 });
                 if (staffError) throw staffError;
             } else {
+                // Keep existing role — don't overwrite Firm Owner or manual role changes
                 const { error: staffError } = await supabaseClient.from('staff').update({
                     auth_user_id: userRecord.id,
                     full_name: name,
-                    role: appRole,
                     is_active: true,
                     ghl_user_id: userId,
                     ghl_location_id: locationId

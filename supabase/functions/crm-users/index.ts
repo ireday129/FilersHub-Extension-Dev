@@ -362,7 +362,7 @@ serve(async (req) => {
                     firm_id: firmId,
                     email: email.toLowerCase(),
                     full_name: name,
-                    role: role || 'Tax Pro',
+                    role: (role && role !== 'Firm Owner') ? role : 'Tax Pro',
                     auth_user_id: userRecord?.id || null,
                     is_active: true,
                     ghl_user_id: ghlUserId || null,
@@ -396,7 +396,29 @@ serve(async (req) => {
             )
         }
 
-        throw new Error('Invalid action. Use ?action=list, ?action=grant, or ?action=revoke')
+        // UPDATE ROLE: Change a staff member's role (admin-only, bypasses RLS)
+        if (action === 'update-role') {
+            const { staffId, role } = body;
+            if (!staffId || !role) throw new Error('staffId and role are required');
+
+            // Prevent setting anyone as Firm Owner through this action
+            if (role === 'Firm Owner') throw new Error('Firm Owner role cannot be assigned manually');
+
+            const { error } = await supabaseAdmin
+                .from('staff')
+                .update({ role })
+                .eq('staff_id', staffId)
+                .eq('firm_id', firmId);
+
+            if (error) throw error;
+
+            return new Response(
+                JSON.stringify({ message: 'Role updated successfully' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
+
+        throw new Error('Invalid action. Use ?action=list, ?action=grant, ?action=revoke, or ?action=update-role')
 
     } catch (error) {
         console.error("crm-users error:", error.message);

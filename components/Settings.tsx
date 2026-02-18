@@ -244,11 +244,23 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const portalUrl = `app.filershub.com/portal/${firmSlug || ''}`;
 
   const handleRoleChange = async (id: string, newRole: UserRole) => {
+    const previousStaff = staff;
     setStaff(prev => prev.map(member =>
       member.id === id ? { ...member, role: newRole } : member
     ));
-    // Persist role change
-    await supabase.from('staff').update({ role: newRole }).eq('staff_id', id);
+    try {
+      const token = await getFreshToken();
+      const { data, error } = await supabase.functions.invoke('crm-users', {
+        body: { action: 'update-role', staffId: id, role: newRole },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (data?.error) throw new Error(data.error);
+      if (error) throw error;
+    } catch (err: any) {
+      console.error('Error updating role:', err);
+      setStaff(previousStaff);
+      alert('Failed to update role: ' + (err?.message || 'Unknown error'));
+    }
   };
 
   const revokeAccess = async (staffId: string) => {
@@ -794,7 +806,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                           }}
                           className="bg-transparent text-sm font-medium text-slate-700 outline-none cursor-pointer focus:text-brand"
                         >
-                          <option value={UserRole.FirmOwner}>Firm Owner</option>
                           <option value={UserRole.Manager}>Manager</option>
                           <option value={UserRole.TaxPro}>Tax Pro</option>
                           {isExtension && <option value="__revoke__" className="text-rose-500">Revoke Access</option>}
