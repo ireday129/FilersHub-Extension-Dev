@@ -17,6 +17,22 @@ import GhlWidget from './components/GhlWidget';
 import Tutorials from './components/Tutorials';
 import CrmAccessPage from './components/CrmAccessPage';
 
+const DASHBOARD_FLOATERS = [
+  { src: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6993c6753b3cc9e7ef06603a.png', style: { top: 40, left: -60, width: 480 }, anim: 'floatA 5s ease-in-out infinite' },
+  { src: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/69948cd064c0d134d507dede.png', style: { top: 10, right: -50, width: 560 }, anim: 'floatB 6s ease-in-out infinite 0.5s' },
+  { src: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6993c7b78ef1b9174835d5e6.png', style: { top: '45%', left: -20, width: 240 }, anim: 'floatC 4.5s ease-in-out infinite 1s' },
+  { src: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/69948d27d614c99d54f2a8db.png', style: { top: '55%', right: -20, width: 360 }, anim: 'floatD 5.5s ease-in-out infinite 0.3s' },
+  { src: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/69948d63d614c96431f2b40f.png', style: { bottom: 60, left: -10, width: 320 }, anim: 'floatE 5s ease-in-out infinite 0.8s' },
+];
+
+const DASHBOARD_KEYFRAMES = `
+@keyframes floatA { 0%, 100% { transform: translateY(0) rotate(-15deg); } 50% { transform: translateY(-12px) rotate(-11deg); } }
+@keyframes floatB { 0%, 100% { transform: translateY(0) rotate(12deg); } 50% { transform: translateY(-14px) rotate(16deg); } }
+@keyframes floatC { 0%, 100% { transform: translateY(0) rotate(-25deg); } 50% { transform: translateY(-9px) rotate(-20deg); } }
+@keyframes floatD { 0%, 100% { transform: translateY(0) rotate(8deg); } 50% { transform: translateY(-11px) rotate(13deg); } }
+@keyframes floatE { 0%, 100% { transform: translateY(0) rotate(-40deg); } 50% { transform: translateY(-10px) rotate(-35deg); } }
+`;
+
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
   const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, availableFirms, selectFirm, staffName } = useFirmData();
@@ -67,6 +83,18 @@ const AuthenticatedApp: React.FC = () => {
       .focus\\:ring-brand:focus { --tw-ring-color: var(--firm-brand); }
     `;
   }, [firmSettings.color]);
+
+  // Inject floating background keyframes (desktop only)
+  useEffect(() => {
+    if (isExtension) return;
+    const id = 'dashboard-float-keyframes';
+    if (!document.getElementById(id)) {
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = DASHBOARD_KEYFRAMES;
+      document.head.appendChild(style);
+    }
+  }, [isExtension]);
 
   const renderContent = () => {
     if (dataLoading) {
@@ -167,7 +195,15 @@ const AuthenticatedApp: React.FC = () => {
   const isSuperAdmin = selectedRole === UserRole.SuperAdmin;
 
   return (
-    <div className={`flex flex-col min-h-screen bg-slate-50 ${isExtension ? 'text-sm overflow-x-hidden max-w-[100vw]' : ''}`}>
+    <div className={`flex flex-col min-h-screen bg-slate-50 ${isExtension ? 'text-sm overflow-x-hidden max-w-[100vw]' : 'overflow-x-hidden'}`}>
+      {!isExtension && DASHBOARD_FLOATERS.map((f, i) => (
+        <img
+          key={i}
+          src={f.src}
+          alt=""
+          style={{ position: 'fixed', pointerEvents: 'none', zIndex: 0, opacity: 0.45, animation: f.anim, ...f.style }}
+        />
+      ))}
       {!isSuperAdmin && (
         <Navbar
           activeTab={activeTab}
@@ -179,7 +215,7 @@ const AuthenticatedApp: React.FC = () => {
         />
       )}
 
-      <main className={`flex-1 overflow-y-auto ${isExtension ? 'p-3' : 'p-4 md:p-8'}`}>
+      <main className={`flex-1 overflow-y-auto ${isExtension ? 'p-3' : 'p-4 md:p-8'}`} style={{ position: 'relative', zIndex: 1 }}>
         <div className="max-w-7xl mx-auto">
           <header className={`${isExtension ? 'mb-4' : 'mb-8'} flex ${isExtension ? 'flex-row items-start justify-between gap-4' : 'flex-col md:flex-row md:items-start justify-between gap-4'}`}>
             <div className="flex-1 min-w-0">
