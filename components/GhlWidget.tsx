@@ -233,7 +233,12 @@ const GhlWidget: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="divide-y divide-slate-100">
+            {!countdown.expired && (
+              <div className="px-4 pb-2">
+                <p className="text-xs text-slate-400 italic">Available after launch day</p>
+              </div>
+            )}
+            <div className="divide-y divide-slate-100" style={!countdown.expired ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
               {ONBOARDING_STEPS.map((step) => {
                 const done = completedSteps.has(step.id);
                 return (
