@@ -661,7 +661,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               <div className="flex items-center gap-2">
                 <Sparkles size={12} className="text-indigo-500" />
                 <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                  Branding syncs to CRM
+                  Branding Syncs to CRM for Pro Users
                 </span>
                 {logoSyncStatus === 'syncing' && (
                   <div className="flex items-center gap-1 text-[10px] text-slate-400">
