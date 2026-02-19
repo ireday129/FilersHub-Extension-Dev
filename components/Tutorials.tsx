@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, ShieldX, Play, Lock, Mail, Zap, X } from 'lucide-react';
+import { Loader2, Play, Lock, Mail, Zap, X } from 'lucide-react';
 
 const FH_GREEN = '#42ab30';
 const FH_ORANGE = '#f69109';
@@ -62,20 +62,18 @@ const PRO_VIDEOS: TutorialVideo[] = [
 ];
 
 const Tutorials: React.FC = () => {
-  const [authorized, setAuthorized] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [tierLoading, setTierLoading] = useState(true);
   const [tier, setTier] = useState<string>('starter');
   const [activeVideo, setActiveVideo] = useState<TutorialVideo | null>(null);
 
+  // Try to detect subscription tier from URL params (optional — page is public)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const locationId = params.get('location_id');
     const email = params.get('email');
 
     if (!locationId || !email) {
-      setError('Missing required parameters');
-      setLoading(false);
+      setTierLoading(false);
       return;
     }
 
@@ -86,12 +84,12 @@ const Tutorials: React.FC = () => {
     })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to load data');
-        setAuthorized(true);
-        if (data.subscriptionTier) setTier(data.subscriptionTier);
+        if (res.ok && data.subscriptionTier) {
+          setTier(data.subscriptionTier);
+        }
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch(() => {})
+      .finally(() => setTierLoading(false));
   }, []);
 
   // Inject keyframe animations
@@ -110,19 +108,10 @@ const Tutorials: React.FC = () => {
 
   const isPro = ['pro', 'growth', 'enterprise'].includes(tier?.toLowerCase());
 
-  if (loading) {
+  if (tierLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: FH_GREEN }} />
-      </div>
-    );
-  }
-
-  if (error || !authorized) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
-        <ShieldX className="w-12 h-12 text-slate-300 mb-3" />
-        <p className="text-sm text-slate-500">Access denied</p>
       </div>
     );
   }
