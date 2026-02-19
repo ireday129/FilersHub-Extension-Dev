@@ -317,6 +317,20 @@ const GhlWidget: React.FC = () => {
           )}
         </div>
 
+        {/* Tutorials Link */}
+        <a
+          href={`/tutorials?${new URLSearchParams(window.location.search).toString()}`}
+          className="flex items-center gap-3 bg-white rounded-xl border border-slate-200 p-4 hover:border-green-300 transition-colors"
+          style={{ ...card, ...fadeIn(3.5), textDecoration: 'none' }}
+        >
+          <Play className="w-5 h-5 shrink-0" style={{ color: FH_GREEN }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-800">Tutorials & Training</p>
+            <p className="text-xs text-slate-500">Watch step-by-step guides to get the most out of FilersHub</p>
+          </div>
+          <Rocket className="w-4 h-4 text-slate-300 shrink-0" />
+        </a>
+
         {/* Support */}
         <div className="flex items-center justify-center gap-2 pt-2 pb-4" style={{ ...card, ...fadeIn(4) }}>
           <Mail className="w-4 h-4 text-slate-400" />
