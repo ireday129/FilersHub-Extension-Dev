@@ -23,6 +23,7 @@ const ONBOARDING_STEPS = [
   { id: 'staff_access', label: 'Grant CRM Staff Access', description: 'Assign Tax Pro or Manager roles to your GHL team members', link: 'https://app.filershub.com/settings/staff' },
   { id: 'first_client', label: 'Add Your First Client', description: 'Create a client record with name, email, and phone', link: 'https://app.filershub.com/clients' },
   { id: 'portal_invite', label: 'Send a Client Portal Invite', description: 'Invite a client so they can access their branded portal', link: 'https://app.filershub.com/clients' },
+  { id: 'chrome_extension', label: 'Install the Chrome Extension', description: 'Access FilersHub directly from your GHL sidebar with one click', link: 'https://chromewebstore.google.com/detail/filershub' },
 ];
 
 function formatRelativeDate(isoDate: string): string {
@@ -289,9 +290,9 @@ const GhlWidget: React.FC = () => {
         </div>
 
         {/* Important Updates */}
-        {updates.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 p-4" style={{ ...card, ...fadeIn(3) }}>
-            <h2 className="text-sm font-semibold text-slate-800 mb-3">Important Updates</h2>
+        <div className="bg-white rounded-xl border border-slate-200 p-4" style={{ ...card, ...fadeIn(3) }}>
+          <h2 className="text-sm font-semibold text-slate-800 mb-3">Important Updates</h2>
+          {updates.length > 0 ? (
             <div className="space-y-3">
               {updates.map((item) => (
                 <div key={item.id} className="flex items-start gap-3">
@@ -311,8 +312,10 @@ const GhlWidget: React.FC = () => {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-slate-400">No updates at this time. Check back soon!</p>
+          )}
+        </div>
 
         {/* Support */}
         <div className="flex items-center justify-center gap-2 pt-2 pb-4" style={{ ...card, ...fadeIn(4) }}>
