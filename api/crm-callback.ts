@@ -191,8 +191,8 @@ export default async function handler(req: any, res: any) {
             }
         }
 
-        // 4. Redirect to Dashboard
-        return res.redirect(302, `https://${process.env.APP_URL || process.env.VERCEL_URL}/`);
+        // 4. Redirect to Install Success page
+        return res.redirect(302, `https://${process.env.APP_URL || process.env.VERCEL_URL}/install-success`);
 
     } catch (error: any) {
         console.error("Handler Error:", error);
