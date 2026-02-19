@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Users, TrendingUp, Loader2, ShieldX, CheckCircle, Circle, Calendar, Sparkles, Mail, Play } from 'lucide-react';
+import { Loader2, ShieldX, CheckCircle, Circle, Calendar, Sparkles, Mail, Play, Rocket, Youtube } from 'lucide-react';
 
 const FH_GREEN = '#42ab30';
 const FH_ORANGE = '#f69109';
@@ -17,29 +17,17 @@ const FLOATERS = [
 
 const ONBOARDING_STEPS = [
   { id: 'firm_profile', label: 'Set Up Firm Profile & Logo', description: 'Add your firm name, address, logo, and contact info', link: 'https://app.filershub.com/settings/firm-profile' },
+  { id: 'brand_color', label: 'Configure Brand Color', description: 'Set the brand color that syncs to your CRM location', link: 'https://app.filershub.com/settings/firm-profile' },
+  { id: 'portal_message', label: 'Set Portal Welcome Message', description: 'Customize the greeting your clients see when they log in', link: 'https://app.filershub.com/settings/firm-profile' },
+  { id: 'portal_url', label: 'Verify Your Portal URL', description: 'Confirm your client portal link is correct and shareable', link: 'https://app.filershub.com/settings/firm-profile' },
+  { id: 'staff_access', label: 'Grant CRM Staff Access', description: 'Assign Tax Pro or Manager roles to your GHL team members', link: 'https://app.filershub.com/settings/staff' },
+  { id: 'first_client', label: 'Add Your First Client', description: 'Create a client record with name, email, and phone', link: 'https://app.filershub.com/clients' },
+  { id: 'portal_invite', label: 'Send a Client Portal Invite', description: 'Invite a client so they can access their branded portal', link: 'https://app.filershub.com/clients' },
 ];
 
 const ANNOUNCEMENTS = [
   { id: '1', type: 'deadline' as const, title: 'Tax Season Deadline', body: 'April 15, 2026 — Individual filing deadline. Extensions must be filed by this date.', date: 'Upcoming' },
   { id: '2', type: 'update' as const, title: 'Welcome to FilersHub Pro!', body: 'Complete your onboarding checklist above to get started. Need help? Reach out anytime.', date: 'Today' },
-];
-
-const STATUS_COLORS: Record<string, string> = {
-  'Intake Received': 'bg-blue-100 text-blue-700',
-  'Compliance Review': 'bg-purple-100 text-purple-700',
-  'In Preparation': 'bg-amber-100 text-amber-700',
-  'Missing Documents': 'bg-red-100 text-red-700',
-  'Ready for Signature': 'bg-teal-100 text-teal-700',
-  'Invoice Sent': 'bg-emerald-100 text-emerald-700',
-  'Bank Product': 'bg-indigo-100 text-indigo-700',
-  'Filed': 'bg-green-100 text-green-700',
-  'Rejected': 'bg-rose-100 text-rose-700',
-  'Accepted': 'bg-sky-100 text-sky-700',
-};
-
-const STATUS_ORDER = [
-  'Intake Received', 'Compliance Review', 'In Preparation', 'Missing Documents',
-  'Ready for Signature', 'Invoice Sent', 'Bank Product', 'Filed', 'Rejected', 'Accepted',
 ];
 
 const WIDGET_KEYFRAMES = `
@@ -51,20 +39,34 @@ const WIDGET_KEYFRAMES = `
 @keyframes floatE { 0%, 100% { transform: translateY(0) rotate(-40deg); } 50% { transform: translateY(-10px) rotate(-35deg); } }
 `;
 
-interface WidgetData {
-  firmName: string;
-  stats: {
-    totalClients: number;
-    totalReturns: number;
-    returnsByStatus: Record<string, number>;
+const LAUNCH_DATE = '2026-04-15T00:00:00';
+
+function useCountdown(targetDate: string) {
+  const calc = () => {
+    const diff = new Date(targetDate).getTime() - Date.now();
+    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
+    return {
+      days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+      hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+      minutes: Math.floor((diff / (1000 * 60)) % 60),
+      seconds: Math.floor((diff / 1000) % 60),
+      expired: false,
+    };
   };
+  const [time, setTime] = useState(calc);
+  useEffect(() => {
+    const id = setInterval(() => setTime(calc), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return time;
 }
 
 const GhlWidget: React.FC = () => {
-  const [data, setData] = useState<WidgetData | null>(null);
+  const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const countdown = useCountdown(LAUNCH_DATE);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -83,9 +85,11 @@ const GhlWidget: React.FC = () => {
       body: JSON.stringify({ locationId, email }),
     })
       .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Failed to load data');
-        setData(json);
+        if (!res.ok) {
+          const json = await res.json();
+          throw new Error(json.error || 'Failed to load data');
+        }
+        setAuthorized(true);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -121,7 +125,7 @@ const GhlWidget: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error || !authorized) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
         <ShieldX className="w-12 h-12 text-slate-300 mb-3" />
@@ -129,11 +133,6 @@ const GhlWidget: React.FC = () => {
       </div>
     );
   }
-
-  if (!data) return null;
-
-  const { stats } = data;
-  const activeReturns = stats.totalReturns - (stats.returnsByStatus['Filed'] || 0) - (stats.returnsByStatus['Accepted'] || 0) - (stats.returnsByStatus['Rejected'] || 0);
 
   const completedCount = completedSteps.size;
   const totalSteps = ONBOARDING_STEPS.length;
@@ -160,10 +159,39 @@ const GhlWidget: React.FC = () => {
       ))}
 
       <div className="max-w-2xl mx-auto space-y-4" style={{ position: 'relative', zIndex: 1 }}>
+        {/* Launch Countdown */}
+        {!countdown.expired && (
+          <div className="rounded-xl px-4 py-3 text-center" style={{ background: `linear-gradient(135deg, ${FH_GREEN}, #2d8a1e)`, ...card, animation: 'fadeIn 0.4s ease-out forwards' }}>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Rocket className="w-4 h-4 text-white" />
+              <span className="text-white text-sm font-semibold">FilersHub Goes Live April 15, 2026</span>
+            </div>
+            <div className="flex items-center justify-center gap-3">
+              {[
+                { val: countdown.days, label: 'Days' },
+                { val: countdown.hours, label: 'Hrs' },
+                { val: countdown.minutes, label: 'Min' },
+                { val: countdown.seconds, label: 'Sec' },
+              ].map((item) => (
+                <div key={item.label} className="flex flex-col items-center">
+                  <span className="text-white text-2xl font-bold leading-none tabular-nums" style={{ minWidth: 40 }}>
+                    {String(item.val).padStart(2, '0')}
+                  </span>
+                  <span className="text-white/70 text-[10px] font-medium mt-0.5">{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center pt-2 pb-2" style={{ animation: 'fadeIn 0.4s ease-out forwards' }}>
           <img src={LOGO_URL} alt="FilersHub" className="h-9 mx-auto mb-3" />
-          <h1 className="text-xl font-bold text-slate-800">Welcome to the FilersHub Pro Launchpad</h1>
+          <h1 className="text-xl font-bold text-slate-800">
+            Welcome to the FilersHub Pro
+            <Sparkles className="inline w-3.5 h-3.5 align-super ml-px mr-0.5" style={{ color: FH_ORANGE }} />
+            {' '}Launchpad
+          </h1>
           <p className="text-sm text-slate-500 mt-1">Your tax practice command center</p>
         </div>
 
@@ -210,9 +238,20 @@ const GhlWidget: React.FC = () => {
         {/* Welcome Video */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden" style={{ ...card, ...fadeIn(2) }}>
           <div className="px-4 pt-4 pb-2">
-            <div className="flex items-center gap-2 mb-2">
-              <Play className="w-4 h-4" />
-              <h2 className="text-sm font-semibold text-slate-800">Getting Started with FilersHub</h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 mb-2">
+                <Play className="w-4 h-4" />
+                <h2 className="text-sm font-semibold text-slate-800">Getting Started with FilersHub</h2>
+              </div>
+              <a
+                href="https://www.youtube.com/@Filers_Hub"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg hover:bg-slate-50 transition-colors"
+                style={{ color: FH_ORANGE }}
+              >
+                <Youtube className="w-[18px] h-[18px]" /> All Videos
+              </a>
             </div>
           </div>
           <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
@@ -227,48 +266,8 @@ const GhlWidget: React.FC = () => {
           </div>
         </div>
 
-        {/* Scorecards */}
-        <div className="grid grid-cols-3 gap-3" style={fadeIn(3)}>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 text-center" style={card}>
-            <Users className="w-5 h-5 mx-auto mb-1" style={{ color: FH_GREEN }} />
-            <p className="text-2xl font-bold text-slate-800">{stats.totalClients}</p>
-            <p className="text-xs text-slate-500">Total Clients</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 text-center" style={card}>
-            <FileText className="w-5 h-5 mx-auto mb-1" style={{ color: FH_GREEN }} />
-            <p className="text-2xl font-bold text-slate-800">{stats.totalReturns}</p>
-            <p className="text-xs text-slate-500">Total Returns</p>
-          </div>
-          <div className="bg-white rounded-xl border border-slate-200 p-4 text-center" style={card}>
-            <TrendingUp className="w-5 h-5 mx-auto mb-1" style={{ color: FH_ORANGE }} />
-            <p className="text-2xl font-bold text-slate-800">{activeReturns}</p>
-            <p className="text-xs text-slate-500">Active Returns</p>
-          </div>
-        </div>
-
-        {/* Returns by Status */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4" style={{ ...card, ...fadeIn(4) }}>
-          <h2 className="text-sm font-medium text-slate-700 mb-3">Returns by Status</h2>
-          {Object.keys(stats.returnsByStatus).length === 0 ? (
-            <p className="text-xs text-slate-400">No returns yet</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {STATUS_ORDER.map((status) => {
-                const count = stats.returnsByStatus[status];
-                if (!count) return null;
-                const colorClass = STATUS_COLORS[status] || 'bg-slate-100 text-slate-700';
-                return (
-                  <span key={status} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${colorClass}`}>
-                    {status} <span className="font-bold">{count}</span>
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
         {/* Announcements & Deadlines */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4" style={{ ...card, ...fadeIn(5) }}>
+        <div className="bg-white rounded-xl border border-slate-200 p-4" style={{ ...card, ...fadeIn(3) }}>
           <h2 className="text-sm font-semibold text-slate-800 mb-3">Announcements & Deadlines</h2>
           <div className="space-y-3">
             {ANNOUNCEMENTS.map((item) => (
@@ -292,7 +291,7 @@ const GhlWidget: React.FC = () => {
         </div>
 
         {/* Support */}
-        <div className="flex items-center justify-center gap-2 pt-2 pb-4" style={{ ...card, ...fadeIn(6) }}>
+        <div className="flex items-center justify-center gap-2 pt-2 pb-4" style={{ ...card, ...fadeIn(4) }}>
           <Mail className="w-4 h-4 text-slate-400" />
           <span className="text-xs text-slate-400">
             Need help?{' '}
