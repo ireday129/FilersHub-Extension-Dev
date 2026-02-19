@@ -340,6 +340,12 @@ const AppContent: React.FC = () => {
     return <InstallSuccess />;
   }
 
+  // Auto-redirect super admins to /super-admin if they land on root
+  if (user?.user_metadata?.is_super_admin === true && path === '/') {
+    window.history.replaceState(null, '', '/super-admin');
+    setPath('/super-admin');
+  }
+
   // Secure Super Admin Dashboard
   if (path === '/super-admin') {
     if (!user) {
