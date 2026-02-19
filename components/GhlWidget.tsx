@@ -20,10 +20,10 @@ const ONBOARDING_STEPS = [
   { id: 'brand_color', label: 'Configure Brand Color', description: 'Set the brand color that syncs to your CRM location', link: 'https://app.filershub.com/settings/firm-profile' },
   { id: 'portal_message', label: 'Set Portal Welcome Message', description: 'Customize the greeting your clients see when they log in', link: 'https://app.filershub.com/settings/firm-profile' },
   { id: 'portal_url', label: 'Verify Your Portal URL', description: 'Confirm your client portal link is correct and shareable', link: 'https://app.filershub.com/settings/firm-profile' },
-  { id: 'staff_access', label: 'Grant CRM Staff Access', description: 'Assign Tax Pro or Manager roles to your GHL team members', link: 'https://app.filershub.com/settings/staff' },
+  { id: 'staff_access', label: 'Grant CRM Staff Access', description: 'Assign Tax Pro or Manager roles to your CRM team members', link: 'https://app.filershub.com/settings/staff' },
   { id: 'first_client', label: 'Add Your First Client', description: 'Create a client record with name, email, and phone', link: 'https://app.filershub.com/clients' },
   { id: 'portal_invite', label: 'Send a Client Portal Invite', description: 'Invite a client so they can access their branded portal', link: 'https://app.filershub.com/clients' },
-  { id: 'chrome_extension', label: 'Install the Chrome Extension', description: 'Access FilersHub directly from your GHL sidebar with one click', link: 'https://chromewebstore.google.com/detail/filershub' },
+  { id: 'chrome_extension', label: 'Install the Chrome Extension', description: 'Access FilersHub directly from your CRM sidebar with one click', link: 'https://chromewebstore.google.com/detail/filershub' },
 ];
 
 function formatRelativeDate(isoDate: string): string {
