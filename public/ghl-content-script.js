@@ -119,6 +119,11 @@
         link.style.setProperty('order', '-99', 'important');
       }
 
+      // Pin Tutorials link right below FilersHub
+      if (text.indexOf('tutorial') !== -1 || title.indexOf('tutorial') !== -1) {
+        link.style.setProperty('order', '-98', 'important');
+      }
+
       // Hide unwanted sidebar items
       for (var j = 0; j < HIDDEN_ITEMS.length; j++) {
         if (text.indexOf(HIDDEN_ITEMS[j]) !== -1 || title.indexOf(HIDDEN_ITEMS[j]) !== -1) {
