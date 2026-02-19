@@ -15,6 +15,7 @@ import { useExtensionMode } from './hooks/useExtensionMode';
 import FirmSelection from './components/FirmSelection';
 import GhlWidget from './components/GhlWidget';
 import Tutorials from './components/Tutorials';
+import CrmAccessPage from './components/CrmAccessPage';
 
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -377,6 +378,14 @@ const AppContent: React.FC = () => {
   // Password reset page (user is authenticated via recovery token)
   if (path === '/reset-password') {
     return <ResetPassword />;
+  }
+
+  // CRM Access Page — auto-login via GHL params or password fallback
+  if (path === '/crm') {
+    if (!user) {
+      return <CrmAccessPage />;
+    }
+    // Already authenticated → fall through to AuthenticatedApp
   }
 
   if (!user) {
