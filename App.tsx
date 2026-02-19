@@ -14,6 +14,7 @@ import { useFirmData } from './hooks/useFirmData';
 import { useExtensionMode } from './hooks/useExtensionMode';
 import FirmSelection from './components/FirmSelection';
 import GhlWidget from './components/GhlWidget';
+import Tutorials from './components/Tutorials';
 
 const AuthenticatedApp: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -319,6 +320,11 @@ const AppContent: React.FC = () => {
   // GHL Dashboard Widget (no auth required — uses widget_token)
   if (path === '/widget') {
     return <GhlWidget />;
+  }
+
+  // GHL Tutorials Page (no auth required — uses widget_token)
+  if (path === '/tutorials') {
+    return <Tutorials />;
   }
 
   if (loading || isFirmLoading || (isExtension && ghlLoading)) {
