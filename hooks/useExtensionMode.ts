@@ -6,6 +6,11 @@ function checkIsCompact(): boolean {
     const isChromeExtension = window.location.protocol === 'chrome-extension:';
     const isExtensionPath = window.location.pathname.startsWith('/extension');
     const isNarrowViewport = window.innerWidth < COMPACT_BREAKPOINT;
+
+    // GHL iframe pages always get the full desktop UI
+    const isGhlPage = window.location.pathname === '/crm';
+    if (isGhlPage) return false;
+
     return isChromeExtension || isExtensionPath || isNarrowViewport;
 }
 
