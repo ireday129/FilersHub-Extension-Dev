@@ -211,7 +211,7 @@ const GhlWidget: React.FC = () => {
         <div className="text-center pt-2 pb-2" style={{ animation: 'fadeIn 0.4s ease-out forwards' }}>
           <img src={LOGO_URL} alt="FilersHub" className="h-9 mx-auto mb-3" />
           <h1 className="text-xl font-bold text-slate-800">
-            Welcome to the FilersHub Pro
+            Welcome to FilersHub
             <Sparkles className="inline w-3.5 h-3.5 align-super ml-px mr-0.5" style={{ color: FH_ORANGE }} />
             {' '}Launchpad
           </h1>
