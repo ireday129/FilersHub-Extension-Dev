@@ -25,10 +25,24 @@ const ONBOARDING_STEPS = [
   { id: 'portal_invite', label: 'Send a Client Portal Invite', description: 'Invite a client so they can access their branded portal', link: 'https://app.filershub.com/clients' },
 ];
 
-const ANNOUNCEMENTS = [
-  { id: '1', type: 'deadline' as const, title: 'Tax Season Deadline', body: 'April 15, 2026 — Individual filing deadline. Extensions must be filed by this date.', date: 'Upcoming' },
-  { id: '2', type: 'update' as const, title: 'Welcome to FilersHub Pro!', body: 'Complete your onboarding checklist above to get started. Need help? Reach out anytime.', date: 'Today' },
-];
+function formatRelativeDate(isoDate: string): string {
+  const now = new Date();
+  const d = new Date(isoDate);
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+interface PlatformUpdate {
+  id: string;
+  type: 'update' | 'deadline';
+  title: string;
+  body: string;
+  date: string;
+}
 
 const WIDGET_KEYFRAMES = `
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -66,6 +80,7 @@ const GhlWidget: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
+  const [updates, setUpdates] = useState<PlatformUpdate[]>([]);
   const countdown = useCountdown(LAUNCH_DATE);
 
   useEffect(() => {
@@ -85,11 +100,18 @@ const GhlWidget: React.FC = () => {
       body: JSON.stringify({ locationId, email }),
     })
       .then(async (res) => {
-        if (!res.ok) {
-          const json = await res.json();
-          throw new Error(json.error || 'Failed to load data');
-        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load data');
         setAuthorized(true);
+        if (data.platformUpdates) {
+          setUpdates(data.platformUpdates.map((u: any) => ({
+            id: u.id,
+            type: u.type,
+            title: u.title,
+            body: u.body,
+            date: formatRelativeDate(u.date),
+          })));
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -266,29 +288,31 @@ const GhlWidget: React.FC = () => {
           </div>
         </div>
 
-        {/* Announcements & Deadlines */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4" style={{ ...card, ...fadeIn(3) }}>
-          <h2 className="text-sm font-semibold text-slate-800 mb-3">Announcements & Deadlines</h2>
-          <div className="space-y-3">
-            {ANNOUNCEMENTS.map((item) => (
-              <div key={item.id} className="flex items-start gap-3">
-                {item.type === 'deadline'
-                  ? <Calendar className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                  : <Sparkles className="w-4 h-4 shrink-0 mt-0.5" style={{ color: FH_ORANGE }} />
-                }
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-slate-800">{item.title}</p>
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${item.type === 'deadline' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'}`}>
-                      {item.date}
-                    </span>
+        {/* Important Updates */}
+        {updates.length > 0 && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4" style={{ ...card, ...fadeIn(3) }}>
+            <h2 className="text-sm font-semibold text-slate-800 mb-3">Important Updates</h2>
+            <div className="space-y-3">
+              {updates.map((item) => (
+                <div key={item.id} className="flex items-start gap-3">
+                  {item.type === 'deadline'
+                    ? <Calendar className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    : <Sparkles className="w-4 h-4 shrink-0 mt-0.5" style={{ color: FH_ORANGE }} />
+                  }
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-slate-800">{item.title}</p>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${item.type === 'deadline' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'}`}>
+                        {item.date}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">{item.body}</p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{item.body}</p>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Support */}
         <div className="flex items-center justify-center gap-2 pt-2 pb-4" style={{ ...card, ...fadeIn(4) }}>

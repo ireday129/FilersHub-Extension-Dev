@@ -13,7 +13,13 @@ import {
   X,
   Minus,
   Plus,
-  Zap
+  Zap,
+  Megaphone,
+  Trash2,
+  Edit3,
+  Eye,
+  EyeOff,
+  PlusCircle
 } from 'lucide-react';
 import { Firm } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,6 +36,22 @@ const SuperAdminDashboard: React.FC = () => {
   const [editValue, setEditValue] = useState(10);
   const [saving, setSaving] = useState(false);
   const logoUrl = FILERSHUB_LOGO_URL;
+
+  // Platform Updates state
+  interface PlatformUpdate {
+    update_id: string;
+    type: 'update' | 'deadline';
+    title: string;
+    body: string;
+    is_active: boolean;
+    created_at: string;
+  }
+  const [updates, setUpdates] = useState<PlatformUpdate[]>([]);
+  const [updatesLoading, setUpdatesLoading] = useState(true);
+  const [newUpdate, setNewUpdate] = useState(false);
+  const [editingUpdate, setEditingUpdate] = useState<string | null>(null);
+  const [updateForm, setUpdateForm] = useState({ type: 'update' as 'update' | 'deadline', title: '', body: '' });
+  const [savingUpdate, setSavingUpdate] = useState(false);
 
   // Map DB tier values to display tier
   const normalizeTier = (dbTier: string): 'Core' | 'Pro' => {
@@ -126,6 +148,101 @@ const SuperAdminDashboard: React.FC = () => {
     }
   };
 
+  // Fetch platform updates
+  useEffect(() => {
+    const fetchUpdates = async () => {
+      setUpdatesLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('platform_updates')
+          .select('update_id, type, title, body, is_active, created_at')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setUpdates(data || []);
+      } catch (err) {
+        console.error('Error fetching platform updates:', err);
+      } finally {
+        setUpdatesLoading(false);
+      }
+    };
+
+    fetchUpdates();
+  }, []);
+
+  const handleCreateUpdate = async () => {
+    if (!updateForm.title.trim() || !updateForm.body.trim()) return;
+    setSavingUpdate(true);
+    try {
+      const { data, error } = await supabase
+        .from('platform_updates')
+        .insert({ type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim() })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setUpdates(prev => [data, ...prev]);
+      setNewUpdate(false);
+      setUpdateForm({ type: 'update', title: '', body: '' });
+    } catch (err) {
+      console.error('Error creating update:', err);
+    } finally {
+      setSavingUpdate(false);
+    }
+  };
+
+  const handleSaveUpdate = async (updateId: string) => {
+    if (!updateForm.title.trim() || !updateForm.body.trim()) return;
+    setSavingUpdate(true);
+    try {
+      const { error } = await supabase
+        .from('platform_updates')
+        .update({ type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim(), updated_at: new Date().toISOString() })
+        .eq('update_id', updateId);
+
+      if (error) throw error;
+      setUpdates(prev => prev.map(u =>
+        u.update_id === updateId ? { ...u, type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim() } : u
+      ));
+      setEditingUpdate(null);
+      setUpdateForm({ type: 'update', title: '', body: '' });
+    } catch (err) {
+      console.error('Error updating update:', err);
+    } finally {
+      setSavingUpdate(false);
+    }
+  };
+
+  const handleToggleActive = async (updateId: string, currentActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('platform_updates')
+        .update({ is_active: !currentActive, updated_at: new Date().toISOString() })
+        .eq('update_id', updateId);
+
+      if (error) throw error;
+      setUpdates(prev => prev.map(u =>
+        u.update_id === updateId ? { ...u, is_active: !currentActive } : u
+      ));
+    } catch (err) {
+      console.error('Error toggling update:', err);
+    }
+  };
+
+  const handleDeleteUpdate = async (updateId: string) => {
+    try {
+      const { error } = await supabase
+        .from('platform_updates')
+        .delete()
+        .eq('update_id', updateId);
+
+      if (error) throw error;
+      setUpdates(prev => prev.filter(u => u.update_id !== updateId));
+    } catch (err) {
+      console.error('Error deleting update:', err);
+    }
+  };
+
   const filteredFirms = useMemo(() => {
     return firms.filter(f => {
       const matchesSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -199,6 +316,181 @@ const SuperAdminDashboard: React.FC = () => {
               <TrendingUp size={16} />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Platform Updates Management */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
+              <Megaphone size={16} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Important Updates</h2>
+              <p className="text-xs text-slate-400">Manage announcements visible in the GHL widget</p>
+            </div>
+          </div>
+          {!newUpdate && (
+            <button
+              onClick={() => { setNewUpdate(true); setEditingUpdate(null); setUpdateForm({ type: 'update', title: '', body: '' }); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors"
+            >
+              <PlusCircle size={14} />
+              New Update
+            </button>
+          )}
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {/* New Update Form */}
+          {newUpdate && (
+            <div className="p-4 bg-violet-50/50">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <select
+                    value={updateForm.type}
+                    onChange={(e) => setUpdateForm(prev => ({ ...prev, type: e.target.value as 'update' | 'deadline' }))}
+                    className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500"
+                  >
+                    <option value="update">Update</option>
+                    <option value="deadline">Deadline</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Title"
+                    value={updateForm.title}
+                    onChange={(e) => setUpdateForm(prev => ({ ...prev, title: e.target.value }))}
+                    className="flex-1 px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+                <textarea
+                  placeholder="Body text..."
+                  value={updateForm.body}
+                  onChange={(e) => setUpdateForm(prev => ({ ...prev, body: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                />
+                <div className="flex items-center gap-2 justify-end">
+                  <button
+                    onClick={() => { setNewUpdate(false); setUpdateForm({ type: 'update', title: '', body: '' }); }}
+                    className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateUpdate}
+                    disabled={savingUpdate || !updateForm.title.trim() || !updateForm.body.trim()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors"
+                  >
+                    {savingUpdate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                    Publish
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Updates List */}
+          {updatesLoading ? (
+            <div className="px-6 py-12 text-center">
+              <Loader2 size={20} className="animate-spin text-slate-300 mx-auto mb-2" />
+              <p className="text-xs text-slate-400">Loading updates...</p>
+            </div>
+          ) : updates.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <Megaphone size={24} className="text-slate-200 mx-auto mb-2" />
+              <p className="text-xs text-slate-400">No updates yet. Create your first one above.</p>
+            </div>
+          ) : updates.map(u => (
+            <div key={u.update_id} className={`p-4 ${!u.is_active ? 'opacity-50' : ''}`}>
+              {editingUpdate === u.update_id ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={updateForm.type}
+                      onChange={(e) => setUpdateForm(prev => ({ ...prev, type: e.target.value as 'update' | 'deadline' }))}
+                      className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500"
+                    >
+                      <option value="update">Update</option>
+                      <option value="deadline">Deadline</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={updateForm.title}
+                      onChange={(e) => setUpdateForm(prev => ({ ...prev, title: e.target.value }))}
+                      className="flex-1 px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                  <textarea
+                    value={updateForm.body}
+                    onChange={(e) => setUpdateForm(prev => ({ ...prev, body: e.target.value }))}
+                    rows={2}
+                    className="w-full px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                  />
+                  <div className="flex items-center gap-2 justify-end">
+                    <button
+                      onClick={() => { setEditingUpdate(null); setUpdateForm({ type: 'update', title: '', body: '' }); }}
+                      className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSaveUpdate(u.update_id)}
+                      disabled={savingUpdate || !updateForm.title.trim() || !updateForm.body.trim()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors"
+                    >
+                      {savingUpdate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-1.5 py-0.5 text-[10px] font-black uppercase rounded ${
+                        u.type === 'deadline' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
+                      }`}>
+                        {u.type}
+                      </span>
+                      <span className="text-sm font-bold text-slate-800">{u.title}</span>
+                      {!u.is_active && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-black uppercase rounded bg-slate-100 text-slate-400">Hidden</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 line-clamp-1">{u.body}</p>
+                    <p className="text-[10px] text-slate-300 mt-1">
+                      {new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleToggleActive(u.update_id, u.is_active)}
+                      className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                      title={u.is_active ? 'Hide from widget' : 'Show on widget'}
+                    >
+                      {u.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
+                    </button>
+                    <button
+                      onClick={() => { setEditingUpdate(u.update_id); setNewUpdate(false); setUpdateForm({ type: u.type, title: u.title, body: u.body }); }}
+                      className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Edit3 size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUpdate(u.update_id)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

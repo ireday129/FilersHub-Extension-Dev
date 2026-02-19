@@ -45,8 +45,8 @@ export default async function handler(req: any, res: any) {
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        // Layer 3: Fetch stats scoped to this firm
-        const [clientsResult, returnsResult] = await Promise.all([
+        // Layer 3: Fetch stats + platform updates
+        const [clientsResult, returnsResult, updatesResult] = await Promise.all([
             supabaseAdmin
                 .from('clients')
                 .select('client_id', { count: 'exact', head: true })
@@ -55,6 +55,12 @@ export default async function handler(req: any, res: any) {
                 .from('tax_returns')
                 .select('status')
                 .eq('firm_id', firmId),
+            supabaseAdmin
+                .from('platform_updates')
+                .select('update_id, type, title, body, created_at')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(10),
         ]);
 
         const totalClients = clientsResult.count || 0;
@@ -68,6 +74,14 @@ export default async function handler(req: any, res: any) {
             returnsByStatus[status] = (returnsByStatus[status] || 0) + 1;
         }
 
+        const platformUpdates = (updatesResult.data || []).map((u: any) => ({
+            id: u.update_id,
+            type: u.type,
+            title: u.title,
+            body: u.body,
+            date: u.created_at,
+        }));
+
         return res.status(200).json({
             firmName: firm.firm_name,
             stats: {
@@ -75,6 +89,7 @@ export default async function handler(req: any, res: any) {
                 totalReturns,
                 returnsByStatus,
             },
+            platformUpdates,
         });
     } catch (err: any) {
         console.error('Widget data error:', err);
