@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, ShieldX } from 'lucide-react';
 import { WatermarkBackground } from './WatermarkBackground';
 import { supabase } from '../services/supabase';
 import { FILERSHUB_LOGO_URL } from '../constants';
@@ -9,6 +9,7 @@ type AutoLoginStatus = 'idle' | 'loading' | 'success' | 'error';
 const CrmAccessPage: React.FC = () => {
     const [autoLoginStatus, setAutoLoginStatus] = useState<AutoLoginStatus>('idle');
     const [autoLoginError, setAutoLoginError] = useState<string | null>(null);
+    const [accessDenied, setAccessDenied] = useState(false);
     const [showPasswordFallback, setShowPasswordFallback] = useState(false);
 
     const [email, setEmail] = useState('');
@@ -43,6 +44,11 @@ const CrmAccessPage: React.FC = () => {
             const data = await response.json();
 
             if (!response.ok) {
+                if (response.status === 403 && (data.code === 'LOCATION_NOT_FOUND' || data.code === 'STAFF_NOT_FOUND')) {
+                    setAccessDenied(true);
+                    setAutoLoginStatus('error');
+                    return;
+                }
                 throw new Error(data.error || 'Auto-login failed');
             }
 
@@ -93,6 +99,16 @@ const CrmAccessPage: React.FC = () => {
             setLoginError(err.message || 'Failed to send reset email');
         }
     };
+
+    // Access denied — location not installed or staff not found
+    if (accessDenied) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
+                <ShieldX className="w-12 h-12 text-slate-300 mb-3" />
+                <p className="text-sm text-slate-500">Access denied</p>
+            </div>
+        );
+    }
 
     // Loading state during auto-login
     if (autoLoginStatus === 'loading' || autoLoginStatus === 'success') {

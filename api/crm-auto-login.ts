@@ -26,7 +26,7 @@ export default async function handler(req: any, res: any) {
 
         if (firmError) throw new Error(`Firm lookup failed: ${firmError.message}`);
         if (!firm) {
-            return res.status(403).json({ error: 'Access denied' });
+            return res.status(403).json({ error: 'Access denied', code: 'LOCATION_NOT_FOUND' });
         }
 
         // Layer 2: Verify email is active staff for this firm
@@ -40,7 +40,7 @@ export default async function handler(req: any, res: any) {
 
         if (staffError) throw new Error(`Staff lookup failed: ${staffError.message}`);
         if (!staffMember) {
-            return res.status(403).json({ error: 'Access denied' });
+            return res.status(403).json({ error: 'Access denied', code: 'STAFF_NOT_FOUND' });
         }
 
         // Layer 3: Generate magic link token hash (no email sent)
