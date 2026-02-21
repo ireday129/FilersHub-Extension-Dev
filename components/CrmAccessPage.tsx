@@ -6,7 +6,12 @@ import { FILERSHUB_LOGO_URL } from '../constants';
 
 type AutoLoginStatus = 'idle' | 'loading' | 'success' | 'error';
 
-const CrmAccessPage: React.FC = () => {
+interface CrmAccessPageProps {
+    isAuthenticated?: boolean;
+    onValidated?: (firmId: string) => void;
+}
+
+const CrmAccessPage: React.FC<CrmAccessPageProps> = ({ isAuthenticated, onValidated }) => {
     const [autoLoginStatus, setAutoLoginStatus] = useState<AutoLoginStatus>('idle');
     const [autoLoginError, setAutoLoginError] = useState<string | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
@@ -29,8 +34,47 @@ const CrmAccessPage: React.FC = () => {
         }
 
         setEmail(emailParam);
-        attemptAutoLogin(locationId, emailParam);
+
+        if (isAuthenticated) {
+            // Already logged in — just validate the location
+            validateLocation(locationId, emailParam);
+        } else {
+            // Not logged in — auto-login flow
+            attemptAutoLogin(locationId, emailParam);
+        }
     }, []);
+
+    const validateLocation = async (locationId: string, userEmail: string) => {
+        setAutoLoginStatus('loading');
+        try {
+            const response = await fetch('/api/crm-validate-location', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ locationId, email: userEmail }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                if (response.status === 403 && (data.code === 'LOCATION_NOT_FOUND' || data.code === 'STAFF_NOT_FOUND')) {
+                    setAccessDenied(true);
+                    setAutoLoginStatus('error');
+                    return;
+                }
+                throw new Error(data.error || 'Validation failed');
+            }
+
+            // Location valid — pass firm_id up
+            if (onValidated && data.firm_id) {
+                onValidated(data.firm_id);
+            }
+            setAutoLoginStatus('success');
+        } catch (err: any) {
+            console.error('CRM location validation failed:', err);
+            setAccessDenied(true);
+            setAutoLoginStatus('error');
+        }
+    };
 
     const attemptAutoLogin = async (locationId: string, userEmail: string) => {
         setAutoLoginStatus('loading');
@@ -110,7 +154,7 @@ const CrmAccessPage: React.FC = () => {
         );
     }
 
-    // Loading state during auto-login
+    // Loading state during auto-login or validation
     if (autoLoginStatus === 'loading' || autoLoginStatus === 'success') {
         return (
             <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -119,7 +163,9 @@ const CrmAccessPage: React.FC = () => {
                     <img src={FILERSHUB_LOGO_URL} alt="FilersHub" className="h-10 mx-auto mb-6" />
                     <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" style={{ color: '#42ab31' }} />
                     <p className="text-sm text-slate-500 font-medium">
-                        {autoLoginStatus === 'loading' ? 'Signing you in...' : 'Loading your workspace...'}
+                        {autoLoginStatus === 'loading'
+                            ? (isAuthenticated ? 'Verifying access...' : 'Signing you in...')
+                            : 'Loading your workspace...'}
                     </p>
                 </div>
             </div>

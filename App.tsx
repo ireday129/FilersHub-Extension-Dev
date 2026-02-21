@@ -33,7 +33,7 @@ const DASHBOARD_KEYFRAMES = `
 @keyframes floatE { 0%, 100% { transform: translateY(0) rotate(-40deg); } 50% { transform: translateY(-10px) rotate(-35deg); } }
 `;
 
-const AuthenticatedApp: React.FC = () => {
+const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFirmId }) => {
   const { user, signOut } = useAuth();
   const { returns, setReturns, loading: dataLoading, refresh, firmId, firmSettings, setFirmSettings, availableFirms, selectFirm, staffName } = useFirmData();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
@@ -41,6 +41,16 @@ const AuthenticatedApp: React.FC = () => {
   const [selectedReturnId, setSelectedReturnId] = useState<string | null>(null);
 
   const { isExtension } = useExtensionMode();
+
+  // Auto-select the target firm when coming from /crm with a specific location
+  useEffect(() => {
+    if (targetFirmId && availableFirms.length > 0 && firmId !== targetFirmId) {
+      const match = availableFirms.find(f => f.id === targetFirmId);
+      if (match) {
+        selectFirm(targetFirmId);
+      }
+    }
+  }, [targetFirmId, availableFirms, firmId]);
 
   // Determine role: URL path takes priority, then user metadata, then first available firm
   useEffect(() => {
@@ -310,7 +320,21 @@ const AppContent: React.FC = () => {
     firm_id: string; name: string; logo: string; color: string; portalMessage: string;
   } | null>(null);
   const [isFirmLoading, setIsFirmLoading] = useState(false);
+  const [crmFirmId, setCrmFirmId] = useState<string | null>(null);
+  const [crmValidated, setCrmValidated] = useState(false);
 
+  // Reset CRM validation when URL search params change (user toggles GHL location)
+  useEffect(() => {
+    const currentSearch = window.location.search;
+    const handleLocationChange = () => {
+      if (window.location.search !== currentSearch) {
+        setCrmValidated(false);
+        setCrmFirmId(null);
+      }
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
 
   useEffect(() => {
     const handlePathChange = () => {
@@ -416,12 +440,24 @@ const AppContent: React.FC = () => {
     return <ResetPassword />;
   }
 
-  // CRM Access Page — auto-login via GHL params or password fallback
+  // CRM Access Page — always validate location, even when authenticated
   if (path === '/crm') {
     if (!user) {
       return <CrmAccessPage />;
     }
-    // Already authenticated → fall through to AuthenticatedApp
+    // Authenticated but not yet validated for this location
+    if (!crmValidated) {
+      return (
+        <CrmAccessPage
+          isAuthenticated
+          onValidated={(firmId) => {
+            setCrmFirmId(firmId);
+            setCrmValidated(true);
+          }}
+        />
+      );
+    }
+    // Validated — fall through to AuthenticatedApp with targetFirmId
   }
 
   if (!user) {
@@ -449,7 +485,7 @@ const AppContent: React.FC = () => {
     return <StaffLogin ghlContext={isExtension ? ghlContext : null} />;
   }
 
-  return <AuthenticatedApp />;
+  return <AuthenticatedApp targetFirmId={crmFirmId} />;
 };
 
 const App: React.FC = () => {
