@@ -16,6 +16,7 @@ CREATE TABLE firms (
   ghl_token_expires_at TIMESTAMP WITH TIME ZONE, -- Token Expiry
   ghl_custom_field_group TEXT DEFAULT 'FilersHub',
   ghl_custom_field_name TEXT DEFAULT 'Return Status',
+  ghl_alert_webhook_url TEXT, -- Inbound Webhook for IRS Alerts Workflow
   
   -- Subscription
   subscription_tier TEXT DEFAULT 'starter',

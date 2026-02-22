@@ -33,6 +33,8 @@ interface SettingsProps {
     color: string;
     slug?: string;
     portalMessage?: string;
+    irsAlertsEnabled?: boolean;
+    ghlAlertWebhookUrl?: string | null;
   };
   setFirmSettings: React.Dispatch<React.SetStateAction<{
     name: string;
@@ -40,6 +42,7 @@ interface SettingsProps {
     color: string;
     slug?: string;
     portalMessage?: string;
+    ghlAlertWebhookUrl?: string | null;
   }>>;
   firmId: string | null;
 }
@@ -442,6 +445,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           brand_color: localSettings.color,
           slug: firmSlug,
           portal_message: localSettings.portalMessage || null,
+          ghl_alert_webhook_url: localSettings.ghlAlertWebhookUrl || null,
           updated_at: new Date().toISOString()
         })
         .eq('firm_id', firmId);
@@ -992,6 +996,30 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               >
                 Connect to IRS e-Services
               </button>
+            </div>
+          )}
+
+          {/* GHL Webhook URL Configuration */}
+          {firmSettings.irsAlertsEnabled && (
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <div className="flex items-start gap-3 mb-3">
+                <Globe className="text-slate-400 mt-1" size={18} />
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">GHL Workflow Webhook (Optional)</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                    Paste a GoHighLevel Inbound Webhook URL here. We will send a POST request with the transcript code data to this URL whenever an IRS Alert is triggered, allowing you to use GHL workflows to send email or SMS notifications.
+                  </p>
+                </div>
+              </div>
+              <div className="ml-7 flex max-w-3xl items-center gap-3">
+                <input
+                  type="url"
+                  placeholder="https://services.leadconnectorhq.com/hooks/..."
+                  value={localSettings.ghlAlertWebhookUrl || ''}
+                  onChange={(e) => setLocalSettings(prev => ({ ...prev, ghlAlertWebhookUrl: e.target.value }))}
+                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
             </div>
           )}
         </div>

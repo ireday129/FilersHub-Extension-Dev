@@ -220,6 +220,7 @@ export interface FirmOption {
   slug: string;
   isStaff: boolean;
   irsAlertsEnabled: boolean;
+  ghlAlertWebhookUrl?: string | null;
   staffName?: string;
   portalMessage?: string;
 }
