@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useFirmData } from '../hooks/useFirmData';
 import { Users, Search, ShieldAlert, CheckCircle2, Shield, Loader2 } from 'lucide-react';
 
-interface GhlContact {
+interface CrmContact {
     id: string;
     name: string;
     email: string;
@@ -12,7 +12,7 @@ interface GhlContact {
     tinType: 'SSN' | 'EIN' | 'UNKNOWN';
 }
 
-interface MonitoredClient extends GhlContact {
+interface MonitoredClient extends CrmContact {
     monitored_id?: string;
     isMonitored: boolean;
     lastPolledAt?: string;
@@ -26,7 +26,7 @@ export default function ClientsMonitor() {
     const [searchTerm, setSearchTerm] = useState('');
     const [syncing, setSyncing] = useState(false);
 
-    // We need to fetch GHL contacts that have a TIN Custom field, and join them with 'monitored_clients'
+    // We need to fetch CRM contacts that have a TIN Custom field, and join them with 'monitored_clients'
     const loadClients = async () => {
         if (!user || !firmId) return;
         setLoading(true);
@@ -39,15 +39,15 @@ export default function ClientsMonitor() {
 
             const monitoredMap = new Map((dbMonitored || []).map(m => [m.ghl_contact_id, m]));
 
-            // 2. We mock the GHL fetch for now until backend integration is finalized.
+            // 2. We mock the CRM fetch for now until backend integration is finalized.
             // In production, we'd call an edge function that lists contacts with the contact.tin field.
-            const mockGhlContacts: GhlContact[] = [
+            const mockCrmContacts: CrmContact[] = [
                 { id: 'contact_1', name: 'Acme Corp', email: 'billing@acme.com', tin: 'XX-XXX1234', tinType: 'EIN' },
                 { id: 'contact_2', name: 'John Doe', email: 'john@example.com', tin: 'XXX-XX-5678', tinType: 'SSN' },
                 { id: 'contact_3', name: 'Jane Smith', email: 'jane@example.com', tin: 'XXX-XX-9012', tinType: 'SSN' },
             ];
 
-            const merged: MonitoredClient[] = mockGhlContacts.map(c => {
+            const merged: MonitoredClient[] = mockCrmContacts.map(c => {
                 const dbInfo = monitoredMap.get(c.id);
                 return {
                     ...c,
@@ -106,7 +106,7 @@ export default function ClientsMonitor() {
         }
     };
 
-    const syncGhlContacts = async () => {
+    const syncCrmContacts = async () => {
         setSyncing(true);
         // Mock sync delay
         await new Promise(r => setTimeout(r, 1500));
@@ -130,12 +130,12 @@ export default function ClientsMonitor() {
                     <p className="text-sm text-slate-500 mt-1">Select which CRM contacts to actively monitor for IRS transcript updates.</p>
                 </div>
                 <button
-                    onClick={syncGhlContacts}
+                    onClick={syncCrmContacts}
                     disabled={syncing}
                     className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center gap-2"
                 >
                     {syncing ? <Loader2 size={16} className="animate-spin" /> : <Users size={16} />}
-                    {syncing ? 'Syncing...' : 'Sync GHL Contacts'}
+                    {syncing ? 'Syncing...' : 'Sync CRM Contacts'}
                 </button>
             </div>
 
@@ -163,7 +163,7 @@ export default function ClientsMonitor() {
                         <ShieldAlert size={48} className="mx-auto text-slate-300 mb-4" />
                         <p className="text-lg font-bold text-slate-700">No Eligible Clients Found</p>
                         <p className="max-w-md mx-auto mt-2 text-sm">
-                            We only show GHL contacts that have a valid SSN or EIN in the designated <code>contact.tin</code> custom field. Update your CRM contacts and sync again.
+                            We only show CRM contacts that have a valid SSN or EIN in the designated <code>contact.tin</code> custom field. Update your CRM contacts and sync again.
                         </p>
                     </div>
                 ) : (
