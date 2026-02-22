@@ -224,6 +224,7 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
           role={selectedRole || UserRole.FirmOwner}
           firmName={firmSettings.name}
           firmLogo={firmSettings.logo}
+          irsAlertsEnabled={firmSettings.irsAlertsEnabled}
           compact={isExtension}
         />
       )}

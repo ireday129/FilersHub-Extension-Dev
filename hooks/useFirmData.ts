@@ -20,7 +20,8 @@ export const useFirmData = () => {
         logo: '',
         color: '',
         slug: '',
-        portalMessage: ''
+        portalMessage: '',
+        irsAlertsEnabled: false
     });
 
     const fetchData = useCallback(async () => {
@@ -120,7 +121,8 @@ export const useFirmData = () => {
                             logo: '',
                             brandColor: '',
                             slug: '',
-                            isStaff: true
+                            isStaff: true,
+                            irsAlertsEnabled: false
                         });
                     }
                 }
@@ -137,7 +139,8 @@ export const useFirmData = () => {
                             logo: '',
                             brandColor: '',
                             slug: '',
-                            isStaff: false
+                            isStaff: false,
+                            irsAlertsEnabled: false
                         });
                     }
                 }
@@ -164,7 +167,7 @@ export const useFirmData = () => {
             const firmIds = Array.from(allFirmsMap.keys());
             const { data: firmsDetails, error: firmsError } = await supabase
                 .from('firms')
-                .select('firm_id, firm_name, logo_url, brand_color, slug, portal_message')
+                .select('firm_id, firm_name, logo_url, brand_color, slug, portal_message, irs_alerts_enabled')
                 .in('firm_id', firmIds);
 
             if (firmsError) {
@@ -180,6 +183,7 @@ export const useFirmData = () => {
                         existing.brandColor = f.brand_color;
                         existing.slug = f.slug || '';
                         existing.portalMessage = f.portal_message || '';
+                        existing.irsAlertsEnabled = f.irs_alerts_enabled || false;
                     }
                 });
             }
@@ -216,7 +220,8 @@ export const useFirmData = () => {
                 logo: selectedFirm.logo || '',
                 color: selectedFirm.brandColor || '#3b82f6',
                 slug: selectedFirm.slug || '',
-                portalMessage: selectedFirm.portalMessage || ''
+                portalMessage: selectedFirm.portalMessage || '',
+                irsAlertsEnabled: selectedFirm.irsAlertsEnabled || false
             });
 
             // Now load data SPECIFIC to this firm and role

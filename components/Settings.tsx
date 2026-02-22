@@ -913,18 +913,45 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
         <div className={`${isExtension ? 'p-4' : 'p-6'} border-b border-slate-100 ${isExtension ? 'space-y-3' : 'flex items-center justify-between'}`}>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+            <div className={`p-2 rounded-lg ${firmSettings.irsAlertsEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-400'}`}>
               <Landmark size={20} />
             </div>
             <div>
-              <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold text-slate-800`}>IRS e-Services Connection <span className="ml-2 text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider">Pro Feature</span></h2>
-              <p className="text-xs text-slate-500">Connect your TDS account to enable automated tax transcript monitoring.</p>
+              <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold text-slate-800 flex items-center gap-2 flex-wrap`}>
+                IRS e-Services Connection
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${firmSettings.irsAlertsEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  Pro Feature
+                </span>
+                {!firmSettings.irsAlertsEnabled && (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full uppercase">
+                    <Lock size={10} /> Locked
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">Connect your TDS account to enable automated tax transcript monitoring.</p>
             </div>
           </div>
         </div>
 
         <div className={`${isExtension ? 'p-4' : 'p-6 bg-slate-50/50'}`}>
-          {loadingIrs ? (
+          {!firmSettings.irsAlertsEnabled ? (
+            <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm text-center relative overflow-hidden">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 opacity-50"></div>
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100 shadow-sm">
+                <Lock size={28} className="text-amber-500" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">Unlock IRS Transcript Monitoring</h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto mb-6 leading-relaxed">
+                Automatically pull client transcripts and get notified via email or SMS when specific transaction codes appear. Upgrade your firm to the Pro tier to enable this feature.
+              </p>
+              <a
+                href="mailto:support@filershub.com?subject=Upgrade to Pro Tier"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 text-white text-sm font-bold rounded-lg hover:bg-amber-600 transition-all shadow-sm active:scale-95"
+              >
+                <Sparkles size={16} /> Contact Support to Upgrade
+              </a>
+            </div>
+          ) : loadingIrs ? (
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
               Checking connection status...

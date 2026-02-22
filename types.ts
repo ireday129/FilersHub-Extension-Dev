@@ -48,6 +48,7 @@ export interface Firm {
   installDate: string;
   ghlIntegrated: boolean;
   slug: string;
+  irsAlertsEnabled?: boolean;
 }
 
 export const TAX_YEARS: Record<string, { label: string; isOpen: boolean }> = {
@@ -218,6 +219,7 @@ export interface FirmOption {
   brandColor: string;
   slug: string;
   isStaff: boolean;
+  irsAlertsEnabled: boolean;
   staffName?: string;
   portalMessage?: string;
 }

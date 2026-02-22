@@ -1,0 +1,1 @@
+ALTER TABLE firms ADD COLUMN irs_alerts_enabled BOOLEAN DEFAULT FALSE;

@@ -73,7 +73,7 @@ const SuperAdminDashboard: React.FC = () => {
         // Fetch firms with staff relationships in one query
         const { data: firmsData, error: firmsError } = await supabase
           .from('firms')
-          .select('firm_id, firm_name, logo_url, slug, subscription_tier, subscription_status, max_staff, ghl_location_id, created_at')
+          .select('firm_id, firm_name, logo_url, slug, subscription_tier, subscription_status, max_staff, ghl_location_id, created_at, irs_alerts_enabled')
           .order('created_at', { ascending: false });
 
         if (firmsError) throw firmsError;
@@ -112,6 +112,7 @@ const SuperAdminDashboard: React.FC = () => {
             installDate: f.created_at ? new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
             ghlIntegrated: !!f.ghl_location_id,
             slug: f.slug || '',
+            irsAlertsEnabled: !!f.irs_alerts_enabled,
           };
         });
 
@@ -145,6 +146,23 @@ const SuperAdminDashboard: React.FC = () => {
       console.error('Error updating staff seats:', err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleIrsAlerts = async (firmId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('firms')
+        .update({ irs_alerts_enabled: !currentStatus })
+        .eq('firm_id', firmId);
+
+      if (error) throw error;
+
+      setFirms(prev => prev.map(f =>
+        f.id === firmId ? { ...f, irsAlertsEnabled: !currentStatus } : f
+      ));
+    } catch (err) {
+      console.error('Error toggling IRS Alerts:', err);
     }
   };
 
@@ -449,9 +467,8 @@ const SuperAdminDashboard: React.FC = () => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-1.5 py-0.5 text-[10px] font-black uppercase rounded ${
-                        u.type === 'deadline' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
-                      }`}>
+                      <span className={`px-1.5 py-0.5 text-[10px] font-black uppercase rounded ${u.type === 'deadline' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
+                        }`}>
                         {u.type}
                       </span>
                       <span className="text-sm font-bold text-slate-800">{u.title}</span>
@@ -534,6 +551,7 @@ const SuperAdminDashboard: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Clients</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Install Date</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">CRM</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">IRS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -564,11 +582,10 @@ const SuperAdminDashboard: React.FC = () => {
                       )}
                       <div>
                         <p className="text-sm font-bold text-slate-800">{firm.name}</p>
-                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase ${
-                          firm.subscriptionStatus === 'active' ? 'text-emerald-600 bg-emerald-50' :
-                          firm.subscriptionStatus === 'trialing' ? 'text-blue-600 bg-blue-50' :
-                          'text-slate-500 bg-slate-100'
-                        }`}>{firm.subscriptionStatus}</span>
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase ${firm.subscriptionStatus === 'active' ? 'text-emerald-600 bg-emerald-50' :
+                            firm.subscriptionStatus === 'trialing' ? 'text-blue-600 bg-blue-50' :
+                              'text-slate-500 bg-slate-100'
+                          }`}>{firm.subscriptionStatus}</span>
                       </div>
                     </div>
                   </td>
@@ -582,11 +599,10 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
-                      firm.subscriptionTier === 'Pro'
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${firm.subscriptionTier === 'Pro'
                         ? 'bg-amber-50 text-amber-600 border-amber-100'
                         : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}>
+                      }`}>
                       {firm.subscriptionTier}
                     </span>
                   </td>
@@ -663,6 +679,16 @@ const SuperAdminDashboard: React.FC = () => {
                         <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
                       </div>
                     )}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => handleToggleIrsAlerts(firm.id, firm.irsAlertsEnabled || false)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 outline-none ${firm.irsAlertsEnabled ? 'bg-emerald-500' : 'bg-slate-200'}`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${firm.irsAlertsEnabled ? 'translate-x-1.5' : '-translate-x-1.5'}`}
+                      />
+                    </button>
                   </td>
                 </tr>
               ))}
