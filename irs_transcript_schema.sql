@@ -5,6 +5,9 @@
 -- Ensure vault extension is available
 CREATE EXTENSION IF NOT EXISTS supabase_vault WITH SCHEMA vault;
 
+-- Explicitly set search path to prevent pg_catalog permission errors
+SET search_path TO public;
+
 -- =====================================================
 -- IRS CONNECTIONS
 -- =====================================================
