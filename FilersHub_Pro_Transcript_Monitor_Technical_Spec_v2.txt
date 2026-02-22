@@ -1,0 +1,521 @@
+
+TECHNICAL SPECIFICATION
+FilersHub Pro: IRS Transcript Monitor
+Automated Transcript Code Monitoring & Alert System
+Integrated with IRS e-Services API (TDS) and GoHighLevel CRM
+
+Prepared for: Antigravity Development Team
+Prepared by: FilersHub
+Date: February 21, 2026
+Version: 1.0
+CONFIDENTIAL
+
+1. Executive Summary
+FilersHub Pro Transcript Monitor is a premium feature that enables tax professionals to automatically monitor their clients’ IRS account transcripts and receive real-time alerts when specific transaction codes appear. This eliminates the need to manually pull and review transcripts, saving hours of staff time and ensuring nothing falls through the cracks.
+The system integrates with the IRS e-Services Transcript Delivery System (TDS) API using the ISP (Intermediate Service Provider) authorization flow, polls transcripts multiple times daily, and delivers customizable alerts through GoHighLevel workflows.
+Target users: Tax professionals (EAs, CPAs, tax attorneys) who are FilersHub Pro subscribers and have active IRS e-Services accounts.
+Delivery model: FilersHub Pro feature, initially deployed as a private GHL integration for resale, with future migration to standalone FilersHub platform.
+
+2. IRS e-Services API Authorization
+Because FilersHub is a third-party application selling access to other tax professionals, we must use the ISP (Intermediate Service Provider) authorization flow. This is required by IRS policy — the A2A flow is only for organizations not reselling their product.
+2.1 ISP Flow Overview
+The ISP flow is an OAuth 2.0 authorization code grant. The tax professional logs into IRS, grants consent to FilersHub’s Client ID, and the IRS returns an authorization code that gets exchanged for access tokens.
+2.2 Registration Requirements
+	•	Complete Secure Access registration for e-Services (FilersHub principal)
+	•	Submit API Client ID Application through e-Services portal
+	•	Provide JWKs file with valid X.509 digital security certificate
+	•	Provide redirect URI (FilersHub callback endpoint)
+	•	Receive Client ID upon approval
+For questions about the Client ID application, contact IRS e-Help Desk: 1-866-255-0654.
+2.3 Certificate Requirements (JWK)
+The JWK must contain an RSA public key with the following required attributes: kty (Key Type), kid (Key ID), use set to “sig”, n (modulus), e (public exponent set to “AQAB”), x5c (X.509 Certificate Chain), and x5t (X.509 Certificate SHA-1 Thumbprint). If any attribute is missing, the JWK is invalid. FilersHub is responsible for tracking expiration and providing a replacement before expiry.
+2.4 OAuth Endpoints
+Environment
+Authorization Endpoint
+Token Endpoint
+Production
+https://api.www4.irs.gov/auth/oauth/v2/authorize
+https://api.www4.irs.gov/auth/oauth/v2/token
+Test
+https://api.alt.www4.irs.gov/auth/oauth/v2/authorize
+https://api.alt.www4.irs.gov/auth/oauth/v2/token
+
+2.5 Token Lifecycle
+Token Type
+Lifespan
+Renewal Method
+Access Token
+15 minutes
+Use refresh token to obtain new access token
+Refresh Token
+1 hour
+Re-authenticate — redirect user back to IRS login
+Authorization Code
+10 minutes
+Single use — must complete token exchange immediately
+
+2.6 Rate Limiting
+The IRS imposes a consumption limit on API calls. Exceeding the limit triggers a 10-minute blackout period with HTTP 429 status code. Our polling scheduler must account for this across all monitored users to avoid hitting limits.
+2.7 ISP Authorization Flow Steps (for each user)
+	•	User clicks “Connect to IRS” in FilersHub Pro settings
+	•	FilersHub redirects user to IRS authorization endpoint with Client ID and response_type=code
+	•	User logs into IRS and grants consent to FilersHub’s Client ID
+	•	IRS redirects back to FilersHub callback URI with authorization code
+	•	FilersHub backend exchanges auth code + Client JWT for access token and refresh token
+	•	Tokens are encrypted and stored in Supabase for scheduled polling
+
+3. System Architecture
+3.1 Technology Stack
+Component
+Technology
+Backend / Database
+Supabase (PostgreSQL + Edge Functions)
+Scheduled Jobs
+Dedicated VPS with cron scheduler (avoids Edge Function cold starts at scale)
+CRM Integration
+GoHighLevel API v2
+Frontend
+React 19 + TypeScript (FilersHub UI)
+Authentication
+Supabase Auth (users) + IRS OAuth ISP (API access)
+Secret Management
+Supabase Vault for IRS tokens, JWK private keys
+Notifications
+GHL Workflows (email, SMS) triggered via GHL API
+
+3.2 High-Level Data Flow
+	•	VPS cron job fires 3–4 times daily
+	•	Polling service queries active monitored clients from Supabase
+	•	For each client, retrieves stored IRS tokens (decrypted from Vault)
+	•	Refreshes access token if expired (using stored refresh token)
+	•	Calls TDS API to pull account transcript for each monitored TIN
+	•	Parses transcript response and extracts transaction codes
+	•	Compares codes against last known snapshot stored in database
+	•	For any new codes: checks user’s alert preferences
+	•	If code matches an enabled alert, fires notification via GHL API
+	•	Updates stored transcript snapshot with latest data
+
+4. Database Schema (Supabase / PostgreSQL)
+All tables use Row Level Security (RLS) scoped to the authenticated FilersHub user. IRS tokens are stored encrypted using Supabase Vault.
+4.1 irs_connections
+Stores each user’s IRS e-Services authorization. One row per FilersHub user.
+Column
+Type
+Notes
+Constraints
+id
+uuid
+Primary key
+PK, default gen_random_uuid()
+user_id
+uuid
+FK to auth.users
+UNIQUE, NOT NULL
+access_token_vault_id
+uuid
+Reference to Vault secret
+NOT NULL
+refresh_token_vault_id
+uuid
+Reference to Vault secret
+NOT NULL
+token_expires_at
+timestamptz
+When access token expires
+NOT NULL
+refresh_expires_at
+timestamptz
+When refresh token expires
+NOT NULL
+irs_user_id
+text
+IRS e-Services user ID
+NOT NULL
+consent_status
+text
+active, revoked, expired
+NOT NULL, default 'active'
+created_at
+timestamptz
+
+default now()
+updated_at
+timestamptz
+
+default now()
+
+4.2 monitored_clients
+Tracks which GHL contacts are being monitored for each user.
+Column
+Type
+Notes
+Constraints
+id
+uuid
+Primary key
+PK
+user_id
+uuid
+FK to auth.users
+NOT NULL
+ghl_contact_id
+text
+GHL contact ID
+NOT NULL
+client_name
+text
+Display name from GHL
+NOT NULL
+tin
+text (encrypted)
+SSN or EIN, encrypted at rest
+NOT NULL
+tin_type
+text
+SSN, EIN, or UNKNOWN
+NOT NULL
+monitoring_active
+boolean
+Toggle monitoring on/off
+default true
+last_poll_at
+timestamptz
+Last successful transcript pull
+nullable
+created_at
+timestamptz
+
+default now()
+
+4.3 transcript_snapshots
+Stores the most recent transcript data for each monitored client. Used to detect new transaction codes by comparing against previous snapshots.
+Column
+Type
+Notes
+Constraints
+id
+uuid
+Primary key
+PK
+monitored_client_id
+uuid
+FK to monitored_clients
+NOT NULL
+tax_year
+int
+e.g. 2024, 2025
+NOT NULL
+transcript_type
+text
+account, return, wage_income, etc.
+NOT NULL
+transaction_codes
+jsonb
+Array of {code, date, amount, description}
+NOT NULL
+raw_response
+jsonb
+Full API response for audit trail
+nullable
+captured_at
+timestamptz
+When this snapshot was taken
+default now()
+
+4.4 alert_preferences
+Stores each user’s selected transcript codes for alerting. Users toggle individual codes on/off from the settings UI.
+Column
+Type
+Notes
+Constraints
+id
+uuid
+Primary key
+PK
+user_id
+uuid
+FK to auth.users
+NOT NULL
+transcript_code
+text
+e.g. 420, 570, 846, 971
+NOT NULL
+code_description
+text
+Human-readable description
+NOT NULL
+alert_enabled
+boolean
+User toggle
+default true
+notify_email
+boolean
+Send email via GHL
+default true
+notify_sms
+boolean
+Send SMS via GHL
+default false
+
+4.5 alert_log
+Audit trail of all alerts sent. Used for troubleshooting and user-facing alert history.
+Column
+Type
+Notes
+Constraints
+id
+uuid
+Primary key
+PK
+user_id
+uuid
+FK to auth.users
+NOT NULL
+monitored_client_id
+uuid
+FK to monitored_clients
+NOT NULL
+transcript_code
+text
+The code that triggered alert
+NOT NULL
+code_description
+text
+Human-readable
+NOT NULL
+client_name
+text
+Snapshot of client name at alert time
+NOT NULL
+notification_channel
+text
+email, sms, both
+NOT NULL
+delivery_status
+text
+sent, failed, pending
+default 'pending'
+created_at
+timestamptz
+
+default now()
+
+
+5. Feature Specifications
+5.1 IRS Connection Onboarding
+A guided setup flow in FilersHub Pro settings that walks the user through connecting their IRS e-Services account.
+	•	Settings page shows “Connect to IRS e-Services” button
+	•	Pre-connection checklist reminds user they need: active e-Services account, completed Secure Access registration
+	•	Button initiates ISP OAuth flow (redirect to IRS authorization endpoint)
+	•	After IRS consent, callback captures tokens and stores them encrypted in Supabase Vault
+	•	UI shows connection status: Connected (green), Expired (yellow), Not Connected (gray)
+	•	Disconnect option revokes stored tokens
+
+5.2 Client Selection for Monitoring
+Users select which GHL contacts to monitor from a searchable list.
+	•	Pulls contacts from GHL that have a TIN stored in a custom field
+	•	Searchable/filterable list with client name, TIN type (SSN/EIN), and monitoring status toggle
+	•	Bulk enable/disable monitoring
+	•	Contact sync runs on a schedule to detect newly added GHL contacts with TINs
+
+5.3 Alert Preferences (Transcript Code Toggles)
+A settings page where users check/uncheck which IRS transcript codes should trigger alerts. Codes are organized by category for usability.
+
+Common transcript codes to include (non-exhaustive, seed data):
+Code
+Category
+Description
+150
+Return Filed
+Tax return filed — establishes tax liability
+420
+Exam / Audit
+Examination of tax return initiated
+421
+Exam / Audit
+Examination closed — no change to tax liability
+570
+Hold / Freeze
+Additional account action pending — holds refund
+571
+Hold / Freeze
+Resolved additional account action — releases hold
+670
+Payment
+Payment applied to account
+766
+Refund / Credit
+Credit to account (estimated tax payment, etc.)
+768
+Refund / Credit
+Earned Income Credit applied
+810
+Refund Freeze
+Refund freeze — refund held pending review
+811
+Refund Freeze
+Refund freeze reversed
+826
+Offset
+Overpayment transferred to another tax period or agency
+846
+Refund Issued
+Refund issued to taxpayer
+898
+Offset
+Refund applied to non-IRS debt (Treasury Offset)
+971
+Notice
+Notice issued to taxpayer
+977
+Amended
+Amended return filed
+
+The UI should allow filtering by category, a “select all” toggle, and per-code notification channel preferences (email, SMS, or both).
+5.4 Alert Notifications via GHL
+When a new transcript code is detected, the system triggers a GHL workflow that sends the notification.
+	•	Alert payload sent to GHL via API includes: client name, transcript code, code description, date on transcript, tax year, and a deep link back to the client’s transcript detail in FilersHub
+	•	GHL workflow handles delivery channel (email template, SMS template)
+	•	Alert messages should be concise, e.g.: “IRS Alert: Code 846 (Refund Issued) detected on John Smith’s 2024 account transcript.”
+
+5.5 Alert History Dashboard
+A page in FilersHub Pro showing all past alerts for the user, with filters for client name, code, date range, and delivery status. Supports CSV export for record-keeping.
+
+6. Polling Engine Design
+6.1 Scheduling
+A dedicated VPS runs the polling service as a scheduled cron process. This avoids Edge Function cold start issues and supports polling hundreds of clients reliably. Recommended polling frequency: every 6 hours (4 times daily) to stay well within IRS rate limits.
+6.2 Batch Processing
+The polling engine must process users in batches to avoid overwhelming the IRS API and hitting rate limits. Recommended approach:
+	•	Process users sequentially, not in parallel
+	•	Add a delay between API calls (e.g. 2–3 seconds)
+	•	Track the IRS rate limit and back off if HTTP 429 is received (10-minute blackout)
+	•	Log all API calls and responses for debugging
+
+6.3 Token Refresh Logic
+Before each API call, the engine checks if the stored access token is still valid. If expired, it attempts a refresh using the stored refresh token. If the refresh token is also expired (after 1 hour), the system marks the user’s connection as “expired” and sends them a notification to re-authenticate.
+6.4 Change Detection Algorithm
+	•	Pull current transcript from TDS API
+	•	Parse transaction codes from response
+	•	Load previous snapshot from transcript_snapshots table
+	•	Compare: identify codes present in new response but absent from previous snapshot
+	•	For each new code, check if user has that code’s alert enabled in alert_preferences
+	•	If enabled, create alert_log entry and fire GHL notification
+	•	Save new snapshot to transcript_snapshots (overwrite previous)
+
+7. Security Requirements
+This system handles taxpayer PII (TINs) and IRS authentication credentials. Security is non-negotiable.
+7.1 Data Encryption
+	•	IRS access tokens and refresh tokens: stored in Supabase Vault (encrypted at rest with AES-256)
+	•	TINs in monitored_clients: encrypted at the column level using pgcrypto or Supabase Vault
+	•	JWK private key: stored in Supabase Vault, never in source code or environment variables directly
+	•	All API calls to IRS: HTTPS only (required by IRS)
+
+7.2 Row Level Security
+All Supabase tables must have RLS enabled. Users can only access their own rows. The polling Edge Function uses a service role key with appropriate scoping.
+7.3 Audit Trail
+The alert_log and transcript_snapshots tables serve as an audit trail. Raw API responses are stored in transcript_snapshots.raw_response for compliance purposes. Consider a retention policy (e.g. 7 years to match IRS record-keeping requirements).
+7.4 IRS Compliance Notes
+	•	The ISP application must not store or display unmasked taxpayer data beyond what the IRS API returns (transcripts are already masked)
+	•	User consent can be revoked at any time via the IRS Consent App — the system must handle revoked consent gracefully
+	•	JWK certificates must be tracked for expiration and renewed before expiry
+
+
+8. UI Screens (FilersHub Pro)
+The following screens need to be built within the existing FilersHub Pro interface.
+8.1 IRS Connection Settings
+	•	Connect / Disconnect button with status indicator
+	•	Connection health: last successful poll timestamp, token expiry status
+	•	Re-authenticate prompt when refresh token expires
+
+8.2 Monitored Clients
+	•	Searchable table of GHL contacts with TINs
+	•	Toggle to enable/disable monitoring per client
+	•	Bulk actions: enable all, disable all
+	•	Last polled timestamp per client
+
+8.3 Alert Preferences
+	•	Grouped by category (Refund, Exam, Hold, Payment, Notice, etc.)
+	•	Toggle switch per code with code number and description
+	•	Notification channel selector per code (email, SMS, both)
+	•	Select All / Deselect All per category
+
+8.4 Alert History
+	•	Table: date, client name, transcript code, description, delivery status
+	•	Filters: client name, code, date range, status
+	•	CSV export
+
+8.5 Client Transcript Detail (Future Phase)
+A detail view showing the full transcript timeline for a specific client, with highlighted new codes. This can be a Phase 2 feature.
+
+9. Error Handling
+Reference the IRS error codes from the e-Services API Authorization User Guide. Key scenarios the system must handle:
+HTTP Code
+IRS Error
+System Response
+401
+202 — login_required
+Mark connection as expired. Notify user to re-authenticate.
+401
+306 — invalid JWT
+Log error. Check JWK certificate expiration. Alert admin.
+429
+111 — rate limit exceeded
+Pause polling for 10 minutes (IRS blackout). Resume after cooldown.
+401
+990 — token expired
+Attempt token refresh. If refresh fails, mark connection expired.
+500
+711 — consent error
+User revoked consent. Mark connection as revoked. Notify user.
+500
+000 — unknown error
+Log full response. Retry on next polling cycle. Alert admin after 3 consecutive failures.
+
+
+10. Implementation Phases
+Phase 1: Foundation (Weeks 1–3)
+	•	IRS ISP Client ID registration and certificate setup
+	•	Supabase schema creation (all tables defined in Section 4)
+	•	ISP OAuth flow implementation (connect/disconnect)
+	•	Token storage in Supabase Vault with refresh logic
+	•	Test against IRS test environment (api.alt.www4.irs.gov)
+
+Phase 2: Polling Engine (Weeks 3–5)
+	•	VPS polling service for transcript retrieval
+	•	TDS API integration and transcript parsing
+	•	Change detection algorithm
+	•	Cron scheduling on dedicated VPS
+	•	Rate limit handling and error recovery
+
+Phase 3: UI & Notifications (Weeks 5–7)
+	•	IRS Connection settings page
+	•	Monitored Clients page with GHL contact sync
+	•	Alert Preferences page with transcript code toggles
+	•	GHL workflow integration for email/SMS alerts
+	•	Alert History dashboard
+
+Phase 4: Testing & Launch (Weeks 7–8)
+	•	End-to-end testing in IRS test environment
+	•	Production IRS endpoint cutover
+	•	Beta testing with select FilersHub Pro users
+	•	Documentation and user onboarding guide
+	•	Production launch
+
+
+11. Decisions & Configuration
+11.1 Resolved Decisions
+Item
+Decision
+GHL TIN Field
+contact.tin — all FilersHub Pro users must use this standardized custom field name
+Transcript Type
+Account transcripts only (Phase 1). Return and wage/income transcripts deferred to future phase.
+Tax Year Scope
+Most recent tax year only (Phase 1). Multi-year selection deferred to future phase.
+TDS Authority Type
+CAF (Centralized Authorization File) authority. RAF support may be added later if needed.
+Polling Infrastructure
+Dedicated VPS (not Supabase Edge Functions). The VPS handles the cron scheduler, token refresh, TDS API polling, and change detection. Supabase remains the database and auth layer.
+Pricing
+Included in FilersHub Pro tier for the first 50 users. Available as an add-on for Core and Pro users beyond the initial 50 at $300/year.
+
