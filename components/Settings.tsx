@@ -10,6 +10,8 @@ import {
   Hash,
   Sparkles,
   CheckCircle2,
+  Landmark,
+  AlertCircle
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { supabase } from '../services/supabase';
@@ -83,6 +85,62 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
         if (data?.subscription_tier) setSubscriptionTier(data.subscription_tier);
       });
   }, [firmId]);
+
+  // IRS Connection State
+  const [irsConnection, setIrsConnection] = useState<any>(null);
+  const [loadingIrs, setLoadingIrs] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchIrsStatus = async () => {
+      setLoadingIrs(true);
+      try {
+        const { data } = await supabase
+          .from('irs_connections')
+          .select('consent_status, updated_at, token_expires_at, refresh_expires_at')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setIrsConnection(data);
+      } catch (err) {
+        console.error('Error fetching IRS connection:', err);
+      } finally {
+        setLoadingIrs(false);
+      }
+    };
+    fetchIrsStatus();
+  }, [user]);
+
+  const handleConnectIrs = () => {
+    if (!user) return;
+    const clientId = 'PENDING_IRS_CLIENT_ID';
+    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/irs-callback` : '';
+    // Placeholder URL pointing directly to the edge function for Phase 1 simulation
+    const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/irs-oauth?state=${user.id}&code=mock_code`;
+    window.location.href = edgeFunctionUrl;
+  };
+
+  const handleDisconnectIrs = async () => {
+    if (!user) return;
+    if (confirm('Are you sure you want to disconnect from IRS e-Services? This will stop transcript monitoring.')) {
+      try {
+        await supabase.from('irs_connections').delete().eq('user_id', user.id);
+        setIrsConnection(null);
+      } catch (err) {
+        console.error('Error disconnecting IRS:', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('irs_success') === 'true') {
+      alert('IRS e-Services account connected successfully!');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (params.get('irs_error')) {
+      alert(`Failed to connect to IRS e-Services: ${params.get('irs_error')}`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     if (!firmId) return;
@@ -848,6 +906,67 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* IRS e-Services Connection Section */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+        <div className={`${isExtension ? 'p-4' : 'p-6'} border-b border-slate-100 ${isExtension ? 'space-y-3' : 'flex items-center justify-between'}`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+              <Landmark size={20} />
+            </div>
+            <div>
+              <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold text-slate-800`}>IRS e-Services Connection <span className="ml-2 text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider">Pro Feature</span></h2>
+              <p className="text-xs text-slate-500">Connect your TDS account to enable automated tax transcript monitoring.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className={`${isExtension ? 'p-4' : 'p-6 bg-slate-50/50'}`}>
+          {loadingIrs ? (
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              Checking connection status...
+            </div>
+          ) : irsConnection ? (
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">Connected to IRS e-Services</h3>
+                    <p className="text-xs text-slate-500 mt-1">Status: <span className="font-semibold text-emerald-600 uppercase text-[10px] bg-emerald-50 px-2 py-0.5 rounded-md">{irsConnection.consent_status}</span></p>
+                    <p className="text-[11px] text-slate-400 mt-1">Last synced: {new Date(irsConnection.updated_at).toLocaleString()}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleDisconnectIrs}
+                  className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-bold rounded-lg transition-colors border border-rose-100 shadow-sm"
+                >
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="max-w-xl">
+                <div className="flex items-start gap-3 mb-2">
+                  <AlertCircle className="text-slate-400 shrink-0 mt-0.5" size={18} />
+                  <h3 className="text-sm font-bold text-slate-800">Not Connected</h3>
+                </div>
+                <p className="text-xs text-slate-500 ml-7 leading-relaxed flex-wrap">
+                  You must authorize FilersHub via the IRS Intermediate Service Provider (ISP) OAuth flow. This grants read-only access to Transcript Delivery System APIs for clients you monitor.
+                </p>
+              </div>
+              <button
+                onClick={handleConnectIrs}
+                className="shrink-0 px-6 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700 transition-all shadow-sm active:scale-95"
+              >
+                Connect to IRS e-Services
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

@@ -6,6 +6,7 @@ import {
   Files,
   CheckSquare,
   Settings,
+  BellRing,
   Menu,
   X
 } from 'lucide-react';
@@ -34,6 +35,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
     { name: NavItem.Clients, icon: Users, visible: isStaff },
     { name: NavItem.Documents, icon: Files, visible: true },
     { name: NavItem.Tasks, icon: CheckSquare, visible: isStaff },
+    { name: NavItem.Alerts, icon: BellRing, visible: isStaff },
     { name: NavItem.Settings, icon: Settings, visible: isFirmOwner },
   ].filter(item => item.visible);
 

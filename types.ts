@@ -5,7 +5,8 @@ export enum NavItem {
   Tasks = 'Tasks',
   Settings = 'Settings',
   Firms = 'Firms',
-  Profile = 'Profile'
+  Profile = 'Profile',
+  Alerts = 'IRS Alerts'
 }
 
 export enum UserRole {

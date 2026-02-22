@@ -7,6 +7,7 @@ import Documents from './components/Documents';
 import Tasks from './components/Tasks';
 import Settings from './components/Settings';
 import Profile from './components/Profile';
+import TranscriptMonitorHub from './components/TranscriptMonitorHub';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LogOut, Loader2 } from 'lucide-react';
@@ -175,6 +176,8 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
             firmId={firmId}
           />
         );
+      case NavItem.Alerts:
+        return <TranscriptMonitorHub />;
       case NavItem.Profile:
         return <Profile role={currentRole} />;
       default:
@@ -250,18 +253,18 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
               <h1 className={`${isExtension ? 'text-xl' : 'text-2xl'} font-bold text-slate-800`}>
                 {isSuperAdmin ? "Platform Overview"
                   : isClient ? `Hello, ${user?.user_metadata?.full_name || user?.email}`
-                  : activeTab === NavItem.Dashboard ? `Hello, ${staffName || (user?.user_metadata?.full_name || user?.email || '').split(' ')[0]}`
-                  : activeTab}
+                    : activeTab === NavItem.Dashboard ? `Hello, ${staffName || (user?.user_metadata?.full_name || user?.email || '').split(' ')[0]}`
+                      : activeTab}
               </h1>
               {!isExtension && (
                 <p className="text-slate-500 text-sm mt-1">
                   {isSuperAdmin
                     ? "Monitoring firms and platform infrastructure usage."
                     : isClient ? `Welcome to the ${firmSettings.name} Portal`
-                    : activeTab === NavItem.Clients ? 'Manage your clients.'
-                    : activeTab === NavItem.Documents ? 'Manage client documents.'
-                    : activeTab === NavItem.Tasks ? 'Manage firm and client tasks.'
-                    : ''}
+                      : activeTab === NavItem.Clients ? 'Manage your clients.'
+                        : activeTab === NavItem.Documents ? 'Manage client documents.'
+                          : activeTab === NavItem.Tasks ? 'Manage firm and client tasks.'
+                            : ''}
                 </p>
               )}
             </div>
