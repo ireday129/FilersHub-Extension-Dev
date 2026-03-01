@@ -544,6 +544,53 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                       )}
                     </div>
                   </div>
+
+                  {/* IRS Alerts */}
+                  <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className={`w-8 h-8 ${irsAlertsEnabled ? 'bg-violet-50' : 'bg-slate-100'} rounded-lg flex items-center justify-center shrink-0`}>
+                      {irsAlertsEnabled ? (
+                        <Shield size={14} className="text-violet-600" />
+                      ) : (
+                        <Lock size={14} className="text-slate-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">IRS Alerts</p>
+                      {irsAlertsEnabled ? (
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${monitoringStatus?.isMonitored ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            <span className={`text-sm font-medium ${monitoringStatus?.isMonitored ? 'text-emerald-700' : 'text-slate-500'}`}>
+                              {monitoringStatus?.isMonitored ? 'Active' : 'Not Monitored'}
+                            </span>
+                          </div>
+                          {!editingInfo && (
+                            <button
+                              onClick={handleToggleMonitoring}
+                              disabled={togglingMonitoring}
+                              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-50 ${
+                                monitoringStatus?.isMonitored
+                                  ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                                  : 'bg-violet-600 text-white hover:bg-violet-700'
+                              }`}
+                            >
+                              {togglingMonitoring ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : monitoringStatus?.isMonitored ? (
+                                'Disable'
+                              ) : (
+                                'Enable'
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs font-semibold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded">Pro Feature</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Edit Actions */}
@@ -563,55 +610,6 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                     >
                       Cancel
                     </button>
-                  </div>
-                )}
-
-                {/* IRS Alerts Monitoring */}
-                {!editingInfo && (
-                  <div className="pt-3 border-t border-slate-100">
-                    <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className={`w-8 h-8 ${irsAlertsEnabled ? 'bg-violet-50' : 'bg-slate-100'} rounded-lg flex items-center justify-center shrink-0`}>
-                        {irsAlertsEnabled ? (
-                          <Shield size={14} className="text-violet-600" />
-                        ) : (
-                          <Lock size={14} className="text-slate-400" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">IRS Transcript Monitoring</p>
-                        {irsAlertsEnabled ? (
-                          <div className="flex items-center justify-between mt-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full ${monitoringStatus?.isMonitored ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                              <span className={`text-sm font-medium ${monitoringStatus?.isMonitored ? 'text-emerald-700' : 'text-slate-500'}`}>
-                                {monitoringStatus?.isMonitored ? 'Active' : 'Not Monitored'}
-                              </span>
-                            </div>
-                            <button
-                              onClick={handleToggleMonitoring}
-                              disabled={togglingMonitoring}
-                              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-50 ${
-                                monitoringStatus?.isMonitored
-                                  ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                                  : 'bg-violet-600 text-white hover:bg-violet-700'
-                              }`}
-                            >
-                              {togglingMonitoring ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : monitoringStatus?.isMonitored ? (
-                                'Disable'
-                              ) : (
-                                'Enable'
-                              )}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs font-semibold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded">Pro Feature</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 )}
 
