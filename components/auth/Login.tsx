@@ -110,7 +110,9 @@ const Login: React.FC<LoginProps> = ({ firmBranding, firmId }) => {
         setLoading(true);
         setError(null);
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email);
+            const portalPath = window.location.pathname;
+            const redirectTo = `${window.location.origin}/reset-password?redirect=${encodeURIComponent(portalPath)}`;
+            const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
             if (error) throw error;
             setResetSent(true);
         } catch (err: any) {

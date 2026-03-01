@@ -30,8 +30,10 @@ const ResetPassword: React.FC = () => {
             const { error } = await supabase.auth.updateUser({ password });
             if (error) throw error;
             setSuccess(true);
+            const params = new URLSearchParams(window.location.search);
+            const redirect = params.get('redirect') || '/';
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = redirect;
             }, 2000);
         } catch (err: any) {
             setError(err.message || 'Failed to update password');

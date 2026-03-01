@@ -83,27 +83,24 @@ export const useFirmData = () => {
 
             // 1c. Email fallback: if no client entries found by auth_user_id, try linking via RPC
             if ((!clientEntries || clientEntries.length === 0) && user.email) {
-                const metaRole = user.user_metadata?.role;
-                const metaFirmId = user.user_metadata?.firm_id;
+                const metaFirmId = user.user_metadata?.firm_id || null;
 
-                if (metaRole === 'Client' && metaFirmId) {
-                    try {
-                        const { data: linkResult } = await supabase.rpc('link_client_auth', {
-                            p_email: user.email.toLowerCase(),
-                            p_firm_id: metaFirmId
-                        });
+                try {
+                    const { data: linkResult } = await supabase.rpc('link_client_auth', {
+                        p_email: user.email.toLowerCase(),
+                        p_firm_id: metaFirmId
+                    });
 
-                        if (linkResult?.success) {
-                            // Re-query after successful linking
-                            const { data: linkedEntries } = await supabase
-                                .from('clients')
-                                .select('firm_id, full_name')
-                                .eq('auth_user_id', user.id);
-                            clientEntries = linkedEntries;
-                        }
-                    } catch (linkErr) {
-                        console.warn('Client email fallback link failed:', linkErr);
+                    if (linkResult?.success) {
+                        // Re-query after successful linking
+                        const { data: linkedEntries } = await supabase
+                            .from('clients')
+                            .select('firm_id, full_name')
+                            .eq('auth_user_id', user.id);
+                        clientEntries = linkedEntries;
                     }
+                } catch (linkErr) {
+                    console.warn('Client email fallback link failed:', linkErr);
                 }
             }
 
