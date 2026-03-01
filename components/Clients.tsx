@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { UserRole, TaxReturn, TaxReturnStatus, NavItem, TAX_RETURN_TYPES, TAX_YEARS } from '../types';
 import { useExtensionMode } from '../hooks/useExtensionMode';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
 import {
   Users,
@@ -25,7 +26,9 @@ import {
   Send,
   CheckCircle2,
   Pencil,
-  Save
+  Save,
+  Shield,
+  Lock
 } from 'lucide-react';
 
 interface ClientsProps {
@@ -37,6 +40,7 @@ interface ClientsProps {
   refreshData: () => Promise<void>;
   currentStaffName?: string;
   firmSlug?: string;
+  irsAlertsEnabled?: boolean;
 }
 
 type ClientView = 'My Clients' | 'Firm Clients';
@@ -51,14 +55,15 @@ interface ClientGroup {
   latestStatus: TaxReturnStatus;
 }
 
-const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData, currentStaffName, firmSlug }) => {
+const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData, currentStaffName, firmSlug, irsAlertsEnabled }) => {
   const { isExtension } = useExtensionMode();
+  const { user } = useAuth();
   const [activeView, setActiveView] = useState<ClientView>('My Clients');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClientName, setSelectedClientName] = useState<string | null>(null);
 
   // Client Info state
-  const [clientInfo, setClientInfo] = useState<{ email: string; phone: string | null; tin: string | null } | null>(null);
+  const [clientInfo, setClientInfo] = useState<{ email: string; phone: string | null; tin: string | null; ghl_contact_id?: string | null } | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [showTin, setShowTin] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
@@ -67,6 +72,10 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
   const [editPhone, setEditPhone] = useState('');
   const [editTin, setEditTin] = useState('');
   const [savingInfo, setSavingInfo] = useState(false);
+
+  // IRS Monitoring state
+  const [monitoringStatus, setMonitoringStatus] = useState<{ isMonitored: boolean; monitoredId?: string } | null>(null);
+  const [togglingMonitoring, setTogglingMonitoring] = useState(false);
 
   // Add Client form state
   const [showAddClient, setShowAddClient] = useState(false);
@@ -229,6 +238,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       setClientInfo(null);
       setShowTin(false);
       setResetSent(false);
+      setMonitoringStatus(null);
       return;
     }
     const fetchClientInfo = async () => {
@@ -236,11 +246,27 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       try {
         const { data, error } = await supabase
           .from('clients')
-          .select('email, phone, tin')
+          .select('email, phone, tin, ghl_contact_id')
           .eq('client_id', selectedClient.clientId)
           .single();
         if (error) throw error;
         setClientInfo(data);
+
+        // Fetch monitoring status if IRS Alerts is enabled and client has a GHL contact
+        if (irsAlertsEnabled && data.ghl_contact_id && user) {
+          const { data: monData } = await supabase
+            .from('monitored_clients')
+            .select('id, monitoring_active')
+            .eq('ghl_contact_id', data.ghl_contact_id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+          setMonitoringStatus(monData
+            ? { isMonitored: monData.monitoring_active, monitoredId: monData.id }
+            : { isMonitored: false }
+          );
+        } else {
+          setMonitoringStatus({ isMonitored: false });
+        }
       } catch (err) {
         console.error('Failed to fetch client info:', err);
         setClientInfo(null);
@@ -296,6 +322,53 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       alert(err.message || 'Failed to save client info.');
     } finally {
       setSavingInfo(false);
+    }
+  };
+
+  const handleToggleMonitoring = async () => {
+    if (!selectedClient || !clientInfo || !user) return;
+    setTogglingMonitoring(true);
+    try {
+      if (monitoringStatus?.monitoredId) {
+        // Toggle existing monitoring record
+        const { error } = await supabase
+          .from('monitored_clients')
+          .update({ monitoring_active: !monitoringStatus.isMonitored })
+          .eq('id', monitoringStatus.monitoredId);
+        if (error) throw error;
+        setMonitoringStatus(prev => prev ? { ...prev, isMonitored: !prev.isMonitored } : prev);
+      } else {
+        // Create new monitoring record
+        if (!clientInfo.ghl_contact_id) {
+          alert('This client does not have a CRM contact linked. Please link a CRM contact first.');
+          return;
+        }
+        if (!clientInfo.tin) {
+          alert('A TIN/SSN is required to enable IRS transcript monitoring. Please add one first.');
+          return;
+        }
+        const tinDigits = clientInfo.tin.replace(/\D/g, '');
+        const tinType = tinDigits.length === 9 && tinDigits.startsWith('9') ? 'EIN' : tinDigits.length === 9 ? 'SSN' : 'UNKNOWN';
+        const { data, error } = await supabase
+          .from('monitored_clients')
+          .insert({
+            user_id: user.id,
+            ghl_contact_id: clientInfo.ghl_contact_id,
+            client_name: selectedClient.name,
+            tin: clientInfo.tin,
+            tin_type: tinType,
+            monitoring_active: true,
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        setMonitoringStatus({ isMonitored: true, monitoredId: data.id });
+      }
+    } catch (err: any) {
+      console.error('Failed to toggle monitoring:', err);
+      alert(err.message || 'Failed to update monitoring status.');
+    } finally {
+      setTogglingMonitoring(false);
     }
   };
 
@@ -490,6 +563,55 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                     >
                       Cancel
                     </button>
+                  </div>
+                )}
+
+                {/* IRS Alerts Monitoring */}
+                {!editingInfo && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className={`w-8 h-8 ${irsAlertsEnabled ? 'bg-violet-50' : 'bg-slate-100'} rounded-lg flex items-center justify-center shrink-0`}>
+                        {irsAlertsEnabled ? (
+                          <Shield size={14} className="text-violet-600" />
+                        ) : (
+                          <Lock size={14} className="text-slate-400" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">IRS Transcript Monitoring</p>
+                        {irsAlertsEnabled ? (
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${monitoringStatus?.isMonitored ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                              <span className={`text-sm font-medium ${monitoringStatus?.isMonitored ? 'text-emerald-700' : 'text-slate-500'}`}>
+                                {monitoringStatus?.isMonitored ? 'Active' : 'Not Monitored'}
+                              </span>
+                            </div>
+                            <button
+                              onClick={handleToggleMonitoring}
+                              disabled={togglingMonitoring}
+                              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all disabled:opacity-50 ${
+                                monitoringStatus?.isMonitored
+                                  ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                                  : 'bg-violet-600 text-white hover:bg-violet-700'
+                              }`}
+                            >
+                              {togglingMonitoring ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : monitoringStatus?.isMonitored ? (
+                                'Disable'
+                              ) : (
+                                'Enable'
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-semibold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded">Pro Feature</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
