@@ -23,7 +23,9 @@ import {
   Eye,
   EyeOff,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  Pencil,
+  Save
 } from 'lucide-react';
 
 interface ClientsProps {
@@ -61,6 +63,10 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
   const [showTin, setShowTin] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editPhone, setEditPhone] = useState('');
+  const [editTin, setEditTin] = useState('');
+  const [savingInfo, setSavingInfo] = useState(false);
 
   // Add Client form state
   const [showAddClient, setShowAddClient] = useState(false);
@@ -264,6 +270,35 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
     }
   };
 
+  const handleStartEdit = () => {
+    if (!clientInfo) return;
+    setEditPhone(clientInfo.phone || '');
+    setEditTin(clientInfo.tin || '');
+    setEditingInfo(true);
+  };
+
+  const handleSaveClientInfo = async () => {
+    if (!selectedClient) return;
+    setSavingInfo(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          phone: editPhone.trim() || null,
+          tin: editTin.trim() || null,
+        })
+        .eq('client_id', selectedClient.clientId);
+      if (error) throw error;
+      setClientInfo(prev => prev ? { ...prev, phone: editPhone.trim() || null, tin: editTin.trim() || null } : prev);
+      setEditingInfo(false);
+    } catch (err: any) {
+      console.error('Failed to save client info:', err);
+      alert(err.message || 'Failed to save client info.');
+    } finally {
+      setSavingInfo(false);
+    }
+  };
+
   const maskedTin = (tin: string) => {
     const digits = tin.replace(/\D/g, '');
     if (digits.length >= 4) {
@@ -349,11 +384,20 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
 
         {/* Client Info Card */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className={`${isExtension ? 'p-3' : 'px-6 py-4'} bg-slate-50 border-b border-slate-100`}>
+          <div className={`${isExtension ? 'p-3' : 'px-6 py-4'} bg-slate-50 border-b border-slate-100 flex items-center justify-between`}>
             <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
               <User size={16} className="text-brand" />
               Client Info
             </h3>
+            {clientInfo && !editingInfo && (
+              <button
+                onClick={handleStartEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-brand hover:bg-brand-light rounded-lg transition-all"
+              >
+                <Pencil size={12} />
+                Edit
+              </button>
+            )}
           </div>
           <div className={`${isExtension ? 'p-3' : 'p-6'}`}>
             {loadingInfo ? (
@@ -363,7 +407,7 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
             ) : clientInfo ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Email */}
+                  {/* Email (read-only always) */}
                   <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
                       <Mail size={14} className="text-blue-600" />
@@ -379,9 +423,19 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                     <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center shrink-0">
                       <Phone size={14} className="text-emerald-600" />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone</p>
-                      <p className="text-sm font-medium text-slate-800">{clientInfo.phone || 'Not provided'}</p>
+                      {editingInfo ? (
+                        <input
+                          type="tel"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          placeholder="(555) 123-4567"
+                          className="w-full mt-0.5 px-2 py-1 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:ring-2 focus:ring-brand outline-none"
+                        />
+                      ) : (
+                        <p className="text-sm font-medium text-slate-800">{clientInfo.phone || 'Not provided'}</p>
+                      )}
                     </div>
                   </div>
 
@@ -392,41 +446,73 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">TIN / SSN</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-800 font-mono">
-                          {clientInfo.tin ? (showTin ? clientInfo.tin : maskedTin(clientInfo.tin)) : 'Not provided'}
-                        </p>
-                        {clientInfo.tin && (
-                          <button
-                            onClick={() => setShowTin(!showTin)}
-                            className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
-                          >
-                            {showTin ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
-                        )}
-                      </div>
+                      {editingInfo ? (
+                        <input
+                          type="text"
+                          value={editTin}
+                          onChange={(e) => setEditTin(e.target.value)}
+                          placeholder="123-45-6789"
+                          className="w-full mt-0.5 px-2 py-1 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 font-mono focus:ring-2 focus:ring-brand outline-none"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-slate-800 font-mono">
+                            {clientInfo.tin ? (showTin ? clientInfo.tin : maskedTin(clientInfo.tin)) : 'Not provided'}
+                          </p>
+                          {clientInfo.tin && (
+                            <button
+                              onClick={() => setShowTin(!showTin)}
+                              className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
+                            >
+                              {showTin ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Password Reset */}
-                <div className="pt-3 border-t border-slate-100">
-                  {resetSent ? (
-                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-                      <CheckCircle2 size={16} />
-                      <span className="text-xs font-bold">Password reset email sent to {clientInfo.email}</span>
-                    </div>
-                  ) : (
+                {/* Edit Actions */}
+                {editingInfo && (
+                  <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
                     <button
-                      onClick={handleSendPasswordReset}
-                      disabled={sendingReset}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50"
+                      onClick={handleSaveClientInfo}
+                      disabled={savingInfo}
+                      className="flex items-center gap-2 px-4 py-2 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand/90 transition-all disabled:opacity-50"
                     >
-                      {sendingReset ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                      {sendingReset ? 'Sending...' : 'Send Password Reset Email'}
+                      {savingInfo ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      {savingInfo ? 'Saving...' : 'Save Changes'}
                     </button>
-                  )}
-                </div>
+                    <button
+                      onClick={() => setEditingInfo(false)}
+                      className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Password Reset */}
+                {!editingInfo && (
+                  <div className="pt-3 border-t border-slate-100">
+                    {resetSent ? (
+                      <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                        <CheckCircle2 size={16} />
+                        <span className="text-xs font-bold">Password reset email sent to {clientInfo.email}</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleSendPasswordReset}
+                        disabled={sendingReset}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50"
+                      >
+                        {sendingReset ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        {sendingReset ? 'Sending...' : 'Send Password Reset Email'}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-slate-400 text-center py-4">Unable to load client details.</p>
