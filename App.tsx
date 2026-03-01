@@ -162,6 +162,7 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
             firmId={firmId}
             refreshData={refresh}
             currentStaffName={staffName}
+            firmSlug={firmSettings.slug}
           />
         );
       case NavItem.Documents:

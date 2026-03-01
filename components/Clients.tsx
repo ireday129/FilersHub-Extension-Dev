@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { UserRole, TaxReturn, TaxReturnStatus, NavItem, TAX_RETURN_TYPES, TAX_YEARS } from '../types';
 import { useExtensionMode } from '../hooks/useExtensionMode';
 import { supabase } from '../services/supabase';
@@ -16,7 +16,14 @@ import {
   FileText,
   ChevronRight,
   Calendar,
-  User
+  User,
+  Mail,
+  Phone,
+  KeyRound,
+  Eye,
+  EyeOff,
+  Send,
+  CheckCircle2
 } from 'lucide-react';
 
 interface ClientsProps {
@@ -27,6 +34,7 @@ interface ClientsProps {
   firmId: string | null;
   refreshData: () => Promise<void>;
   currentStaffName?: string;
+  firmSlug?: string;
 }
 
 type ClientView = 'My Clients' | 'Firm Clients';
@@ -41,11 +49,18 @@ interface ClientGroup {
   latestStatus: TaxReturnStatus;
 }
 
-const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData, currentStaffName }) => {
+const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, setActiveTab, firmId, refreshData, currentStaffName, firmSlug }) => {
   const { isExtension } = useExtensionMode();
   const [activeView, setActiveView] = useState<ClientView>('My Clients');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClientName, setSelectedClientName] = useState<string | null>(null);
+
+  // Client Info state
+  const [clientInfo, setClientInfo] = useState<{ email: string; phone: string | null; tin: string | null } | null>(null);
+  const [loadingInfo, setLoadingInfo] = useState(false);
+  const [showTin, setShowTin] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   // Add Client form state
   const [showAddClient, setShowAddClient] = useState(false);
@@ -197,10 +212,65 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
     })).sort((a, b) => a.name.localeCompare(b.name));
   }, [filteredReturns]);
 
+  // Fetch client details when a client is selected
   const selectedClient = useMemo(() => {
     if (!selectedClientName) return null;
     return clientGroups.find(g => g.name === selectedClientName) || null;
   }, [selectedClientName, clientGroups]);
+
+  useEffect(() => {
+    if (!selectedClient) {
+      setClientInfo(null);
+      setShowTin(false);
+      setResetSent(false);
+      return;
+    }
+    const fetchClientInfo = async () => {
+      setLoadingInfo(true);
+      try {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('email, phone, tin')
+          .eq('client_id', selectedClient.clientId)
+          .single();
+        if (error) throw error;
+        setClientInfo(data);
+      } catch (err) {
+        console.error('Failed to fetch client info:', err);
+        setClientInfo(null);
+      } finally {
+        setLoadingInfo(false);
+      }
+    };
+    fetchClientInfo();
+  }, [selectedClient?.clientId]);
+
+  const handleSendPasswordReset = async () => {
+    if (!clientInfo?.email) return;
+    setSendingReset(true);
+    setResetSent(false);
+    try {
+      const redirectTo = firmSlug
+        ? `${window.location.origin}/reset-password?redirect=${encodeURIComponent(`/portal/${firmSlug}`)}`
+        : `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(clientInfo.email, { redirectTo });
+      if (error) throw error;
+      setResetSent(true);
+    } catch (err: any) {
+      console.error('Failed to send password reset:', err);
+      alert(err.message || 'Failed to send password reset email.');
+    } finally {
+      setSendingReset(false);
+    }
+  };
+
+  const maskedTin = (tin: string) => {
+    const digits = tin.replace(/\D/g, '');
+    if (digits.length >= 4) {
+      return `***-**-${digits.slice(-4)}`;
+    }
+    return '***-**-****';
+  };
 
   const stats = useMemo(() => {
     return {
@@ -274,6 +344,93 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                 {selectedClient.preparer && ` • Assigned to ${selectedClient.preparer}`}
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Client Info Card */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className={`${isExtension ? 'p-3' : 'px-6 py-4'} bg-slate-50 border-b border-slate-100`}>
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <User size={16} className="text-brand" />
+              Client Info
+            </h3>
+          </div>
+          <div className={`${isExtension ? 'p-3' : 'p-6'}`}>
+            {loadingInfo ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 size={20} className="animate-spin text-slate-400" />
+              </div>
+            ) : clientInfo ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Email */}
+                  <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+                      <Mail size={14} className="text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</p>
+                      <p className="text-sm font-medium text-slate-800 truncate">{clientInfo.email}</p>
+                    </div>
+                  </div>
+
+                  {/* Phone */}
+                  <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center shrink-0">
+                      <Phone size={14} className="text-emerald-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone</p>
+                      <p className="text-sm font-medium text-slate-800">{clientInfo.phone || 'Not provided'}</p>
+                    </div>
+                  </div>
+
+                  {/* TIN */}
+                  <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center shrink-0">
+                      <KeyRound size={14} className="text-amber-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">TIN / SSN</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-slate-800 font-mono">
+                          {clientInfo.tin ? (showTin ? clientInfo.tin : maskedTin(clientInfo.tin)) : 'Not provided'}
+                        </p>
+                        {clientInfo.tin && (
+                          <button
+                            onClick={() => setShowTin(!showTin)}
+                            className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
+                          >
+                            {showTin ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Password Reset */}
+                <div className="pt-3 border-t border-slate-100">
+                  {resetSent ? (
+                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                      <CheckCircle2 size={16} />
+                      <span className="text-xs font-bold">Password reset email sent to {clientInfo.email}</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleSendPasswordReset}
+                      disabled={sendingReset}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50"
+                    >
+                      {sendingReset ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                      {sendingReset ? 'Sending...' : 'Send Password Reset Email'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 text-center py-4">Unable to load client details.</p>
+            )}
           </div>
         </div>
 

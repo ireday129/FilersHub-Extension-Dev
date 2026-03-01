@@ -33,7 +33,6 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
   const navItems = isClient ? [
     { name: NavItem.Dashboard, icon: LayoutDashboard, visible: true },
     { name: NavItem.Documents, icon: Files, visible: true },
-    { name: NavItem.Settings, icon: Settings, visible: true }
   ] : [
     { name: NavItem.Dashboard, icon: LayoutDashboard, visible: true },
     { name: NavItem.Clients, icon: Users, visible: isStaff },
