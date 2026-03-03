@@ -181,7 +181,7 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
       case NavItem.Alerts:
         return <TranscriptMonitorHub />;
       case NavItem.Profile:
-        return <Profile role={currentRole} />;
+        return <Profile role={currentRole} setActiveTab={setActiveTab} />;
       default:
         return (
           <Dashboard

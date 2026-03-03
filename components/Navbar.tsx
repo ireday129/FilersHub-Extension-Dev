@@ -30,10 +30,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
   const isClient = role === UserRole.Client;
 
   // Define which items are visible based on role
-  const navItems = isClient ? [
-    { name: NavItem.Dashboard, icon: LayoutDashboard, visible: true },
-    { name: NavItem.Documents, icon: Files, visible: true },
-  ] : [
+  const navItems = isClient ? [] as { name: NavItem; icon: typeof LayoutDashboard; visible: boolean }[] : [
     { name: NavItem.Dashboard, icon: LayoutDashboard, visible: true },
     { name: NavItem.Clients, icon: Users, visible: isStaff },
     { name: NavItem.Documents, icon: Files, visible: true },

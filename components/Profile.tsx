@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { UserRole } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
-import { Upload, User, Shield, Mail, Save, Loader2 } from 'lucide-react';
+import { Upload, User, Shield, Mail, Save, Loader2, ArrowLeft } from 'lucide-react';
+import { NavItem } from '../types';
 
 interface ProfileProps {
     role: UserRole;
+    setActiveTab?: (tab: NavItem) => void;
 }
 
-const Profile: React.FC<ProfileProps> = ({ role }) => {
+const Profile: React.FC<ProfileProps> = ({ role, setActiveTab }) => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
@@ -136,6 +138,15 @@ const Profile: React.FC<ProfileProps> = ({ role }) => {
 
     return (
         <div className="max-w-xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {role === UserRole.Client && setActiveTab && (
+                <button
+                    onClick={() => setActiveTab(NavItem.Dashboard)}
+                    className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-brand transition-colors"
+                >
+                    <ArrowLeft size={16} />
+                    Go Back to Dashboard
+                </button>
+            )}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50">
                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
