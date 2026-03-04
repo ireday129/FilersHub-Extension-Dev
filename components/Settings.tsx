@@ -11,7 +11,8 @@ import {
   Sparkles,
   CheckCircle2,
   Landmark,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { supabase } from '../services/supabase';
