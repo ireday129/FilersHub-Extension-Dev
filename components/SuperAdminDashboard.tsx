@@ -5,7 +5,6 @@ import {
   Calendar,
   Search,
   CheckCircle,
-  TrendingUp,
   Mail,
   LogOut,
   Loader2,
@@ -13,13 +12,15 @@ import {
   X,
   Minus,
   Plus,
-  Zap,
   Megaphone,
   Trash2,
   Edit3,
   Eye,
   EyeOff,
-  PlusCircle
+  PlusCircle,
+  CreditCard,
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 import { Firm } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -52,6 +53,33 @@ const SuperAdminDashboard: React.FC = () => {
   const [editingUpdate, setEditingUpdate] = useState<string | null>(null);
   const [updateForm, setUpdateForm] = useState({ type: 'update' as 'update' | 'deadline', title: '', body: '' });
   const [savingUpdate, setSavingUpdate] = useState(false);
+
+  // Subscriptions state
+  interface SubscriptionRow {
+    subscription_id: string;
+    stripe_subscription_id: string | null;
+    stripe_customer_id: string | null;
+    plan_tier: string;
+    status: string;
+    current_period_start: string | null;
+    current_period_end: string | null;
+    cancel_at: string | null;
+    created_at: string;
+    firmName: string;
+    ownerEmail: string;
+  }
+  interface PendingSubRow {
+    id: string;
+    stripe_subscription_id: string;
+    customer_email: string;
+    plan_tier: string;
+    status: string;
+    created_at: string;
+  }
+  const [subscriptions, setSubscriptions] = useState<SubscriptionRow[]>([]);
+  const [pendingSubs, setPendingSubs] = useState<PendingSubRow[]>([]);
+  const [subsLoading, setSubsLoading] = useState(true);
+  const [subStatusFilter, setSubStatusFilter] = useState<string>('All');
 
   // Map DB tier values to display tier
   const normalizeTier = (dbTier: string): 'Core' | 'Pro' => {
@@ -188,6 +216,78 @@ const SuperAdminDashboard: React.FC = () => {
     fetchUpdates();
   }, []);
 
+  // Fetch subscriptions
+  useEffect(() => {
+    const fetchSubscriptions = async () => {
+      setSubsLoading(true);
+      try {
+        const { data: subsData } = await supabase
+          .from('subscriptions')
+          .select('subscription_id, stripe_subscription_id, stripe_customer_id, plan_tier, status, current_period_start, current_period_end, cancel_at, created_at, firm_id')
+          .order('created_at', { ascending: false });
+
+        if (subsData && subsData.length > 0) {
+          const firmIds = subsData.map((s: any) => s.firm_id);
+
+          const { data: firmNames } = await supabase
+            .from('firms')
+            .select('firm_id, firm_name')
+            .in('firm_id', firmIds);
+
+          const { data: owners } = await supabase
+            .from('staff')
+            .select('firm_id, email')
+            .in('firm_id', firmIds)
+            .eq('role', 'Firm Owner');
+
+          const nameMap = new Map((firmNames || []).map((f: any) => [f.firm_id, f.firm_name]));
+          const ownerMap = new Map((owners || []).map((o: any) => [o.firm_id, o.email]));
+
+          setSubscriptions(subsData.map((s: any) => ({
+            ...s,
+            firmName: nameMap.get(s.firm_id) || '—',
+            ownerEmail: ownerMap.get(s.firm_id) || '—'
+          })));
+        }
+
+        const { data: pendingData } = await supabase
+          .from('pending_subscriptions')
+          .select('id, stripe_subscription_id, customer_email, plan_tier, status, created_at')
+          .is('linked_firm_id', null)
+          .order('created_at', { ascending: false });
+
+        setPendingSubs(pendingData || []);
+      } catch (err) {
+        console.error('Error fetching subscriptions:', err);
+      } finally {
+        setSubsLoading(false);
+      }
+    };
+
+    fetchSubscriptions();
+  }, []);
+
+  const subStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'text-emerald-600 bg-emerald-50';
+      case 'trialing': return 'text-blue-600 bg-blue-50';
+      case 'past_due': return 'text-amber-600 bg-amber-50';
+      case 'canceled': return 'text-rose-600 bg-rose-50';
+      default: return 'text-slate-500 bg-slate-100';
+    }
+  };
+
+  const filteredSubs = useMemo(() => {
+    if (subStatusFilter === 'All') return subscriptions;
+    return subscriptions.filter(s => s.status === subStatusFilter);
+  }, [subscriptions, subStatusFilter]);
+
+  const subStats = useMemo(() => ({
+    active: subscriptions.filter(s => s.status === 'active').length,
+    pastDue: subscriptions.filter(s => s.status === 'past_due').length,
+    pending: pendingSubs.length,
+  }), [subscriptions, pendingSubs]);
+
   const handleCreateUpdate = async () => {
     if (!updateForm.title.trim() || !updateForm.body.trim()) return;
     setSavingUpdate(true);
@@ -298,7 +398,7 @@ const SuperAdminDashboard: React.FC = () => {
       </div>
 
       {/* Platform Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Firms</p>
           <div className="flex items-center justify-between">
@@ -309,29 +409,29 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pro Tier Firms</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Subs</p>
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-black text-slate-800">{loading ? '—' : stats.proFirms}</h3>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Zap size={16} />
+            <h3 className="text-2xl font-black text-slate-800">{subsLoading ? '—' : subStats.active}</h3>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CreditCard size={16} />
             </div>
           </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Staff</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Past Due</p>
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-black text-slate-800">{loading ? '—' : stats.totalStaff}</h3>
+            <h3 className="text-2xl font-black text-slate-800">{subsLoading ? '—' : subStats.pastDue}</h3>
             <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Users size={16} />
+              <AlertTriangle size={16} />
             </div>
           </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Clients</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pending Link</p>
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-black text-slate-800">{loading ? '—' : stats.totalClients}</h3>
+            <h3 className="text-2xl font-black text-slate-800">{subsLoading ? '—' : subStats.pending}</h3>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <TrendingUp size={16} />
+              <Clock size={16} />
             </div>
           </div>
         </div>
@@ -508,6 +608,147 @@ const SuperAdminDashboard: React.FC = () => {
               )}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Subscriptions */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <CreditCard size={16} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Subscriptions</h2>
+              <p className="text-xs text-slate-400">Stripe subscription status for all firms</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+            {['All', 'active', 'past_due', 'canceled', 'trialing'].map(s => (
+              <button
+                key={s}
+                onClick={() => setSubStatusFilter(s)}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${subStatusFilter === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+              >
+                {s === 'All' ? 'All' : s === 'past_due' ? 'Past Due' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50/50">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Firm</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Owner Email</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Tier</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Period End</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Stripe ID</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {subsLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <Loader2 size={24} className="animate-spin text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">Loading subscriptions...</p>
+                  </td>
+                </tr>
+              ) : filteredSubs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <CreditCard size={32} className="text-slate-200 mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">No subscriptions found.</p>
+                  </td>
+                </tr>
+              ) : filteredSubs.map(sub => (
+                <tr key={sub.subscription_id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-bold text-slate-800">{sub.firmName}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-1.5 text-slate-500">
+                      <Mail size={12} />
+                      <span className="text-xs">{sub.ownerEmail}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
+                      ['growth', 'enterprise', 'pro'].includes(sub.plan_tier?.toLowerCase())
+                        ? 'bg-amber-50 text-amber-600 border-amber-100'
+                        : 'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}>
+                      {sub.plan_tier}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${subStatusColor(sub.status)}`}>
+                      {sub.status === 'past_due' ? 'Past Due' : sub.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs text-slate-500">
+                      {sub.current_period_end
+                        ? new Date(sub.current_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {sub.stripe_subscription_id
+                        ? `${sub.stripe_subscription_id.slice(0, 20)}...`
+                        : '—'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pending (unlinked) subscriptions */}
+        {pendingSubs.length > 0 && (
+          <div className="border-t border-slate-200">
+            <div className="px-6 py-3 bg-amber-50/50 border-b border-amber-100">
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-amber-600" />
+                <p className="text-xs font-bold text-amber-700">Pending — Paid but not yet installed ({pendingSubs.length})</p>
+              </div>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {pendingSubs.map(ps => (
+                <div key={ps.id} className="px-6 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5 text-slate-500">
+                      <Mail size={12} />
+                      <span className="text-xs font-medium">{ps.customer_email}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
+                      ['growth', 'enterprise', 'pro'].includes(ps.plan_tier?.toLowerCase())
+                        ? 'bg-amber-50 text-amber-600 border-amber-100'
+                        : 'bg-slate-50 text-slate-600 border-slate-200'
+                    }`}>
+                      {ps.plan_tier}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${subStatusColor(ps.status)}`}>
+                      {ps.status}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    {new Date(ps.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="p-4 bg-slate-50 border-t border-slate-100">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            {subsLoading ? 'Loading...' : `${filteredSubs.length} subscription${filteredSubs.length !== 1 ? 's' : ''}`}
+          </p>
         </div>
       </div>
 

@@ -9,8 +9,9 @@ import Settings from './components/Settings';
 import Profile from './components/Profile';
 import TranscriptMonitorHub from './components/TranscriptMonitorHub';
 import SuperAdminDashboard from './components/SuperAdminDashboard';
+import SubscriptionBlockedScreen from './components/SubscriptionBlockedScreen';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, AlertTriangle } from 'lucide-react';
 import { useFirmData } from './hooks/useFirmData';
 import { useExtensionMode } from './hooks/useExtensionMode';
 import FirmSelection from './components/FirmSelection';
@@ -137,6 +138,11 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
       return <SuperAdminDashboard />;
     }
 
+    // Block access if subscription is canceled
+    if (firmSettings.subscriptionStatus === 'canceled') {
+      return <SubscriptionBlockedScreen />;
+    }
+
     switch (activeTab) {
       case NavItem.Dashboard:
         return (
@@ -232,6 +238,19 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
       )}
 
       <main className={`flex-1 overflow-y-auto ${isExtension ? 'p-3' : 'p-4 md:p-8'}`} style={{ position: 'relative', zIndex: 1 }}>
+        {firmSettings.subscriptionStatus === 'past_due' && selectedRole !== UserRole.SuperAdmin && (
+          <div className="max-w-7xl mx-auto mb-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-3">
+              <AlertTriangle className="text-amber-600 shrink-0" size={18} />
+              <div>
+                <p className="text-sm font-bold text-amber-800">Payment Issue</p>
+                <p className="text-xs text-amber-600">
+                  Your subscription payment failed. Please update your payment method to avoid service interruption.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="max-w-7xl mx-auto">
           <header className={`${isExtension ? 'mb-4' : 'mb-8'} flex ${isExtension ? 'flex-row items-start justify-between gap-4' : 'flex-col md:flex-row md:items-start justify-between gap-4'}`}>
             <div className="flex-1 min-w-0">

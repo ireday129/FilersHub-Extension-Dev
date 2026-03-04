@@ -22,6 +22,49 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Link pending Stripe subscriptions to a newly-created firm
+async function linkPendingSubscription(supabase: any, firmId: string, ownerEmail: string) {
+    if (!ownerEmail) return;
+
+    const { data: pending } = await supabase
+        .from('pending_subscriptions')
+        .select('*')
+        .eq('customer_email', ownerEmail.toLowerCase())
+        .is('linked_firm_id', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (!pending) return;
+
+    console.log(`Found pending subscription for ${ownerEmail}: ${pending.stripe_subscription_id}`);
+
+    await supabase.from('firms').update({
+        stripe_customer_id: pending.stripe_customer_id,
+        stripe_subscription_id: pending.stripe_subscription_id,
+        subscription_status: pending.status,
+        subscription_tier: pending.plan_tier,
+    }).eq('firm_id', firmId);
+
+    await supabase.from('subscriptions').upsert({
+        firm_id: firmId,
+        stripe_subscription_id: pending.stripe_subscription_id,
+        stripe_customer_id: pending.stripe_customer_id,
+        plan_tier: pending.plan_tier,
+        status: pending.status,
+        current_period_start: pending.current_period_start,
+        current_period_end: pending.current_period_end,
+        cancel_at: pending.cancel_at,
+    }, { onConflict: 'stripe_subscription_id' });
+
+    await supabase.from('pending_subscriptions').update({
+        linked_firm_id: firmId,
+        linked_at: new Date().toISOString()
+    }).eq('id', pending.id);
+
+    console.log(`Linked pending subscription ${pending.stripe_subscription_id} to firm ${firmId}`);
+}
+
 serve(async (req) => {
     const requestCorsHeaders = { ...corsHeaders, 'Access-Control-Allow-Origin': getCorsOrigin(req) };
 
@@ -939,6 +982,19 @@ serve(async (req) => {
                     }).eq('staff_id', existingStaff.staff_id);
                 }
 
+                // Link pending Stripe subscription if firm was just created (trialing)
+                if (firmId && email) {
+                    const { data: firmSubCheck } = await supabaseAdmin
+                        .from('firms')
+                        .select('subscription_status')
+                        .eq('firm_id', firmId)
+                        .maybeSingle();
+
+                    if (firmSubCheck?.subscription_status === 'trialing') {
+                        await linkPendingSubscription(supabaseAdmin, firmId, email);
+                    }
+                }
+
                 // 4. Generate Magic Link & Create Session Server-Side
                 // We verify the OTP server-side so we control the redirect URL
                 // (bypasses Supabase Site URL / Redirect URL allowlist config)
@@ -1029,6 +1085,18 @@ serve(async (req) => {
                                     }).eq('staff_id', existingStaff.staff_id);
                                 }
                             }
+                        }
+                    }
+                    // Link pending Stripe subscription if firm was just created (trialing)
+                    if (firmId && email) {
+                        const { data: firmSubCheck } = await supabaseAdmin
+                            .from('firms')
+                            .select('subscription_status')
+                            .eq('firm_id', firmId)
+                            .maybeSingle();
+
+                        if (firmSubCheck?.subscription_status === 'trialing') {
+                            await linkPendingSubscription(supabaseAdmin, firmId, email);
                         }
                     }
                 } catch (err) {

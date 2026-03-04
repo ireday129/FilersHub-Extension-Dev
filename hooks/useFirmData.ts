@@ -21,7 +21,8 @@ export const useFirmData = () => {
         color: '',
         slug: '',
         portalMessage: '',
-        irsAlertsEnabled: false
+        irsAlertsEnabled: false,
+        subscriptionStatus: 'active' as string
     });
 
     const fetchData = useCallback(async () => {
@@ -37,7 +38,9 @@ export const useFirmData = () => {
                     logo: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6970261e7b1aed27424cce3c.png',
                     color: '#42ab31',
                     slug: 'dev-firm',
-                    portalMessage: ''
+                    portalMessage: '',
+                    irsAlertsEnabled: false,
+                    subscriptionStatus: 'active'
                 });
                 // Mock Returns
                 setReturns([
@@ -165,7 +168,7 @@ export const useFirmData = () => {
             const firmIds = Array.from(allFirmsMap.keys());
             const { data: firmsDetails, error: firmsError } = await supabase
                 .from('firms')
-                .select('firm_id, firm_name, logo_url, brand_color, slug, portal_message, irs_alerts_enabled, ghl_alert_webhook_url')
+                .select('firm_id, firm_name, logo_url, brand_color, slug, portal_message, irs_alerts_enabled, ghl_alert_webhook_url, subscription_status')
                 .in('firm_id', firmIds);
 
             if (firmsError) {
@@ -183,6 +186,7 @@ export const useFirmData = () => {
                         existing.portalMessage = f.portal_message || '';
                         existing.irsAlertsEnabled = f.irs_alerts_enabled || false;
                         existing.ghlAlertWebhookUrl = f.ghl_alert_webhook_url || null;
+                        existing.subscriptionStatus = f.subscription_status || 'active';
                     }
                 });
             }
@@ -220,7 +224,8 @@ export const useFirmData = () => {
                 color: selectedFirm.brandColor || '#3b82f6',
                 slug: selectedFirm.slug || '',
                 portalMessage: selectedFirm.portalMessage || '',
-                irsAlertsEnabled: selectedFirm.irsAlertsEnabled || false
+                irsAlertsEnabled: selectedFirm.irsAlertsEnabled || false,
+                subscriptionStatus: selectedFirm.subscriptionStatus || 'active'
             });
 
             // Now load data SPECIFIC to this firm and role

@@ -223,6 +223,7 @@ export interface FirmOption {
   ghlAlertWebhookUrl?: string | null;
   staffName?: string;
   portalMessage?: string;
+  subscriptionStatus?: string;
 }
 
 export interface TaxReturn {
