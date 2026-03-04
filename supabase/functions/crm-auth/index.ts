@@ -7,6 +7,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 const ALLOWED_ORIGINS = [
     Deno.env.get('APP_URL') || 'https://app.filershub.com',
     'https://app.filershub.com',
+    'https://dev.filershub.com',
     'chrome-extension://',
 ];
 
