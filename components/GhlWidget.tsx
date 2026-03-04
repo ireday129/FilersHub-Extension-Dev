@@ -55,6 +55,9 @@ const WIDGET_KEYFRAMES = `
 `;
 
 
+const LAUNCH_DATE = new Date('2026-04-15T00:00:00');
+const isPreLaunch = new Date() < LAUNCH_DATE;
+
 const GhlWidget: React.FC = () => {
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -185,7 +188,12 @@ const GhlWidget: React.FC = () => {
                 />
               </div>
             </div>
-            <div className="divide-y divide-slate-100">
+            {isPreLaunch && (
+              <div className="px-4 pb-2">
+                <p className="text-xs text-slate-400 italic">Available after launch day</p>
+              </div>
+            )}
+            <div className="divide-y divide-slate-100" style={isPreLaunch ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
               {ONBOARDING_STEPS.map((step) => {
                 const done = completedSteps.has(step.id);
                 return (
