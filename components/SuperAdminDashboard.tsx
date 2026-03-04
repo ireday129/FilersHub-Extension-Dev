@@ -23,7 +23,8 @@ import {
   Clock,
   ShieldCheck,
   Link2,
-  Unlink
+  Unlink,
+  RefreshCw
 } from 'lucide-react';
 import { Firm } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -83,6 +84,8 @@ const SuperAdminDashboard: React.FC = () => {
   const [pendingSubs, setPendingSubs] = useState<PendingSubRow[]>([]);
   const [subsLoading, setSubsLoading] = useState(true);
   const [subStatusFilter, setSubStatusFilter] = useState<string>('All');
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: number; pending: number; skipped: number } | null>(null);
 
   // Map DB tier values to display tier
   const normalizeTier = (dbTier: string): 'Core' | 'Pro' | 'IRS Alerts' => {
@@ -214,6 +217,25 @@ const SuperAdminDashboard: React.FC = () => {
       ));
     } catch (err) {
       console.error('Error overriding access:', err);
+    }
+  };
+
+  const handleStripeSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-sync');
+      if (error) throw error;
+
+      setSyncResult({ synced: data.synced, pending: data.pending, skipped: data.skipped });
+
+      // Reload the page data after sync
+      window.location.reload();
+    } catch (err) {
+      console.error('Stripe sync error:', err);
+      setSyncResult({ synced: 0, pending: 0, skipped: -1 });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -646,16 +668,26 @@ const SuperAdminDashboard: React.FC = () => {
               <p className="text-xs text-slate-400">Stripe subscription status for all firms</p>
             </div>
           </div>
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-            {['All', 'active', 'past_due', 'canceled', 'trialing'].map(s => (
-              <button
-                key={s}
-                onClick={() => setSubStatusFilter(s)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${subStatusFilter === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
-              >
-                {s === 'All' ? 'All' : s === 'past_due' ? 'Past Due' : s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleStripeSync}
+              disabled={syncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 rounded-lg transition-colors"
+            >
+              <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Syncing...' : 'Sync Stripe'}
+            </button>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+              {['All', 'active', 'past_due', 'canceled', 'trialing'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setSubStatusFilter(s)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${subStatusFilter === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                >
+                  {s === 'All' ? 'All' : s === 'past_due' ? 'Past Due' : s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
