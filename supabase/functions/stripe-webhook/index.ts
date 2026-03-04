@@ -85,34 +85,87 @@ async function resolveFirmId(supabase: any, stripeCustomerId: string, customerEm
     return null;
 }
 
-async function resolveTier(supabase: any, priceId: string): Promise<{ plan_tier: string; max_clients: number; max_staff: number }> {
+async function resolveTier(supabase: any, priceId: string): Promise<{ plan_tier: string; max_clients: number; max_staff: number; is_addon: boolean }> {
     const { data: mapping } = await supabase
         .from('stripe_tier_map')
-        .select('plan_tier, max_clients, max_staff')
+        .select('plan_tier, max_clients, max_staff, is_addon')
         .eq('stripe_price_id', priceId)
         .maybeSingle();
 
-    if (mapping) return mapping;
+    if (mapping) return { ...mapping, is_addon: mapping.is_addon ?? false };
 
     console.warn(`No tier mapping found for price ${priceId}, defaulting to Core`);
-    return { plan_tier: 'Core', max_clients: 500, max_staff: 10 };
+    return { plan_tier: 'Core', max_clients: 500, max_staff: 10, is_addon: false };
 }
 
-async function updateFirmSubscription(supabase: any, firmId: string, sub: any, tier: { plan_tier: string; max_clients: number; max_staff: number }) {
-    await supabase.from('firms').update({
-        stripe_subscription_id: sub.id,
-        stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : sub.customer?.id,
-        subscription_status: sub.status,
-        subscription_tier: tier.plan_tier,
-        max_clients: tier.max_clients,
-        max_staff: tier.max_staff,
-        updated_at: new Date().toISOString()
-    }).eq('firm_id', firmId);
+async function updateFirmSubscription(supabase: any, firmId: string, sub: any, tier: { plan_tier: string; max_clients: number; max_staff: number; is_addon: boolean }) {
+    const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
+    const isActive = sub.status === 'active' || sub.status === 'trialing';
 
+    if (tier.is_addon) {
+        // ── ADD-ON SUBSCRIPTION (IRS Alerts) ──
+        // Do NOT overwrite subscription_tier, max_clients, max_staff, or stripe_subscription_id
+        const firmUpdate: Record<string, any> = {
+            stripe_customer_id: customerId,
+            irs_alerts_enabled: isActive,
+            irs_addon_subscription_id: sub.id,
+            updated_at: new Date().toISOString()
+        };
+
+        // If add-on is canceled, keep IRS alerts ON if firm is on Pro (Pro includes IRS Alerts)
+        if (!isActive) {
+            const { data: firm } = await supabase
+                .from('firms')
+                .select('subscription_tier')
+                .eq('firm_id', firmId)
+                .maybeSingle();
+
+            if (firm?.subscription_tier === 'Pro') {
+                firmUpdate.irs_alerts_enabled = true;
+            }
+        }
+
+        await supabase.from('firms').update(firmUpdate).eq('firm_id', firmId);
+    } else {
+        // ── BASE PLAN SUBSCRIPTION (Core or Pro) ──
+        const firmUpdate: Record<string, any> = {
+            stripe_subscription_id: sub.id,
+            stripe_customer_id: customerId,
+            subscription_status: sub.status,
+            subscription_tier: tier.plan_tier,
+            max_clients: tier.max_clients,
+            max_staff: tier.max_staff,
+            updated_at: new Date().toISOString()
+        };
+
+        // Auto-enable IRS alerts for Pro
+        if (tier.plan_tier === 'Pro' && isActive) {
+            firmUpdate.irs_alerts_enabled = true;
+        }
+
+        // If Pro is canceled, disable IRS alerts UNLESS a standalone add-on is active
+        if (tier.plan_tier === 'Pro' && !isActive) {
+            const { data: addonSub } = await supabase
+                .from('subscriptions')
+                .select('status')
+                .eq('firm_id', firmId)
+                .eq('plan_tier', 'IRS Alerts')
+                .in('status', ['active', 'trialing'])
+                .maybeSingle();
+
+            firmUpdate.irs_alerts_enabled = !!addonSub;
+        }
+
+        // Core cancellation: don't touch irs_alerts_enabled (controlled by add-on)
+
+        await supabase.from('firms').update(firmUpdate).eq('firm_id', firmId);
+    }
+
+    // Always record in subscriptions table (supports multiple per firm)
     await supabase.from('subscriptions').upsert({
         firm_id: firmId,
         stripe_subscription_id: sub.id,
-        stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : sub.customer?.id,
+        stripe_customer_id: customerId,
         plan_tier: tier.plan_tier,
         status: sub.status,
         current_period_start: sub.current_period_start
@@ -128,7 +181,7 @@ async function updateFirmSubscription(supabase: any, firmId: string, sub: any, t
     }, { onConflict: 'stripe_subscription_id' });
 }
 
-async function upsertPending(supabase: any, sub: any, customerEmail: string, tier: { plan_tier: string }) {
+async function upsertPending(supabase: any, sub: any, customerEmail: string, tier: { plan_tier: string; is_addon: boolean }) {
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
 
     await supabase.from('pending_subscriptions').upsert({
@@ -136,6 +189,7 @@ async function upsertPending(supabase: any, sub: any, customerEmail: string, tie
         stripe_subscription_id: sub.id,
         customer_email: customerEmail.toLowerCase(),
         plan_tier: tier.plan_tier,
+        is_addon: tier.is_addon ?? false,
         status: sub.status,
         current_period_start: sub.current_period_start
             ? new Date(sub.current_period_start * 1000).toISOString()
@@ -180,7 +234,7 @@ async function handleCheckoutCompleted(supabase: any, session: any) {
 
     const sub = await subResp.json();
     const priceId = sub.items?.data?.[0]?.price?.id;
-    const tier = priceId ? await resolveTier(supabase, priceId) : { plan_tier: 'Core', max_clients: 500, max_staff: 10 };
+    const tier = priceId ? await resolveTier(supabase, priceId) : { plan_tier: 'Core', max_clients: 500, max_staff: 10, is_addon: false };
 
     const firmId = await resolveFirmId(supabase, customerId, customerEmail);
 
@@ -196,7 +250,7 @@ async function handleCheckoutCompleted(supabase: any, session: any) {
 async function handleSubscriptionChange(supabase: any, sub: any) {
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
     const priceId = sub.items?.data?.[0]?.price?.id;
-    const tier = priceId ? await resolveTier(supabase, priceId) : { plan_tier: 'Core', max_clients: 500, max_staff: 10 };
+    const tier = priceId ? await resolveTier(supabase, priceId) : { plan_tier: 'Core', max_clients: 500, max_staff: 10, is_addon: false };
 
     // Try to resolve firm
     const customerEmail = await getStripeCustomerEmail(customerId);

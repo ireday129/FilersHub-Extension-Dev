@@ -26,43 +26,63 @@ const corsHeaders = {
 async function linkPendingSubscription(supabase: any, firmId: string, ownerEmail: string) {
     if (!ownerEmail) return;
 
-    const { data: pending } = await supabase
+    // Fetch ALL unlinked pending subscriptions for this email (base plan + add-ons)
+    const { data: pendingList } = await supabase
         .from('pending_subscriptions')
         .select('*')
         .eq('customer_email', ownerEmail.toLowerCase())
         .is('linked_firm_id', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
-    if (!pending) return;
+    if (!pendingList || pendingList.length === 0) return;
 
-    console.log(`Found pending subscription for ${ownerEmail}: ${pending.stripe_subscription_id}`);
+    for (const pending of pendingList) {
+        const isActive = pending.status === 'active' || pending.status === 'trialing';
+        console.log(`Found pending subscription for ${ownerEmail}: ${pending.stripe_subscription_id} (addon: ${pending.is_addon})`);
 
-    await supabase.from('firms').update({
-        stripe_customer_id: pending.stripe_customer_id,
-        stripe_subscription_id: pending.stripe_subscription_id,
-        subscription_status: pending.status,
-        subscription_tier: pending.plan_tier,
-    }).eq('firm_id', firmId);
+        if (pending.is_addon) {
+            // Add-on: only set irs_alerts_enabled and irs_addon_subscription_id
+            await supabase.from('firms').update({
+                stripe_customer_id: pending.stripe_customer_id,
+                irs_alerts_enabled: isActive,
+                irs_addon_subscription_id: pending.stripe_subscription_id,
+            }).eq('firm_id', firmId);
+        } else {
+            // Base plan: set tier, limits, status + auto-enable IRS alerts for Pro
+            const firmUpdate: Record<string, any> = {
+                stripe_customer_id: pending.stripe_customer_id,
+                stripe_subscription_id: pending.stripe_subscription_id,
+                subscription_status: pending.status,
+                subscription_tier: pending.plan_tier,
+            };
 
-    await supabase.from('subscriptions').upsert({
-        firm_id: firmId,
-        stripe_subscription_id: pending.stripe_subscription_id,
-        stripe_customer_id: pending.stripe_customer_id,
-        plan_tier: pending.plan_tier,
-        status: pending.status,
-        current_period_start: pending.current_period_start,
-        current_period_end: pending.current_period_end,
-        cancel_at: pending.cancel_at,
-    }, { onConflict: 'stripe_subscription_id' });
+            if (pending.plan_tier === 'Pro' && isActive) {
+                firmUpdate.irs_alerts_enabled = true;
+            }
 
-    await supabase.from('pending_subscriptions').update({
-        linked_firm_id: firmId,
-        linked_at: new Date().toISOString()
-    }).eq('id', pending.id);
+            await supabase.from('firms').update(firmUpdate).eq('firm_id', firmId);
+        }
 
-    console.log(`Linked pending subscription ${pending.stripe_subscription_id} to firm ${firmId}`);
+        // Record in subscriptions table
+        await supabase.from('subscriptions').upsert({
+            firm_id: firmId,
+            stripe_subscription_id: pending.stripe_subscription_id,
+            stripe_customer_id: pending.stripe_customer_id,
+            plan_tier: pending.plan_tier,
+            status: pending.status,
+            current_period_start: pending.current_period_start,
+            current_period_end: pending.current_period_end,
+            cancel_at: pending.cancel_at,
+        }, { onConflict: 'stripe_subscription_id' });
+
+        // Mark as linked
+        await supabase.from('pending_subscriptions').update({
+            linked_firm_id: firmId,
+            linked_at: new Date().toISOString()
+        }).eq('id', pending.id);
+
+        console.log(`Linked pending subscription ${pending.stripe_subscription_id} to firm ${firmId}`);
+    }
 }
 
 serve(async (req) => {
