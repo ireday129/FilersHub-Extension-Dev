@@ -18,6 +18,9 @@ import FirmSelection from './components/FirmSelection';
 import GhlWidget from './components/GhlWidget';
 import Tutorials from './components/Tutorials';
 import CrmAccessPage from './components/CrmAccessPage';
+import PreLaunchScreen from './components/PreLaunchScreen';
+
+const LAUNCH_DATE = new Date('2026-04-15T00:00:00');
 
 const DASHBOARD_FLOATERS = [
   { src: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6993c6753b3cc9e7ef06603a.png', style: { top: 40, left: -60, width: 480 }, anim: 'floatA 5s ease-in-out infinite' },
@@ -511,6 +514,11 @@ const AppContent: React.FC = () => {
 
     // Home page: Staff Login (default landing page)
     return <StaffLogin ghlContext={isExtension ? ghlContext : null} />;
+  }
+
+  // Pre-launch gate — show coming soon screen until launch date
+  if (new Date() < LAUNCH_DATE) {
+    return <PreLaunchScreen />;
   }
 
   return <AuthenticatedApp targetFirmId={crmFirmId} />;
