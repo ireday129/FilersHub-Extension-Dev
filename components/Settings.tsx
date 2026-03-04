@@ -247,7 +247,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       const token = await getFreshToken();
 
       const { data, error } = await supabase.functions.invoke('crm-users', {
-        body: { action: 'list' },
+        body: { action: 'list', firmId },
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -279,6 +279,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       const { data, error } = await supabase.functions.invoke('crm-users', {
         body: {
           action: 'grant',
+          firmId,
           ghlUserId: user.id,
           email: user.email,
           name: user.name || `${user.firstName} ${user.lastName}`,
@@ -322,7 +323,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     try {
       const token = await getFreshToken();
       const { data, error } = await supabase.functions.invoke('crm-users', {
-        body: { action: 'update-role', staffId: id, role: newRole },
+        body: { action: 'update-role', firmId, staffId: id, role: newRole },
         headers: { Authorization: `Bearer ${token}` }
       });
       if (data?.error) throw new Error(data.error);
@@ -339,7 +340,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       const token = await getFreshToken();
 
       const { data, error } = await supabase.functions.invoke('crm-users', {
-        body: { action: 'revoke', staffId },
+        body: { action: 'revoke', firmId, staffId },
         headers: { Authorization: `Bearer ${token}` }
       });
       if (data?.error) throw new Error(data.error);

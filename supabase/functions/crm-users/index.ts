@@ -146,14 +146,20 @@ serve(async (req) => {
         const url = new URL(req.url)
         const action = body.action || url.searchParams.get('action')
 
-        // 1. Get staff record
-        const { data: staffData, error: staffError } = await supabaseAdmin
+        // 1. Get staff record — use provided firmId if available (multi-firm support)
+        const requestedFirmId = body.firmId || null;
+
+        let staffQuery = supabaseAdmin
             .from('staff')
             .select('firm_id, role')
             .eq('auth_user_id', user.id)
-            .eq('is_active', true)
-            .limit(1)
-            .maybeSingle()
+            .eq('is_active', true);
+
+        if (requestedFirmId) {
+            staffQuery = staffQuery.eq('firm_id', requestedFirmId);
+        }
+
+        const { data: staffData, error: staffError } = await staffQuery.limit(1).maybeSingle();
 
         if (staffError) throw new Error(`Staff lookup failed: ${staffError.message}`)
         if (!staffData) throw new Error(`No active staff record found for user ${user.email}`)
