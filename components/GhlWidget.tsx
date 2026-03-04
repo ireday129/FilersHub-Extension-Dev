@@ -54,27 +54,6 @@ const WIDGET_KEYFRAMES = `
 @keyframes floatE { 0%, 100% { transform: translateY(0) rotate(-40deg); } 50% { transform: translateY(-10px) rotate(-35deg); } }
 `;
 
-const LAUNCH_DATE = '2026-04-15T00:00:00';
-
-function useCountdown(targetDate: string) {
-  const calc = () => {
-    const diff = new Date(targetDate).getTime() - Date.now();
-    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
-    return {
-      days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-      hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-      minutes: Math.floor((diff / (1000 * 60)) % 60),
-      seconds: Math.floor((diff / 1000) % 60),
-      expired: false,
-    };
-  };
-  const [time, setTime] = useState(calc);
-  useEffect(() => {
-    const id = setInterval(() => setTime(calc), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return time;
-}
 
 const GhlWidget: React.FC = () => {
   const [authorized, setAuthorized] = useState(false);
@@ -82,8 +61,6 @@ const GhlWidget: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [updates, setUpdates] = useState<PlatformUpdate[]>([]);
-  const countdown = useCountdown(LAUNCH_DATE);
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const locationId = params.get('location_id');
@@ -182,31 +159,6 @@ const GhlWidget: React.FC = () => {
       ))}
 
       <div className="max-w-2xl mx-auto space-y-4" style={{ position: 'relative', zIndex: 1 }}>
-        {/* Launch Countdown */}
-        {!countdown.expired && (
-          <div className="rounded-xl px-4 py-3 text-center" style={{ background: `linear-gradient(135deg, ${FH_GREEN}, #2d8a1e)`, ...card, animation: 'fadeIn 0.4s ease-out forwards' }}>
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Rocket className="w-4 h-4 text-white" />
-              <span className="text-white text-sm font-semibold">FilersHub Goes Live April 15, 2026</span>
-            </div>
-            <div className="flex items-center justify-center gap-3">
-              {[
-                { val: countdown.days, label: 'Days' },
-                { val: countdown.hours, label: 'Hrs' },
-                { val: countdown.minutes, label: 'Min' },
-                { val: countdown.seconds, label: 'Sec' },
-              ].map((item) => (
-                <div key={item.label} className="flex flex-col items-center">
-                  <span className="text-white text-2xl font-bold leading-none tabular-nums" style={{ minWidth: 40 }}>
-                    {String(item.val).padStart(2, '0')}
-                  </span>
-                  <span className="text-white/70 text-[10px] font-medium mt-0.5">{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Header */}
         <div className="text-center pt-2 pb-2" style={{ animation: 'fadeIn 0.4s ease-out forwards' }}>
           <img src={LOGO_URL} alt="FilersHub" className="h-9 mx-auto mb-3" />
@@ -233,12 +185,7 @@ const GhlWidget: React.FC = () => {
                 />
               </div>
             </div>
-            {!countdown.expired && (
-              <div className="px-4 pb-2">
-                <p className="text-xs text-slate-400 italic">Available after launch day</p>
-              </div>
-            )}
-            <div className="divide-y divide-slate-100" style={!countdown.expired ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
+            <div className="divide-y divide-slate-100">
               {ONBOARDING_STEPS.map((step) => {
                 const done = completedSteps.has(step.id);
                 return (
