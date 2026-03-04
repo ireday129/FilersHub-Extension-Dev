@@ -22,7 +22,7 @@ interface NavbarProps {
   compact?: boolean;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName, firmLogo, irsAlertsEnabled, compact }) => {
+const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmLogo, irsAlertsEnabled, compact }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const isStaff = isStaffRole(role);
@@ -108,8 +108,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, role, firmName
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
             title="My Profile"
           >
-            <span className={`${compact ? 'text-base' : 'text-xl'} font-bold text-slate-800 tracking-tight hidden sm:block`}>{firmName}</span>
-            {firmLogo && <img src={firmLogo} alt={`${firmName} Logo`} className={`${compact ? 'h-7' : 'h-9'} w-auto object-contain`} />}
+            {firmLogo && <img src={firmLogo} alt="Firm Logo" className={`${compact ? 'h-7' : 'h-9'} w-auto object-contain`} />}
           </button>
         </div>
       </div>
