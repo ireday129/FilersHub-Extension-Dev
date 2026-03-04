@@ -86,6 +86,9 @@ const SuperAdminDashboard: React.FC = () => {
   const [subStatusFilter, setSubStatusFilter] = useState<string>('All');
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ synced: number; pending: number; skipped: number; error?: string } | null>(null);
+  const [linkingPendingId, setLinkingPendingId] = useState<string | null>(null);
+  const [linkingFirmId, setLinkingFirmId] = useState<string>('');
+  const [linkingInProgress, setLinkingInProgress] = useState(false);
 
   // Map DB tier values to display tier
   const normalizeTier = (dbTier: string): 'Core' | 'Pro' | 'IRS Alerts' => {
@@ -217,6 +220,38 @@ const SuperAdminDashboard: React.FC = () => {
       ));
     } catch (err) {
       console.error('Error overriding access:', err);
+    }
+  };
+
+  const unlinkedFirms = useMemo(() => {
+    return firms.filter(f => !f.stripeSubscriptionId);
+  }, [firms]);
+
+  const handleLinkPendingToFirm = async (pendingEmail: string, firmId: string) => {
+    if (!firmId) return;
+    setLinkingInProgress(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('crm-auth', {
+        body: { action: 'claim-subscription', email: pendingEmail, firmId }
+      });
+
+      if (error) {
+        console.error('Link error:', error);
+        return;
+      }
+
+      if (data?.linked) {
+        // Remove from pending list and refresh firms
+        setPendingSubs(prev => prev.filter(ps => ps.customer_email !== pendingEmail));
+        setLinkingPendingId(null);
+        setLinkingFirmId('');
+        // Reload to refresh all data
+        setTimeout(() => window.location.reload(), 500);
+      }
+    } catch (err) {
+      console.error('Link error:', err);
+    } finally {
+      setLinkingInProgress(false);
     }
   };
 
@@ -797,8 +832,8 @@ const SuperAdminDashboard: React.FC = () => {
             </div>
             <div className="divide-y divide-slate-100">
               {pendingSubs.map(ps => (
-                <div key={ps.id} className="px-6 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                <div key={ps.id} className="px-6 py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-4 min-w-0">
                     <div className="flex items-center gap-1.5 text-slate-500">
                       <Mail size={12} />
                       <span className="text-xs font-medium">{ps.customer_email}</span>
@@ -814,9 +849,49 @@ const SuperAdminDashboard: React.FC = () => {
                       {ps.status}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400">
-                    {new Date(ps.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {linkingPendingId === ps.id ? (
+                      <>
+                        <select
+                          value={linkingFirmId}
+                          onChange={(e) => setLinkingFirmId(e.target.value)}
+                          className="px-2 py-1 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 max-w-[200px]"
+                        >
+                          <option value="">Select a firm...</option>
+                          {unlinkedFirms.map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => handleLinkPendingToFirm(ps.customer_email, linkingFirmId)}
+                          disabled={!linkingFirmId || linkingInProgress}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-colors"
+                        >
+                          {linkingInProgress ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
+                          Link
+                        </button>
+                        <button
+                          onClick={() => { setLinkingPendingId(null); setLinkingFirmId(''); }}
+                          className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(ps.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                        <button
+                          onClick={() => { setLinkingPendingId(ps.id); setLinkingFirmId(''); }}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                        >
+                          <Link2 size={12} />
+                          Link to Firm
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
