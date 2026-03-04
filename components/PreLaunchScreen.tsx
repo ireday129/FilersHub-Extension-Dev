@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle, LogOut, Calendar } from 'lucide-react';
 import { FILERSHUB_LOGO_URL } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
+import { WatermarkBackground } from './WatermarkBackground';
 
 const LAUNCH_DATE = new Date('2026-04-15T00:00:00');
 
@@ -30,7 +31,8 @@ const PreLaunchScreen: React.FC = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-            <div className="max-w-md w-full text-center">
+            <WatermarkBackground />
+            <div className="max-w-md w-full text-center relative z-10">
                 <img
                     src={FILERSHUB_LOGO_URL}
                     alt="FilersHub"
