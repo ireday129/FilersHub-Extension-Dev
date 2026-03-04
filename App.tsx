@@ -471,6 +471,12 @@ const AppContent: React.FC = () => {
     return <ResetPassword />;
   }
 
+  // Pre-launch gate — only on production CRM path, before validation
+  const isProduction = window.location.hostname === 'app.filershub.com';
+  if (isProduction && path === '/crm' && new Date() < LAUNCH_DATE) {
+    return <PreLaunchScreen />;
+  }
+
   // CRM Access Page — always validate location, even when authenticated
   if (path === '/crm') {
     if (!user) {
@@ -514,12 +520,6 @@ const AppContent: React.FC = () => {
 
     // Home page: Staff Login (default landing page)
     return <StaffLogin ghlContext={isExtension ? ghlContext : null} />;
-  }
-
-  // Pre-launch gate — only on production CRM path
-  const isProduction = window.location.hostname === 'app.filershub.com';
-  if (isProduction && path === '/crm' && new Date() < LAUNCH_DATE) {
-    return <PreLaunchScreen />;
   }
 
   return <AuthenticatedApp targetFirmId={crmFirmId} />;
