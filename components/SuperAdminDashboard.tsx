@@ -85,7 +85,7 @@ const SuperAdminDashboard: React.FC = () => {
   const [subsLoading, setSubsLoading] = useState(true);
   const [subStatusFilter, setSubStatusFilter] = useState<string>('All');
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ synced: number; pending: number; skipped: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ synced: number; pending: number; skipped: number; error?: string } | null>(null);
 
   // Map DB tier values to display tier
   const normalizeTier = (dbTier: string): 'Core' | 'Pro' | 'IRS Alerts' => {
@@ -225,15 +225,26 @@ const SuperAdminDashboard: React.FC = () => {
     setSyncResult(null);
     try {
       const { data, error } = await supabase.functions.invoke('stripe-sync');
-      if (error) throw error;
 
-      setSyncResult({ synced: data.synced, pending: data.pending, skipped: data.skipped });
+      if (error) {
+        console.error('Stripe sync error:', error);
+        setSyncResult({ synced: 0, pending: 0, skipped: 0, error: error.message || JSON.stringify(error) });
+        return;
+      }
 
-      // Reload the page data after sync
-      window.location.reload();
-    } catch (err) {
+      if (data?.error) {
+        console.error('Stripe sync function error:', data.error);
+        setSyncResult({ synced: 0, pending: 0, skipped: 0, error: data.error });
+        return;
+      }
+
+      setSyncResult({ synced: data.synced ?? 0, pending: data.pending ?? 0, skipped: data.skipped ?? 0 });
+
+      // Reload after a short delay so user can see the result
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (err: any) {
       console.error('Stripe sync error:', err);
-      setSyncResult({ synced: 0, pending: 0, skipped: -1 });
+      setSyncResult({ synced: 0, pending: 0, skipped: 0, error: err?.message || 'Unknown error' });
     } finally {
       setSyncing(false);
     }
@@ -690,6 +701,18 @@ const SuperAdminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {syncResult && (
+          <div className={`px-6 py-3 border-b border-slate-100 ${syncResult.error ? 'bg-rose-50' : 'bg-emerald-50'}`}>
+            {syncResult.error ? (
+              <p className="text-xs font-bold text-rose-600">Sync failed: {syncResult.error}</p>
+            ) : (
+              <p className="text-xs font-bold text-emerald-700">
+                Sync complete: {syncResult.synced} linked to firms, {syncResult.pending} stored as pending, {syncResult.skipped} skipped
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">
