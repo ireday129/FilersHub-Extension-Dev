@@ -20,7 +20,10 @@ import {
   PlusCircle,
   CreditCard,
   AlertTriangle,
-  Clock
+  Clock,
+  ShieldCheck,
+  Link2,
+  Unlink
 } from 'lucide-react';
 import { Firm } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -102,7 +105,7 @@ const SuperAdminDashboard: React.FC = () => {
         // Fetch firms with staff relationships in one query
         const { data: firmsData, error: firmsError } = await supabase
           .from('firms')
-          .select('firm_id, firm_name, logo_url, slug, subscription_tier, subscription_status, max_staff, ghl_location_id, created_at, irs_alerts_enabled')
+          .select('firm_id, firm_name, logo_url, slug, subscription_tier, subscription_status, max_staff, ghl_location_id, created_at, irs_alerts_enabled, stripe_subscription_id')
           .order('created_at', { ascending: false });
 
         if (firmsError) throw firmsError;
@@ -142,6 +145,7 @@ const SuperAdminDashboard: React.FC = () => {
             ghlIntegrated: !!f.ghl_location_id,
             slug: f.slug || '',
             irsAlertsEnabled: !!f.irs_alerts_enabled,
+            stripeSubscriptionId: f.stripe_subscription_id || null,
           };
         });
 
@@ -192,6 +196,24 @@ const SuperAdminDashboard: React.FC = () => {
       ));
     } catch (err) {
       console.error('Error toggling IRS Alerts:', err);
+    }
+  };
+
+  const handleOverrideAccess = async (firmId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'trialing' : 'active';
+    try {
+      const { error } = await supabase
+        .from('firms')
+        .update({ subscription_status: newStatus, updated_at: new Date().toISOString() })
+        .eq('firm_id', firmId);
+
+      if (error) throw error;
+
+      setFirms(prev => prev.map(f =>
+        f.id === firmId ? { ...f, subscriptionStatus: newStatus } : f
+      ));
+    } catch (err) {
+      console.error('Error overriding access:', err);
     }
   };
 
@@ -789,6 +811,8 @@ const SuperAdminDashboard: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Firm Details</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Owner Info</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Tier</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Stripe</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Access</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Staff Seats</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Clients</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Install Date</th>
@@ -799,14 +823,14 @@ const SuperAdminDashboard: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={10} className="px-6 py-16 text-center">
                     <Loader2 size={24} className="animate-spin text-slate-300 mx-auto mb-2" />
                     <p className="text-sm text-slate-400">Loading firms...</p>
                   </td>
                 </tr>
               ) : filteredFirms.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={10} className="px-6 py-16 text-center">
                     <Building2 size={32} className="text-slate-200 mx-auto mb-2" />
                     <p className="text-sm text-slate-400">No firms found.</p>
                   </td>
@@ -824,10 +848,6 @@ const SuperAdminDashboard: React.FC = () => {
                       )}
                       <div>
                         <p className="text-sm font-bold text-slate-800">{firm.name}</p>
-                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase ${firm.subscriptionStatus === 'active' ? 'text-emerald-600 bg-emerald-50' :
-                            firm.subscriptionStatus === 'trialing' ? 'text-blue-600 bg-blue-50' :
-                              'text-slate-500 bg-slate-100'
-                          }`}>{firm.subscriptionStatus}</span>
                       </div>
                     </div>
                   </td>
@@ -847,6 +867,39 @@ const SuperAdminDashboard: React.FC = () => {
                       }`}>
                       {firm.subscriptionTier}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {firm.stripeSubscriptionId ? (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg" title={firm.stripeSubscriptionId}>
+                        <Link2 size={12} />
+                        <span className="text-[10px] font-bold">Connected</span>
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-400 rounded-lg">
+                        <Unlink size={12} />
+                        <span className="text-[10px] font-bold">None</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {firm.stripeSubscriptionId ? (
+                      <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${subStatusColor(firm.subscriptionStatus)}`}>
+                        {firm.subscriptionStatus}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleOverrideAccess(firm.id, firm.subscriptionStatus)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition-colors ${
+                          firm.subscriptionStatus === 'active'
+                            ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                            : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                        }`}
+                        title={firm.subscriptionStatus === 'active' ? 'Click to revoke manual access' : 'Click to grant manual access'}
+                      >
+                        <ShieldCheck size={12} />
+                        {firm.subscriptionStatus === 'active' ? 'Granted' : 'Grant Access'}
+                      </button>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     {editingSeats === firm.id ? (

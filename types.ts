@@ -49,6 +49,7 @@ export interface Firm {
   ghlIntegrated: boolean;
   slug: string;
   irsAlertsEnabled?: boolean;
+  stripeSubscriptionId?: string | null;
 }
 
 export const TAX_YEARS: Record<string, { label: string; isOpen: boolean }> = {
