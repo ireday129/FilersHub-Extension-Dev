@@ -243,6 +243,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     setIsLoadingGHL(true);
     setShowGHLModal(true);
     setGhlError('');
+    setGrantStatus({});
     try {
       const token = await getFreshToken();
 
