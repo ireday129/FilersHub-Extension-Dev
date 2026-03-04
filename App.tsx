@@ -516,8 +516,9 @@ const AppContent: React.FC = () => {
     return <StaffLogin ghlContext={isExtension ? ghlContext : null} />;
   }
 
-  // Pre-launch gate — show coming soon screen until launch date
-  if (new Date() < LAUNCH_DATE) {
+  // Pre-launch gate — only on production CRM path
+  const isProduction = window.location.hostname === 'app.filershub.com';
+  if (isProduction && path === '/crm' && new Date() < LAUNCH_DATE) {
     return <PreLaunchScreen />;
   }
 
