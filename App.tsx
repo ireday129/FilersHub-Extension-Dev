@@ -138,9 +138,12 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
       return <SuperAdminDashboard />;
     }
 
-    // Block access if subscription is canceled
+    // Block access if no active subscription
     if (firmSettings.subscriptionStatus === 'canceled') {
-      return <SubscriptionBlockedScreen />;
+      return <SubscriptionBlockedScreen reason="canceled" />;
+    }
+    if (firmSettings.subscriptionStatus === 'trialing') {
+      return <SubscriptionBlockedScreen reason="no_subscription" />;
     }
 
     switch (activeTab) {

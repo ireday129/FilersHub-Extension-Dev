@@ -1,10 +1,16 @@
 import React from 'react';
-import { ShieldX, LogOut } from 'lucide-react';
+import { ShieldX, Lock, LogOut } from 'lucide-react';
 import { FILERSHUB_LOGO_URL } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 
-const SubscriptionBlockedScreen: React.FC = () => {
+interface Props {
+    reason: 'no_subscription' | 'canceled';
+}
+
+const SubscriptionBlockedScreen: React.FC<Props> = ({ reason }) => {
     const { signOut } = useAuth();
+
+    const isNoSub = reason === 'no_subscription';
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
@@ -16,23 +22,29 @@ const SubscriptionBlockedScreen: React.FC = () => {
                 />
 
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                    <div className="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <ShieldX className="w-7 h-7 text-rose-600" />
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4 ${isNoSub ? 'bg-blue-100' : 'bg-rose-100'}`}>
+                        {isNoSub
+                            ? <Lock className="w-7 h-7 text-blue-600" />
+                            : <ShieldX className="w-7 h-7 text-rose-600" />
+                        }
                     </div>
 
                     <h1 className="text-xl font-bold text-slate-800 mb-2">
-                        Subscription Inactive
+                        {isNoSub ? 'Subscription Required' : 'Subscription Inactive'}
                     </h1>
 
                     <p className="text-sm text-slate-500 mb-6">
-                        Your subscription has expired or been canceled. Please renew your subscription to continue using FilersHub.
+                        {isNoSub
+                            ? 'An active subscription is required to access FilersHub. Please purchase a plan to unlock your account.'
+                            : 'Your subscription has expired or been canceled. Please renew your subscription to continue using FilersHub.'
+                        }
                     </p>
 
                     <a
                         href="mailto:support@filershub.com"
                         className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition-colors"
                     >
-                        Contact Support
+                        {isNoSub ? 'Get a Subscription' : 'Contact Support'}
                     </a>
 
                     <button

@@ -14,3 +14,7 @@ ALTER TABLE pending_subscriptions ADD COLUMN IF NOT EXISTS is_addon BOOLEAN DEFA
 -- Track add-on subscription ID separately on firms
 -- (stripe_subscription_id holds the base plan; this holds the IRS Alerts add-on)
 ALTER TABLE firms ADD COLUMN IF NOT EXISTS irs_addon_subscription_id TEXT;
+
+-- Change default subscription_status from 'active' to 'trialing'
+-- so new installs without a paid subscription are blocked until linked
+ALTER TABLE firms ALTER COLUMN subscription_status SET DEFAULT 'trialing';
