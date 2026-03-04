@@ -74,6 +74,7 @@ export const useFirmData = () => {
             if (staffError) {
                 console.error("Staff query error:", staffError);
             }
+            console.log("[useFirmData] auth_user_id:", user.id, "| staffEntries:", staffEntries?.length, staffEntries);
 
             // 1b. Get ALL Client entries for this user
             let clientEntries: any[] | null = null;
