@@ -199,7 +199,8 @@ serve(async (req) => {
                             { headers: { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' } }
                         );
                         if (!response.ok) {
-                            console.warn(`GHL API (${label}) failed: ${response.status}`);
+                            const errBody = await response.text().catch(() => '');
+                            console.warn(`GHL API (${label}) failed: ${response.status} — ${errBody}`);
                             return null;
                         }
                         const data = await response.json();
