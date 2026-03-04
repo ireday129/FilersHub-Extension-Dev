@@ -4,7 +4,6 @@ import {
   Users,
   Calendar,
   Search,
-  CheckCircle,
   Mail,
   LogOut,
   Loader2,
@@ -185,6 +184,24 @@ const SuperAdminDashboard: React.FC = () => {
       console.error('Error updating staff seats:', err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleTier = async (firmId: string, currentTier: string) => {
+    const newTier = currentTier === 'Pro' ? 'Core' : 'Pro';
+    try {
+      const { error } = await supabase
+        .from('firms')
+        .update({ subscription_tier: newTier, updated_at: new Date().toISOString() })
+        .eq('firm_id', firmId);
+
+      if (error) throw error;
+
+      setFirms(prev => prev.map(f =>
+        f.id === firmId ? { ...f, subscriptionTier: newTier as 'Core' | 'Pro' | 'IRS Alerts' } : f
+      ));
+    } catch (err) {
+      console.error('Error toggling tier:', err);
     }
   };
 
@@ -946,21 +963,20 @@ const SuperAdminDashboard: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Staff Seats</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Clients</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Install Date</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">CRM</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">IRS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-16 text-center">
+                  <td colSpan={9} className="px-6 py-16 text-center">
                     <Loader2 size={24} className="animate-spin text-slate-300 mx-auto mb-2" />
                     <p className="text-sm text-slate-400">Loading firms...</p>
                   </td>
                 </tr>
               ) : filteredFirms.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-16 text-center">
+                  <td colSpan={9} className="px-6 py-16 text-center">
                     <Building2 size={32} className="text-slate-200 mx-auto mb-2" />
                     <p className="text-sm text-slate-400">No firms found.</p>
                   </td>
@@ -991,12 +1007,16 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${firm.subscriptionTier === 'Pro'
-                        ? 'bg-amber-50 text-amber-600 border-amber-100'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                      }`}>
+                    <button
+                      onClick={() => handleToggleTier(firm.id, firm.subscriptionTier)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border cursor-pointer transition-colors ${firm.subscriptionTier === 'Pro'
+                        ? 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                      title={`Click to switch to ${firm.subscriptionTier === 'Pro' ? 'Core' : 'Pro'}`}
+                    >
                       {firm.subscriptionTier}
-                    </span>
+                    </button>
                   </td>
                   <td className="px-6 py-4 text-center">
                     {firm.stripeSubscriptionId ? (
@@ -1093,17 +1113,6 @@ const SuperAdminDashboard: React.FC = () => {
                       <Calendar size={14} />
                       <span className="text-xs font-medium">{firm.installDate}</span>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {firm.ghlIntegrated ? (
-                      <div className="inline-flex items-center justify-center w-6 h-6 bg-emerald-50 text-emerald-600 rounded-full">
-                        <CheckCircle size={14} strokeWidth={3} />
-                      </div>
-                    ) : (
-                      <div className="inline-flex items-center justify-center w-6 h-6 bg-slate-100 text-slate-300 rounded-full">
-                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
-                      </div>
-                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <button
