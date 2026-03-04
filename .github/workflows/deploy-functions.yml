@@ -34,4 +34,7 @@ jobs:
           supabase functions deploy crm-update --project-ref $PROJECT_ID
           supabase functions deploy crm-logo-sync --project-ref $PROJECT_ID
           supabase functions deploy crm-sidebar-pin --project-ref $PROJECT_ID
-          supabase functions deploy stripe-sync --project-ref $PROJECT_ID
+
+      - name: Deploy Stripe Sync (No JWT - uses service role internally)
+        run: |
+          supabase functions deploy stripe-sync --project-ref $PROJECT_ID --no-verify-jwt
