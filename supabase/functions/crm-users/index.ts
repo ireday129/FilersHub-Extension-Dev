@@ -187,30 +187,22 @@ serve(async (req) => {
             let ghlUsers: any[] = [];
             let source = 'database';
 
-            // Helper: fetch all users from GHL (handles pagination, max 100 per page)
+            // Helper: fetch users from GHL API
             const fetchGhlUsers = async (token: string, label: string): Promise<any[] | null> => {
-                const allUsers: any[] = [];
-                let skip = 0;
-                const limit = 100;
                 try {
-                    while (true) {
-                        const response = await fetch(
-                            `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}&limit=${limit}&skip=${skip}`,
-                            { headers: { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' } }
-                        );
-                        if (!response.ok) {
-                            const errBody = await response.text().catch(() => '');
-                            console.warn(`GHL API (${label}) failed: ${response.status} — ${errBody}`);
-                            return null;
-                        }
-                        const data = await response.json();
-                        const users = data.users || [];
-                        allUsers.push(...users);
-                        console.log(`GHL (${label}): fetched ${users.length} users (skip=${skip}, total so far=${allUsers.length})`);
-                        if (users.length < limit) break; // No more pages
-                        skip += limit;
+                    const response = await fetch(
+                        `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}`,
+                        { headers: { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' } }
+                    );
+                    if (!response.ok) {
+                        const errBody = await response.text().catch(() => '');
+                        console.warn(`GHL API (${label}) failed: ${response.status} — ${errBody}`);
+                        return null;
                     }
-                    return allUsers;
+                    const data = await response.json();
+                    const users = data.users || [];
+                    console.log(`GHL (${label}): fetched ${users.length} users`);
+                    return users;
                 } catch (err) {
                     console.warn(`GHL API (${label}) error:`, err.message);
                     return null;
