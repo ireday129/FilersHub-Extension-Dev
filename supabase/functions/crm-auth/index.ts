@@ -373,6 +373,49 @@ serve(async (req) => {
             });
         }
 
+        // 0b. CLAIM SUBSCRIPTION: Link a pending Stripe subscription by purchase email
+        if (req.method === 'POST' && body.action === 'claim-subscription') {
+            const email = (body.email || '').trim().toLowerCase();
+            const firmId = (body.firmId || '').trim();
+
+            if (!email || !email.includes('@') || !firmId) {
+                return new Response(JSON.stringify({ error: 'Email and firmId are required' }), {
+                    status: 400, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // Check for unlinked pending subscriptions for this email
+            const { data: pendingList } = await supabaseAdmin
+                .from('pending_subscriptions')
+                .select('id')
+                .eq('customer_email', email)
+                .is('linked_firm_id', null);
+
+            if (!pendingList || pendingList.length === 0) {
+                return new Response(JSON.stringify({ linked: false, message: 'No pending subscription found for this email' }), {
+                    status: 200, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // Link pending subscriptions to the firm
+            await linkPendingSubscription(supabaseAdmin, firmId, email);
+
+            // Fetch updated firm status
+            const { data: updatedFirm } = await supabaseAdmin
+                .from('firms')
+                .select('subscription_status, subscription_tier')
+                .eq('firm_id', firmId)
+                .maybeSingle();
+
+            return new Response(JSON.stringify({
+                linked: true,
+                subscription_status: updatedFirm?.subscription_status,
+                subscription_tier: updatedFirm?.subscription_tier,
+            }), {
+                status: 200, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
         // 1. INIT: Generate Auth URL
         if (pathname.endsWith('/init') || (req.method === 'POST' && body.action === 'init')) {
             const action = url.searchParams.get('action') || body.action;

@@ -140,10 +140,10 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
 
     // Block access if no active subscription
     if (firmSettings.subscriptionStatus === 'canceled') {
-      return <SubscriptionBlockedScreen reason="canceled" />;
+      return <SubscriptionBlockedScreen reason="canceled" firmId={firmId} />;
     }
     if (firmSettings.subscriptionStatus === 'trialing') {
-      return <SubscriptionBlockedScreen reason="no_subscription" />;
+      return <SubscriptionBlockedScreen reason="no_subscription" firmId={firmId} />;
     }
 
     switch (activeTab) {
