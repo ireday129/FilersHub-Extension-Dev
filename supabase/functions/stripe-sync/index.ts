@@ -1,4 +1,5 @@
 // @ts-nocheck
+// Stripe subscription sync — pulls all active subscriptions and links to firms
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
