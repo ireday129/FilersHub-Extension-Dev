@@ -17,5 +17,10 @@
 - The app also runs inside GHL (GoHighLevel) iframes. GHL iframes load the app at `/` (not `/extension`), so they always get the full desktop UI. Never use iframe detection (`window.self !== window.top`) to determine extension mode.
 - Make sure the entire application is accessible within the Chrome extension and within any iframe (GHL or otherwise).
 
-## Deployment & Updates
+## Branch & Deployment Workflow
+- **Two-branch setup:** `main` (production at app.filershub.com) and `dev` (staging at dev.filershub.com). Both share the same Supabase database.
+- **All new work goes to `dev` first.** Create feature branches from `dev`, merge PRs into `dev`. Only merge `dev` into `main` after Irene reviews and approves on the dev URL.
+- **Hotfixes:** Branch from `main`, merge to `main`, then back-merge into `dev` to keep branches in sync.
+- **Before running database migrations or schema changes, coordinate carefully** — both environments share the same Supabase database.
+- **Claude Code:** Always verify you are on the `dev` branch (not `main`) when building new features.
 - I dont want to use the Terminal ever. My Github commits push directly to my Vercel hosting and the Github Actions automatically deploy my functions updates.
