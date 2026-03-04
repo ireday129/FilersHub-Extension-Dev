@@ -63,7 +63,7 @@ const PRO_VIDEOS: TutorialVideo[] = [
 
 const Tutorials: React.FC = () => {
   const [tierLoading, setTierLoading] = useState(true);
-  const [tier, setTier] = useState<string>('starter');
+  const [tier, setTier] = useState<string>('Core');
   const [activeVideo, setActiveVideo] = useState<TutorialVideo | null>(null);
 
   // Try to detect subscription tier from URL params (optional — page is public)
@@ -106,7 +106,7 @@ const Tutorials: React.FC = () => {
     };
   }, []);
 
-  const isPro = ['pro', 'growth', 'enterprise'].includes(tier?.toLowerCase());
+  const isPro = tier === 'Pro';
 
   if (tierLoading) {
     return (

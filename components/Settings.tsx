@@ -115,11 +115,20 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
 
   const handleConnectIrs = () => {
     if (!user) return;
-    const clientId = 'PENDING_IRS_CLIENT_ID';
-    const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/irs-callback` : '';
-    // Placeholder URL pointing directly to the edge function for Phase 1 simulation
-    const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/irs-oauth?state=${user.id}&code=mock_code`;
-    window.location.href = edgeFunctionUrl;
+    const clientId = import.meta.env.VITE_IRS_CLIENT_ID || 'PENDING_IRS_CLIENT_ID';
+    const redirectUri = 'https://app.filershub.com/api/irs-callback';
+    const irsAuthorizeUrl = import.meta.env.VITE_IRS_AUTHORIZE_URL
+      || 'https://api.alt.www4.irs.gov/auth/oauth/v2/authorize';
+
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope: 'tds.read',
+      state: user.id,
+    });
+
+    window.location.href = `${irsAuthorizeUrl}?${params.toString()}`;
   };
 
   const handleDisconnectIrs = async () => {
@@ -189,10 +198,10 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const [copiedPortalUrl, setCopiedPortalUrl] = useState(false);
 
   // Pro plan logo sync state
-  const [subscriptionTier, setSubscriptionTier] = useState<string>('starter');
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('Core');
   const [logoSyncStatus, setLogoSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [logoSyncMessage, setLogoSyncMessage] = useState('');
-  const isPro = ['pro', 'growth', 'enterprise'].includes(subscriptionTier?.toLowerCase());
+  const isPro = subscriptionTier === 'Pro';
 
   const refreshStaff = async () => {
     if (!firmId) return;

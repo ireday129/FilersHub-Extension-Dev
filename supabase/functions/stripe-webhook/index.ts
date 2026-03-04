@@ -94,8 +94,8 @@ async function resolveTier(supabase: any, priceId: string): Promise<{ plan_tier:
 
     if (mapping) return mapping;
 
-    console.warn(`No tier mapping found for price ${priceId}, defaulting to starter`);
-    return { plan_tier: 'starter', max_clients: 500, max_staff: 10 };
+    console.warn(`No tier mapping found for price ${priceId}, defaulting to Core`);
+    return { plan_tier: 'Core', max_clients: 500, max_staff: 10 };
 }
 
 async function updateFirmSubscription(supabase: any, firmId: string, sub: any, tier: { plan_tier: string; max_clients: number; max_staff: number }) {
@@ -180,7 +180,7 @@ async function handleCheckoutCompleted(supabase: any, session: any) {
 
     const sub = await subResp.json();
     const priceId = sub.items?.data?.[0]?.price?.id;
-    const tier = priceId ? await resolveTier(supabase, priceId) : { plan_tier: 'starter', max_clients: 500, max_staff: 10 };
+    const tier = priceId ? await resolveTier(supabase, priceId) : { plan_tier: 'Core', max_clients: 500, max_staff: 10 };
 
     const firmId = await resolveFirmId(supabase, customerId, customerEmail);
 
@@ -196,7 +196,7 @@ async function handleCheckoutCompleted(supabase: any, session: any) {
 async function handleSubscriptionChange(supabase: any, sub: any) {
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
     const priceId = sub.items?.data?.[0]?.price?.id;
-    const tier = priceId ? await resolveTier(supabase, priceId) : { plan_tier: 'starter', max_clients: 500, max_staff: 10 };
+    const tier = priceId ? await resolveTier(supabase, priceId) : { plan_tier: 'Core', max_clients: 500, max_staff: 10 };
 
     // Try to resolve firm
     const customerEmail = await getStripeCustomerEmail(customerId);

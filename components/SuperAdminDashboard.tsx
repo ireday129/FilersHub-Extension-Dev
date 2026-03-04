@@ -30,7 +30,7 @@ import { FILERSHUB_LOGO_URL } from '../constants';
 const SuperAdminDashboard: React.FC = () => {
   const { signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [tierFilter, setTierFilter] = useState<'All' | 'Core' | 'Pro'>('All');
+  const [tierFilter, setTierFilter] = useState<'All' | 'Core' | 'Pro' | 'IRS Alerts'>('All');
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingSeats, setEditingSeats] = useState<string | null>(null);
@@ -82,10 +82,11 @@ const SuperAdminDashboard: React.FC = () => {
   const [subStatusFilter, setSubStatusFilter] = useState<string>('All');
 
   // Map DB tier values to display tier
-  const normalizeTier = (dbTier: string): 'Core' | 'Pro' => {
+  const normalizeTier = (dbTier: string): 'Core' | 'Pro' | 'IRS Alerts' => {
     const t = dbTier?.toLowerCase();
-    if (t === 'pro' || t === 'growth' || t === 'enterprise') return 'Pro';
-    return 'Core'; // starter, core, or anything else defaults to Core
+    if (t === 'pro') return 'Pro';
+    if (t === 'irs alerts') return 'IRS Alerts';
+    return 'Core';
   };
 
   const handleLogout = async () => {
@@ -676,7 +677,7 @@ const SuperAdminDashboard: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
-                      ['growth', 'enterprise', 'pro'].includes(sub.plan_tier?.toLowerCase())
+                      sub.plan_tier === 'Pro'
                         ? 'bg-amber-50 text-amber-600 border-amber-100'
                         : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}>
@@ -726,7 +727,7 @@ const SuperAdminDashboard: React.FC = () => {
                       <span className="text-xs font-medium">{ps.customer_email}</span>
                     </div>
                     <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
-                      ['growth', 'enterprise', 'pro'].includes(ps.plan_tier?.toLowerCase())
+                      ps.plan_tier === 'Pro'
                         ? 'bg-amber-50 text-amber-600 border-amber-100'
                         : 'bg-slate-50 text-slate-600 border-slate-200'
                     }`}>
@@ -767,7 +768,7 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-              {(['All', 'Core', 'Pro'] as const).map(t => (
+              {(['All', 'Core', 'Pro', 'IRS Alerts'] as const).map(t => (
                 <button
                   key={t}
                   onClick={() => setTierFilter(t)}

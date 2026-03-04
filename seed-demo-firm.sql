@@ -9,7 +9,7 @@ VALUES (
   gen_random_uuid(),
   'FilersHub Demo',
   'filershub-demo',
-  'pro',
+  'Pro',
   'active',
   500,
   10

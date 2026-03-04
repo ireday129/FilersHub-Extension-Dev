@@ -158,7 +158,7 @@ serve(async (req) => {
         if (!firmData) throw new Error('Firm not found');
 
         // Check Pro tier
-        const isPro = ['pro', 'growth', 'enterprise'].includes(firmData.subscription_tier?.toLowerCase());
+        const isPro = firmData.subscription_tier === 'Pro';
         if (!isPro) {
             return new Response(
                 JSON.stringify({ error: 'Sidebar pinning is available for Pro plans and above' }),

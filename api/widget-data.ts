@@ -84,7 +84,7 @@ export default async function handler(req: any, res: any) {
 
         return res.status(200).json({
             firmName: firm.firm_name,
-            subscriptionTier: firm.subscription_tier || 'starter',
+            subscriptionTier: firm.subscription_tier || 'Core',
             stats: {
                 totalClients,
                 totalReturns,
