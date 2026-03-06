@@ -77,14 +77,6 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
   const [monitoringStatus, setMonitoringStatus] = useState<{ isMonitored: boolean; monitoredId?: string } | null>(null);
   const [togglingMonitoring, setTogglingMonitoring] = useState(false);
 
-  // Add Client form state
-  const [showAddClient, setShowAddClient] = useState(false);
-  const [newClientName, setNewClientName] = useState('');
-  const [newClientEmail, setNewClientEmail] = useState('');
-  const [addingClient, setAddingClient] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-  const [addSuccess, setAddSuccess] = useState(false);
-
   // Create Return modal state
   const [createReturnClientId, setCreateReturnClientId] = useState<string | null>(null);
   const [createReturnYear, setCreateReturnYear] = useState('');
@@ -127,64 +119,6 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
       setCreateReturnError(err.message || 'Failed to create return.');
     } finally {
       setCreatingReturn(false);
-    }
-  };
-
-  const canAddClients = role === UserRole.FirmOwner || role === UserRole.Manager;
-
-  const handleAddClient = async () => {
-    if (!newClientName.trim() || !newClientEmail.trim() || !firmId) return;
-    setAddingClient(true);
-    setAddError(null);
-    setAddSuccess(false);
-
-    try {
-      const { error } = await supabase.from('clients').insert({
-        firm_id: firmId,
-        full_name: newClientName.trim(),
-        email: newClientEmail.trim().toLowerCase(),
-      });
-
-      if (error) {
-        if (error.message?.includes('unique') || error.code === '23505') {
-          setAddError('A client with this email already exists for your firm.');
-        } else {
-          throw error;
-        }
-        return;
-      }
-
-      // Invite client to Supabase Auth so they can log in to their portal
-      try {
-        const resp = await fetch('/api/invite-client', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: newClientEmail.trim().toLowerCase(),
-            firmId,
-            fullName: newClientName.trim(),
-          }),
-        });
-        const result = await resp.json();
-        if (!resp.ok) {
-          console.error('Auth invite failed:', result.error);
-        }
-      } catch (inviteErr) {
-        console.error('Failed to send auth invite:', inviteErr);
-      }
-
-      setNewClientName('');
-      setNewClientEmail('');
-      setAddSuccess(true);
-      setTimeout(() => {
-        setShowAddClient(false);
-        setAddSuccess(false);
-      }, 1500);
-      await refreshData();
-    } catch (err: any) {
-      setAddError(err.message || 'Failed to add client.');
-    } finally {
-      setAddingClient(false);
     }
   };
 
@@ -790,63 +724,6 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
               </div>
             </div>
 
-            {canAddClients && (
-              <div className="bg-[#1e293b] p-6 rounded-2xl text-white relative overflow-hidden group">
-                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                  <Users size={120} />
-                </div>
-                {showAddClient ? (
-                  <div className="relative z-10 space-y-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-bold">Add New Client</h4>
-                      <button onClick={() => { setShowAddClient(false); setAddError(null); setAddSuccess(false); }} className="text-slate-400 hover:text-white">
-                        <X size={16} />
-                      </button>
-                    </div>
-                    {addError && (
-                      <div className="bg-rose-500/20 text-rose-300 text-xs font-bold p-2 rounded-lg">{addError}</div>
-                    )}
-                    {addSuccess && (
-                      <div className="bg-emerald-500/20 text-emerald-300 text-xs font-bold p-2 rounded-lg">Client added successfully!</div>
-                    )}
-                    <input
-                      type="text"
-                      placeholder="Full Name"
-                      value={newClientName}
-                      onChange={(e) => setNewClientName(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand"
-                    />
-                    <input
-                      type="email"
-                      placeholder="Email Address"
-                      value={newClientEmail}
-                      onChange={(e) => setNewClientEmail(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-brand"
-                    />
-                    <button
-                      onClick={handleAddClient}
-                      disabled={addingClient || !newClientName.trim() || !newClientEmail.trim()}
-                      className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {addingClient ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                      {addingClient ? 'Adding...' : 'Add Client'}
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <h4 className="text-sm font-bold mb-2">Add a new client</h4>
-                    <p className="text-xs text-slate-400 mb-4 leading-relaxed">Add client details so they can access their portal.</p>
-                    <button
-                      onClick={() => setShowAddClient(true)}
-                      className="w-full py-2 bg-brand text-white text-xs font-bold rounded-lg hover:bg-opacity-90 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Plus size={14} />
-                      Add New Client
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Main List Area */}
@@ -868,15 +745,6 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
                         className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] w-28 focus:ring-2 focus:ring-brand outline-none"
                       />
                     </div>
-                    {canAddClients && (
-                      <button
-                        onClick={() => setShowAddClient(true)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 bg-brand text-white text-[11px] font-bold rounded-lg hover:bg-brand/90 transition-all shrink-0"
-                      >
-                        <Plus size={12} />
-                        Add
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -952,49 +820,6 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
         </div>
       )}
 
-      {/* Add Client Modal (extension mode) */}
-      {isExtension && showAddClient && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowAddClient(false); setAddError(null); setAddSuccess(false); }}>
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800">Add New Client</h3>
-              <button onClick={() => { setShowAddClient(false); setAddError(null); setAddSuccess(false); }} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 space-y-3">
-              {addError && (
-                <div className="bg-rose-50 text-rose-600 text-xs font-bold p-2.5 rounded-xl border border-rose-100">{addError}</div>
-              )}
-              {addSuccess && (
-                <div className="bg-emerald-50 text-emerald-600 text-xs font-bold p-2.5 rounded-xl border border-emerald-100">Client added!</div>
-              )}
-              <input
-                type="text"
-                placeholder="Full Name"
-                value={newClientName}
-                onChange={(e) => setNewClientName(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand outline-none"
-              />
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={newClientEmail}
-                onChange={(e) => setNewClientEmail(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand outline-none"
-              />
-              <button
-                onClick={handleAddClient}
-                disabled={addingClient || !newClientName.trim() || !newClientEmail.trim()}
-                className="w-full py-2.5 bg-brand text-white text-xs font-bold rounded-xl hover:bg-brand/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {addingClient ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                {addingClient ? 'Adding...' : 'Add Client'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Create Return Modal */}
       {createReturnClientId && (
