@@ -936,7 +936,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold text-slate-800 flex items-center gap-2 flex-wrap`}>
                 IRS e-Services Connection
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${firmSettings.irsAlertsEnabled ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                  Pro Feature
+                  PREMIUM FEATURE
                 </span>
                 {!firmSettings.irsAlertsEnabled && (
                   <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full uppercase">
@@ -1011,15 +1011,15 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
             </div>
           )}
 
-          {/* GHL Webhook URL Configuration */}
+          {/* CRM Webhook URL Configuration */}
           {firmSettings.irsAlertsEnabled && (
             <div className="mt-8 pt-6 border-t border-slate-200">
               <div className="flex items-start gap-3 mb-3">
                 <Globe className="text-slate-400 mt-1" size={18} />
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">GHL Workflow Webhook (Optional)</h3>
+                  <h3 className="text-sm font-bold text-slate-800">CRM Workflow Webhook (Optional)</h3>
                   <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                    Paste a GoHighLevel Inbound Webhook URL here. We will send a POST request with the transcript code data to this URL whenever an IRS Alert is triggered, allowing you to use GHL workflows to send email or SMS notifications.
+                    Paste a CRM Inbound Webhook URL here. We will send a POST request with the transcript code data to this URL whenever an IRS Alert is triggered, allowing you to use CRM workflows to send email or SMS notifications.
                   </p>
                 </div>
               </div>
