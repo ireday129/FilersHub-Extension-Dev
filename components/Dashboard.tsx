@@ -1721,8 +1721,8 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
         </div>
       )}
 
-      <div className={`grid grid-cols-1 ${isExtension ? '' : 'lg:grid-cols-3'} gap-8`}>
-        <div className={`${isExtension ? 'col-span-1' : 'lg:col-span-2'} space-y-6`}>
+      <div className={`grid grid-cols-1 ${isExtension || isClient ? '' : 'lg:grid-cols-3'} gap-8`}>
+        <div className={`${isExtension || isClient ? 'col-span-1' : 'lg:col-span-2'} space-y-6`}>
           {isStaff ? (
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <div className={`${isExtension ? 'p-3' : 'px-6 py-4'} border-b border-slate-100 space-y-3`}>
