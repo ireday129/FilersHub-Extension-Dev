@@ -23,7 +23,7 @@ export default function TranscriptMonitorHub() {
                         <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                             <Shield className="text-emerald-600" size={24} />
                             IRS Transcript Monitor
-                            <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full ml-2">PRO</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full ml-2">PREMIUM</span>
                         </h1>
                         <p className="text-sm text-slate-500 mt-1">Manage client monitoring, configure alert rules, and view triggered events.</p>
                     </div>
