@@ -1453,7 +1453,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       </div>
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Federal:</span>
                     </div>
-                    <span className={`text-sm font-black ${selectedReturn.federalBalance?.trim().startsWith('+') ? 'text-emerald-600' : selectedReturn.federalBalance?.trim().startsWith('-') ? 'text-rose-500' : 'text-slate-800'}`}>
+                    <span className={`text-sm font-black ${selectedReturn.federalBalance?.trim().startsWith('-') ? 'text-rose-700' : parseFloat(selectedReturn.federalBalance?.replace(/[^0-9.-]/g, '') || '0') > 0 ? 'text-emerald-700' : 'text-slate-800'}`}>
                       {selectedReturn.federalBalance}
                     </span>
                   </div>
@@ -1465,7 +1465,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       </div>
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">State:</span>
                     </div>
-                    <span className={`text-sm font-black ${selectedReturn.stateBalance?.trim().startsWith('+') ? 'text-emerald-600' : selectedReturn.stateBalance?.trim().startsWith('-') ? 'text-rose-500' : 'text-slate-800'}`}>
+                    <span className={`text-sm font-black ${selectedReturn.stateBalance?.trim().startsWith('-') ? 'text-rose-700' : parseFloat(selectedReturn.stateBalance?.replace(/[^0-9.-]/g, '') || '0') > 0 ? 'text-emerald-700' : 'text-slate-800'}`}>
                       {selectedReturn.stateBalance}
                     </span>
                   </div>
