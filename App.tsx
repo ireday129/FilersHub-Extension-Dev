@@ -232,7 +232,7 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
           key={i}
           src={f.src}
           alt=""
-          style={{ position: 'fixed', pointerEvents: 'none', zIndex: 0, opacity: 0.45, animation: f.anim, ...f.style }}
+          style={{ position: 'fixed', pointerEvents: 'none', zIndex: 0, opacity: 0.35, animation: f.anim, ...f.style }}
         />
       ))}
       {!isSuperAdmin && (
