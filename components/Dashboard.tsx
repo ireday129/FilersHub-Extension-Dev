@@ -995,7 +995,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 </div>
 
                 {/* Completed Return & Signature Boxes */}
-                <div className="bg-white rounded-2xl border-[4px] border-dotted border-brand shadow-sm overflow-hidden">
+                <div className="bg-white rounded-2xl border-[4px] border-dotted border-amber-400 shadow-sm overflow-hidden animate-pulse-glow">
                   <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                       <FileCheck size={16} className="text-emerald-500" />
@@ -1370,7 +1370,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       value={selectedReturn.federalBalance}
                       onChange={(e) => handleUpdateField(selectedReturn.id, 'federalBalance', e.target.value)}
                       placeholder="$0.00 Refund / Due"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all"
+                      className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-semibold focus:ring-2 focus:ring-brand outline-none transition-all ${
+                        selectedReturn.federalBalance?.trim().startsWith('-') ? 'text-rose-700' : parseFloat(selectedReturn.federalBalance?.replace(/[^0-9.-]/g, '') || '0') > 0 ? 'text-emerald-700' : 'text-slate-700'
+                      }`}
                     />
                   </div>
                   <div>
@@ -1380,7 +1382,9 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                       value={selectedReturn.stateBalance}
                       onChange={(e) => handleUpdateField(selectedReturn.id, 'stateBalance', e.target.value)}
                       placeholder="$0.00 Refund / Due"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-brand outline-none transition-all"
+                      className={`w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-sm font-semibold focus:ring-2 focus:ring-brand outline-none transition-all ${
+                        selectedReturn.stateBalance?.trim().startsWith('-') ? 'text-rose-700' : parseFloat(selectedReturn.stateBalance?.replace(/[^0-9.-]/g, '') || '0') > 0 ? 'text-emerald-700' : 'text-slate-700'
+                      }`}
                     />
                   </div>
                 </div>
