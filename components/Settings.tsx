@@ -536,7 +536,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                     <tr>
                       <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>Name</th>
                       {!isExtension && <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</th>}
-                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>Role</th>
                       <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right`}>Access</th>
                     </tr>
                   </thead>
@@ -556,20 +555,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                             </div>
                           </td>
                           {!isExtension && <td className="px-6 py-4 text-sm text-slate-500">{user.email}</td>}
-                          <td className={`${isExtension ? 'px-3' : 'px-6'} py-4`}>
-                            {hasAccess ? (
-                              <span className="text-xs font-semibold text-slate-600">{user.appRole || selectedRoles[user.id] || 'Tax Pro'}</span>
-                            ) : (
-                              <select
-                                value={selectedRoles[user.id] || 'Tax Pro'}
-                                onChange={(e) => setSelectedRoles(prev => ({ ...prev, [user.id]: e.target.value }))}
-                                className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 outline-none focus:ring-2 focus:ring-brand"
-                              >
-                                <option value="Tax Pro">Tax Pro</option>
-                                <option value="Manager">Manager</option>
-                              </select>
-                            )}
-                          </td>
                           <td className={`${isExtension ? 'px-3' : 'px-6'} py-4 text-right`}>
                             {hasAccess ? (
                               <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
