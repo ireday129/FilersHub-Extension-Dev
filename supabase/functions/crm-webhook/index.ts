@@ -337,8 +337,8 @@ Deno.serve(async (req) => {
             }
 
             // 4. Upsert Staff — multi-firm safe
-            // Only the INSTALL event sets Firm Owner. UserCreate/UserUpdate always defaults to Tax Pro.
-            const appRole = 'Tax Pro';
+            // Map GHL admin role to Firm Owner; all other roles default to Tax Pro.
+            const appRole = role === 'admin' ? 'Firm Owner' : 'Tax Pro';
 
             const { data: existingStaff } = await supabaseClient.from('staff')
                 .select('staff_id, role').eq('email', email).eq('firm_id', firm.firm_id).maybeSingle();
