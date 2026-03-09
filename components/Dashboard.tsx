@@ -995,7 +995,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                 </div>
 
                 {/* Completed Return & Signature Boxes */}
-                <div className="bg-white rounded-2xl border-[4px] border-dotted border-amber-400 shadow-sm overflow-hidden animate-pulse-glow">
+                <div className="bg-white rounded-2xl border-[2px] border-dotted border-brand shadow-sm overflow-hidden animate-pulse-glow">
                   <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                       <FileCheck size={16} className="text-emerald-500" />
