@@ -51,6 +51,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   billing: 'Billing',
   bug: 'Bug Report',
   feature_request: 'Feature Request',
+  client_login: 'Client Login',
+  staff_login: 'Staff Login',
 };
 
 function formatDate(iso: string): string {
@@ -284,6 +286,8 @@ const WidgetSupportTickets: React.FC<WidgetSupportTicketsProps> = ({ locationId,
               <option value="billing">Billing</option>
               <option value="bug">Bug Report</option>
               <option value="feature_request">Feature Request</option>
+              <option value="client_login">Client Login</option>
+              <option value="staff_login">Staff Login</option>
             </select>
           </div>
 

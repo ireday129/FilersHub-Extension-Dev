@@ -294,7 +294,7 @@ const GhlWidget: React.FC = () => {
         </a>
 
         {/* Support */}
-        <div className="flex items-center justify-center gap-3 pt-2 pb-4" style={{ ...card, ...fadeIn(4) }}>
+        <div className="flex justify-center pt-2 pb-4" style={{ ...card, ...fadeIn(4) }}>
           <button
             onClick={() => setShowSupport(true)}
             className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg border border-slate-200 bg-white hover:border-green-300 transition-colors"
@@ -303,9 +303,6 @@ const GhlWidget: React.FC = () => {
             <MessageCircle className="w-4 h-4" />
             Support Center
           </button>
-          <a href="mailto:support@filershub.com" className="text-xs text-slate-400 underline underline-offset-2">
-            support@filershub.com
-          </a>
         </div>
 
         {/* Support Tickets Overlay */}

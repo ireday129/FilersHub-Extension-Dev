@@ -155,10 +155,10 @@ export default async function handler(req: any, res: any) {
                 return res.status(400).json({ error: 'Missing ticketId or body' });
             }
 
-            // Verify ticket belongs to this firm
+            // Verify ticket belongs to this firm and is not resolved/closed
             const { data: ticket, error: ticketError } = await supabaseAdmin
                 .from('support_tickets')
-                .select('ticket_id')
+                .select('ticket_id, status')
                 .eq('ticket_id', ticketId)
                 .eq('firm_id', firmId)
                 .maybeSingle();
@@ -166,6 +166,9 @@ export default async function handler(req: any, res: any) {
             if (ticketError) throw new Error(`Ticket lookup failed: ${ticketError.message}`);
             if (!ticket) {
                 return res.status(404).json({ error: 'Ticket not found' });
+            }
+            if (ticket.status === 'resolved' || ticket.status === 'closed') {
+                return res.status(400).json({ error: 'Cannot reply to a resolved or closed ticket' });
             }
 
             const { data: message, error: msgError } = await supabaseAdmin
