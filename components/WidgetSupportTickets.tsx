@@ -13,6 +13,7 @@ interface Ticket {
   updated_at: string;
   message_count: number;
   last_message_at: string | null;
+  has_new_response: boolean;
 }
 
 interface Message {
@@ -131,6 +132,10 @@ const WidgetSupportTickets: React.FC<WidgetSupportTicketsProps> = ({ locationId,
     setSelectedTicketId(ticketId);
     setView('detail');
     setMessagesLoading(true);
+    // Clear badge immediately in local state
+    setTickets(prev => prev.map(t =>
+      t.ticket_id === ticketId ? { ...t, has_new_response: false } : t
+    ));
     try {
       const data = await apiCall({ action: 'get', ticketId });
       setSelectedTicket(data.ticket);
@@ -225,6 +230,9 @@ const WidgetSupportTickets: React.FC<WidgetSupportTicketsProps> = ({ locationId,
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-sm font-medium text-slate-800 truncate">{ticket.subject}</p>
+                    {ticket.has_new_response && (
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 shrink-0">New Reply</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${STATUS_STYLES[ticket.status] || 'bg-slate-100 text-slate-500'}`}>

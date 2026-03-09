@@ -56,32 +56,44 @@ export default async function handler(req: any, res: any) {
 
             if (ticketsError) throw new Error(`Failed to fetch tickets: ${ticketsError.message}`);
 
-            // Get message counts for each ticket
+            // Get message counts and detect new admin responses
             const ticketIds = (tickets || []).map((t: any) => t.ticket_id);
-            let messageCounts: Record<string, { count: number; last_at: string | null }> = {};
+            let messageCounts: Record<string, { count: number; last_at: string | null; last_admin_at: string | null }> = {};
 
             if (ticketIds.length > 0) {
                 const { data: messages } = await supabaseAdmin
                     .from('ticket_messages')
-                    .select('ticket_id, created_at')
+                    .select('ticket_id, sender_type, created_at')
                     .in('ticket_id', ticketIds);
 
                 for (const msg of (messages || [])) {
                     if (!messageCounts[msg.ticket_id]) {
-                        messageCounts[msg.ticket_id] = { count: 0, last_at: null };
+                        messageCounts[msg.ticket_id] = { count: 0, last_at: null, last_admin_at: null };
                     }
                     messageCounts[msg.ticket_id].count++;
                     if (!messageCounts[msg.ticket_id].last_at || msg.created_at > messageCounts[msg.ticket_id].last_at!) {
                         messageCounts[msg.ticket_id].last_at = msg.created_at;
                     }
+                    if (msg.sender_type === 'admin') {
+                        if (!messageCounts[msg.ticket_id].last_admin_at || msg.created_at > messageCounts[msg.ticket_id].last_admin_at!) {
+                            messageCounts[msg.ticket_id].last_admin_at = msg.created_at;
+                        }
+                    }
                 }
             }
 
-            const enrichedTickets = (tickets || []).map((t: any) => ({
-                ...t,
-                message_count: messageCounts[t.ticket_id]?.count || 0,
-                last_message_at: messageCounts[t.ticket_id]?.last_at || null,
-            }));
+            const enrichedTickets = (tickets || []).map((t: any) => {
+                const lastAdminAt = messageCounts[t.ticket_id]?.last_admin_at || null;
+                const hasNewResponse = lastAdminAt
+                    ? !t.firm_last_read_at || new Date(lastAdminAt) > new Date(t.firm_last_read_at)
+                    : false;
+                return {
+                    ...t,
+                    message_count: messageCounts[t.ticket_id]?.count || 0,
+                    last_message_at: messageCounts[t.ticket_id]?.last_at || null,
+                    has_new_response: hasNewResponse,
+                };
+            });
 
             return res.status(200).json({ tickets: enrichedTickets });
         }
@@ -146,6 +158,12 @@ export default async function handler(req: any, res: any) {
                 .order('created_at', { ascending: true });
 
             if (msgsError) throw new Error(`Failed to fetch messages: ${msgsError.message}`);
+
+            // Mark ticket as read by the firm
+            await supabaseAdmin
+                .from('support_tickets')
+                .update({ firm_last_read_at: new Date().toISOString() })
+                .eq('ticket_id', ticketId);
 
             return res.status(200).json({ ticket, messages: messages || [] });
         }

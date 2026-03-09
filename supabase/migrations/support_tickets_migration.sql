@@ -29,3 +29,6 @@ CREATE TABLE ticket_messages (
 
 CREATE INDEX idx_ticket_messages_ticket_id ON ticket_messages(ticket_id);
 CREATE INDEX idx_ticket_messages_created_at ON ticket_messages(created_at);
+
+-- Track when the firm owner last read each ticket (for "new response" badge)
+ALTER TABLE support_tickets ADD COLUMN firm_last_read_at TIMESTAMPTZ;
