@@ -57,23 +57,27 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
     }
   }, [targetFirmId, availableFirms, firmId]);
 
-  // Determine role: URL path takes priority, then user metadata, then first available firm
+  // Determine role: URL path takes priority, then selected firm's staff role, then user metadata
   useEffect(() => {
     const resolveRole = () => {
       const path = window.location.pathname;
       if (path === '/super-admin') {
         setSelectedRole(UserRole.SuperAdmin);
-      } else if (user?.user_metadata?.role) {
-        setSelectedRole(prev => prev === UserRole.SuperAdmin ? (user.user_metadata.role as UserRole) : (prev || user.user_metadata.role as UserRole));
-      } else if (availableFirms && availableFirms.length > 0) {
-        setSelectedRole(prev => prev || availableFirms[0].role as UserRole);
+      } else if (firmId && availableFirms && availableFirms.length > 0) {
+        // Use the role from the currently selected firm (staff table is source of truth)
+        const selectedFirm = availableFirms.find(f => f.id === firmId);
+        if (selectedFirm) {
+          setSelectedRole(selectedFirm.role as UserRole);
+        }
+      } else if (availableFirms && availableFirms.length === 1) {
+        setSelectedRole(availableFirms[0].role as UserRole);
       }
     };
 
     resolveRole();
     window.addEventListener('popstate', resolveRole);
     return () => window.removeEventListener('popstate', resolveRole);
-  }, [user, availableFirms]);
+  }, [user, availableFirms, firmId]);
 
   // Dynamic Theme Injection
   useEffect(() => {
