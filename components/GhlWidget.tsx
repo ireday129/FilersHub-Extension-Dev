@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, ShieldX, CheckCircle, Circle, Calendar, Sparkles, Mail, Play, Rocket, Youtube } from 'lucide-react';
+import { Loader2, ShieldX, CheckCircle, Circle, Calendar, Sparkles, Play, Rocket, Youtube, MessageCircle } from 'lucide-react';
+import WidgetSupportTickets from './WidgetSupportTickets';
 
 const FH_GREEN = '#42ab30';
 const FH_ORANGE = '#f69109';
@@ -64,6 +65,7 @@ const GhlWidget: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [updates, setUpdates] = useState<PlatformUpdate[]>([]);
+  const [showSupport, setShowSupport] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const locationId = params.get('location_id');
@@ -292,15 +294,28 @@ const GhlWidget: React.FC = () => {
         </a>
 
         {/* Support */}
-        <div className="flex items-center justify-center gap-2 pt-2 pb-4" style={{ ...card, ...fadeIn(4) }}>
-          <Mail className="w-4 h-4 text-slate-400" />
-          <span className="text-xs text-slate-400">
-            Need help?{' '}
-            <a href="mailto:support@filershub.com" className="font-medium underline underline-offset-2" style={{ color: FH_GREEN }}>
-              support@filershub.com
-            </a>
-          </span>
+        <div className="flex items-center justify-center gap-3 pt-2 pb-4" style={{ ...card, ...fadeIn(4) }}>
+          <button
+            onClick={() => setShowSupport(true)}
+            className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg border border-slate-200 bg-white hover:border-green-300 transition-colors"
+            style={{ color: FH_GREEN }}
+          >
+            <MessageCircle className="w-4 h-4" />
+            Support Center
+          </button>
+          <a href="mailto:support@filershub.com" className="text-xs text-slate-400 underline underline-offset-2">
+            support@filershub.com
+          </a>
         </div>
+
+        {/* Support Tickets Overlay */}
+        {showSupport && (
+          <WidgetSupportTickets
+            locationId={new URLSearchParams(window.location.search).get('location_id') || ''}
+            email={new URLSearchParams(window.location.search).get('email') || ''}
+            onClose={() => setShowSupport(false)}
+          />
+        )}
       </div>
     </div>
   );

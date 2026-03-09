@@ -23,12 +23,14 @@ import {
   ShieldCheck,
   Link2,
   Unlink,
-  RefreshCw
+  RefreshCw,
+  MessageCircle
 } from 'lucide-react';
 import { Firm } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabase';
 import { FILERSHUB_LOGO_URL } from '../constants';
+import SuperAdminTickets from './SuperAdminTickets';
 
 const SuperAdminDashboard: React.FC = () => {
   const { signOut } = useAuth();
@@ -56,6 +58,9 @@ const SuperAdminDashboard: React.FC = () => {
   const [editingUpdate, setEditingUpdate] = useState<string | null>(null);
   const [updateForm, setUpdateForm] = useState({ type: 'update' as 'update' | 'deadline', title: '', body: '' });
   const [savingUpdate, setSavingUpdate] = useState(false);
+
+  // Support Tickets state
+  const [openTicketCount, setOpenTicketCount] = useState<number>(0);
 
   // Subscriptions state
   interface SubscriptionRow {
@@ -506,7 +511,7 @@ const SuperAdminDashboard: React.FC = () => {
       </div>
 
       {/* Platform Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Firms</p>
           <div className="flex items-center justify-between">
@@ -540,6 +545,15 @@ const SuperAdminDashboard: React.FC = () => {
             <h3 className="text-2xl font-black text-slate-800">{subsLoading ? '—' : subStats.pending}</h3>
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <Clock size={16} />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Open Tickets</p>
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-black text-slate-800">{openTicketCount}</h3>
+            <div className="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
+              <MessageCircle size={16} />
             </div>
           </div>
         </div>
@@ -718,6 +732,9 @@ const SuperAdminDashboard: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Support Tickets */}
+      <SuperAdminTickets onOpenCountChange={setOpenTicketCount} />
 
       {/* Subscriptions */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
