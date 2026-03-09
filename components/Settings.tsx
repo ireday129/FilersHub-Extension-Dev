@@ -710,7 +710,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-400 max-w-[180px]">Transparent PNG recommended.</p>
+                  <p className="text-[10px] text-slate-400 max-w-[200px]">Preferred size: 200x100px with a transparent background (PNG).</p>
                 </div>
               </div>
 
