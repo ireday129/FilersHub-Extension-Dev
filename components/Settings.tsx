@@ -536,8 +536,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                     <tr>
                       <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>Name</th>
                       {!isExtension && <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email</th>}
-                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>CRM Role</th>
-                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>App Role</th>
+                      <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>Role</th>
                       <th className={`${isExtension ? 'px-3' : 'px-6'} py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right`}>Access</th>
                     </tr>
                   </thead>
@@ -557,7 +556,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                             </div>
                           </td>
                           {!isExtension && <td className="px-6 py-4 text-sm text-slate-500">{user.email}</td>}
-                          <td className={`${isExtension ? 'px-3' : 'px-6'} py-4 text-xs font-medium text-slate-400 capitalize`}>{user.role}</td>
                           <td className={`${isExtension ? 'px-3' : 'px-6'} py-4`}>
                             {hasAccess ? (
                               <span className="text-xs font-semibold text-slate-600">{user.appRole || selectedRoles[user.id] || 'Tax Pro'}</span>
