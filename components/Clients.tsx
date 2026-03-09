@@ -9,7 +9,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Clock,
-  Filter,
   UserCheck,
   Plus,
   X,
@@ -684,50 +683,23 @@ const Clients: React.FC<ClientsProps> = ({ role, returns, setSelectedReturnId, s
         </div>
       )}
 
+      {!selectedClientName && !isExtension && (
+        <div className="relative max-w-md">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search clients..."
+            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand outline-none transition-all shadow-sm"
+          />
+        </div>
+      )}
+
       {selectedClientName ? renderClientDetail() : (
-        <div className={`grid grid-cols-1 ${isExtension ? '' : 'lg:grid-cols-4'} gap-6`}>
-          {/* Left Sidebar: Filters & Quick Search (hidden in extension) */}
-          <div className={`${isExtension ? 'hidden' : 'lg:col-span-1'} space-y-6`}>
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Search Clients</label>
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Name or type..."
-                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-slate-100">
-                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <Filter size={14} /> Quick Stats
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className="text-xs font-bold text-slate-600">Total Clients</span>
-                    <span className="text-xs font-black text-slate-900">{stats.total}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-rose-50 border border-rose-100">
-                    <span className="text-xs font-bold text-rose-600">Docs Missing</span>
-                    <span className="text-xs font-black text-rose-700">{stats.highPriority}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 border border-emerald-100">
-                    <span className="text-xs font-bold text-emerald-600">Recently Filed</span>
-                    <span className="text-xs font-black text-emerald-700">{stats.filed}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Main List Area */}
-          <div className={isExtension ? 'col-span-1' : 'lg:col-span-3'}>
+        <div>
+          {/* Client List */}
+          <div>
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
                 <span className="text-xs font-bold text-slate-400 uppercase shrink-0">
