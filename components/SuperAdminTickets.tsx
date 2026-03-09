@@ -287,7 +287,6 @@ const SuperAdminTickets: React.FC<SuperAdminTicketsProps> = ({ onOpenCountChange
                 <th className="text-left px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Subject</th>
                 <th className="text-left px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
                 <th className="text-left px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="text-left px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Submitted By</th>
                 <th className="text-left px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Last Activity</th>
                 <th className="text-center px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Msgs</th>
                 <th className="w-10"></th>
@@ -315,12 +314,6 @@ const SuperAdminTickets: React.FC<SuperAdminTicketsProps> = ({ onOpenCountChange
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div>
-                        <span className="text-xs font-medium text-slate-700">{ticket.submitted_by_name || '—'}</span>
-                        <p className="text-[10px] text-slate-400">{ticket.submitted_by_email}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
                       <span className="text-xs text-slate-500">{formatDate(ticket.updated_at)}</span>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -339,7 +332,7 @@ const SuperAdminTickets: React.FC<SuperAdminTicketsProps> = ({ onOpenCountChange
                   {/* Expanded Detail Panel */}
                   {expandedId === ticket.ticket_id && (
                     <tr>
-                      <td colSpan={8} className="bg-slate-50 border-b border-slate-200">
+                      <td colSpan={7} className="bg-slate-50 border-b border-slate-200">
                         <div className="px-6 py-4">
                           {/* Status Controls */}
                           <div className="flex items-center gap-3 mb-4">
