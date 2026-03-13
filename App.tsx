@@ -15,7 +15,7 @@ import { LogOut, Loader2, AlertTriangle } from 'lucide-react';
 import { useFirmData } from './hooks/useFirmData';
 import { useExtensionMode } from './hooks/useExtensionMode';
 import FirmSelection from './components/FirmSelection';
-import GhlWidget from './components/GhlWidget';
+import Launchpad from './components/Launchpad';
 import Tutorials from './components/Tutorials';
 import CrmAccessPage from './components/CrmAccessPage';
 import PreLaunchScreen from './components/PreLaunchScreen';
@@ -415,7 +415,7 @@ const AppContent: React.FC = () => {
 
   // GHL Dashboard Widget (no auth required — uses widget_token)
   if (path === '/widget') {
-    return <GhlWidget />;
+    return <Launchpad />;
   }
 
   // GHL Tutorials Page (no auth required — uses widget_token)

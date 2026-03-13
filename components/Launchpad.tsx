@@ -70,7 +70,7 @@ const WIDGET_KEYFRAMES = `
 const LAUNCH_DATE = new Date('2026-04-15T00:00:00');
 const isPreLaunch = new Date() < LAUNCH_DATE;
 
-const GhlWidget: React.FC = () => {
+const Launchpad: React.FC = () => {
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -371,4 +371,4 @@ const GhlWidget: React.FC = () => {
   );
 };
 
-export default GhlWidget;
+export default Launchpad;
