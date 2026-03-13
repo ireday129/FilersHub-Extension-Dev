@@ -16,7 +16,15 @@ const FLOATERS = [
   { src: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/69948d63d614c96431f2b40f.png', style: { bottom: 60, left: -10, width: 320 }, anim: 'floatE 5s ease-in-out infinite 0.8s' },
 ];
 
-const ONBOARDING_STEPS = [
+interface OnboardingStep {
+  id: string;
+  label: string;
+  description: string;
+  link: string;
+  isPro?: boolean;
+}
+
+const ONBOARDING_STEPS: OnboardingStep[] = [
   { id: 'firm_profile', label: 'Set Up Firm Profile & Logo', description: 'Add your firm name, address, logo, and contact info', link: 'https://app.filershub.com/settings/firm-profile' },
   { id: 'brand_color', label: 'Configure Brand Color', description: 'Set the brand color that syncs to your CRM location', link: 'https://app.filershub.com/settings/firm-profile' },
   { id: 'portal_message', label: 'Set Portal Welcome Message', description: 'Customize the greeting your clients see when they log in', link: 'https://app.filershub.com/settings/firm-profile' },
@@ -25,6 +33,8 @@ const ONBOARDING_STEPS = [
   { id: 'first_client', label: 'Add Your First Client', description: 'Create a client record with name, email, and phone', link: 'https://app.filershub.com/clients' },
   { id: 'portal_invite', label: 'Send a Client Portal Invite', description: 'Invite a client so they can access their branded portal', link: 'https://app.filershub.com/clients' },
   { id: 'chrome_extension', label: 'Install the Chrome Extension', description: 'Access FilersHub directly from your CRM sidebar with one click', link: 'https://chromewebstore.google.com/detail/filershub' },
+  { id: 'schedule_walkthrough', label: 'Schedule 1 on 1 Walkthrough Call', description: 'Get a personalized tour of FilersHub', link: 'https://app.filershub.com/support', isPro: true },
+  { id: 'setup_irs_alerts', label: 'Set Up IRS Alerts', description: 'Monitor client transcripts for important updates', link: 'https://app.filershub.com/settings/alerts', isPro: true },
 ];
 
 function formatRelativeDate(isoDate: string): string {
@@ -66,6 +76,7 @@ const GhlWidget: React.FC = () => {
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [updates, setUpdates] = useState<PlatformUpdate[]>([]);
   const [showSupport, setShowSupport] = useState(false);
+  const [isPro, setIsPro] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const locationId = params.get('location_id');
@@ -86,6 +97,9 @@ const GhlWidget: React.FC = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to load data');
         setAuthorized(true);
+        if (data.subscriptionTier && data.subscriptionTier.toLowerCase().includes('pro')) {
+          setIsPro(true);
+        }
         if (data.platformUpdates) {
           setUpdates(data.platformUpdates.map((u: any) => ({
             id: u.id,
@@ -198,19 +212,25 @@ const GhlWidget: React.FC = () => {
             <div className="divide-y divide-slate-100" style={isPreLaunch ? { opacity: 0.45, pointerEvents: 'none' } : undefined}>
               {ONBOARDING_STEPS.map((step) => {
                 const done = completedSteps.has(step.id);
+                const disabled = step.isPro && !isPro;
                 return (
-                  <div key={step.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => toggleStep(step.id)}>
+                  <div key={step.id} className={`flex items-start gap-3 px-4 py-3 transition-colors ${disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-slate-50 cursor-pointer'}`} onClick={() => { if (!disabled) toggleStep(step.id); }}>
                     <div className="pt-0.5 shrink-0">
                       {done
                         ? <CheckCircle className="w-[22px] h-[22px]" style={{ color: FH_GREEN }} fill={FH_GREEN} stroke="white" />
-                        : <Circle className="w-[22px] h-[22px] text-slate-300" />
+                        : <Circle className={`w-[22px] h-[22px] ${disabled ? 'text-slate-200' : 'text-slate-300'}`} />
                       }
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${done ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{step.label}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{step.description}</p>
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-medium ${done ? 'text-slate-400 line-through' : disabled ? 'text-slate-400' : 'text-slate-800'}`}>{step.label}</p>
+                        {step.isPro && (
+                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-slate-800 text-white tracking-wide">Pro</span>
+                        )}
+                      </div>
+                      <p className={`text-xs mt-0.5 ${disabled ? 'text-slate-300' : 'text-slate-400'}`}>{step.description}</p>
                     </div>
-                    {!done && (
+                    {!done && !disabled && (
                       <a href={step.link} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs text-white px-3 py-1.5 rounded-lg font-medium transition-colors hover:opacity-90" style={{ background: FH_GREEN }} onClick={(e) => e.stopPropagation()}>Start</a>
                     )}
                   </div>
