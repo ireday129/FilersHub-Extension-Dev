@@ -248,7 +248,7 @@ const Launchpad: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <p className={`text-sm font-medium ${done ? 'text-slate-400 line-through' : disabled ? 'text-slate-400' : 'text-slate-800'}`}>{step.label}</p>
                         {step.isPro && (
-                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-slate-800 text-white tracking-wide">Pro</span>
+                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full text-black tracking-wide" style={{ backgroundColor: FH_ORANGE }}>Pro</span>
                         )}
                       </div>
                       <p className={`text-xs mt-0.5 ${disabled ? 'text-slate-300' : 'text-slate-400'}`}>{step.description}</p>
@@ -309,7 +309,7 @@ const Launchpad: React.FC = () => {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-slate-800">{item.title}</p>
                       {item.isPro && (
-                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-slate-800 text-white tracking-wide">Pro Exclusive</span>
+                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full text-black tracking-wide" style={{ backgroundColor: FH_ORANGE }}>Pro Exclusive</span>
                       )}
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${item.type === 'deadline' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'}`}>
                         {item.date}
