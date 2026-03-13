@@ -57,10 +57,14 @@ export default async function handler(req: any, res: any) {
                 .eq('firm_id', firmId),
             supabaseAdmin
                 .from('platform_updates')
-                .select('update_id, type, title, body, created_at')
+                .select('update_id, type, title, body, created_at, is_pro')
                 .eq('is_active', true)
                 .order('created_at', { ascending: false })
                 .limit(10),
+            supabaseAdmin
+                .from('staff_archived_updates')
+                .select('update_id')
+                .eq('staff_id', staffMember.staff_id)
         ]);
 
         const totalClients = clientsResult.count || 0;
@@ -74,13 +78,18 @@ export default async function handler(req: any, res: any) {
             returnsByStatus[status] = (returnsByStatus[status] || 0) + 1;
         }
 
-        const platformUpdates = (updatesResult.data || []).map((u: any) => ({
-            id: u.update_id,
-            type: u.type,
-            title: u.title,
-            body: u.body,
-            date: u.created_at,
-        }));
+        const archivedUpdates = new Set((updatesResult[3]?.data || []).map((au: any) => au.update_id));
+
+        const platformUpdates = (updatesResult.data || [])
+            .filter((u: any) => !archivedUpdates.has(u.update_id))
+            .map((u: any) => ({
+                id: u.update_id,
+                type: u.type,
+                title: u.title,
+                body: u.body,
+                date: u.created_at,
+                isPro: u.is_pro || false,
+            }));
 
         return res.status(200).json({
             firmName: firm.firm_name,

@@ -50,13 +50,14 @@ const SuperAdminDashboard: React.FC = () => {
     title: string;
     body: string;
     is_active: boolean;
+    is_pro: boolean;
     created_at: string;
   }
   const [updates, setUpdates] = useState<PlatformUpdate[]>([]);
   const [updatesLoading, setUpdatesLoading] = useState(true);
   const [newUpdate, setNewUpdate] = useState(false);
   const [editingUpdate, setEditingUpdate] = useState<string | null>(null);
-  const [updateForm, setUpdateForm] = useState({ type: 'update' as 'update' | 'deadline', title: '', body: '' });
+  const [updateForm, setUpdateForm] = useState({ type: 'update' as 'update' | 'deadline', title: '', body: '', is_pro: false });
   const [savingUpdate, setSavingUpdate] = useState(false);
 
   // Support Tickets state
@@ -314,7 +315,7 @@ const SuperAdminDashboard: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('platform_updates')
-          .select('update_id, type, title, body, is_active, created_at')
+          .select('update_id, type, title, body, is_active, is_pro, created_at')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -407,14 +408,14 @@ const SuperAdminDashboard: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('platform_updates')
-        .insert({ type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim() })
+        .insert({ type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim(), is_pro: updateForm.is_pro })
         .select()
         .single();
 
       if (error) throw error;
       setUpdates(prev => [data, ...prev]);
       setNewUpdate(false);
-      setUpdateForm({ type: 'update', title: '', body: '' });
+      setUpdateForm({ type: 'update', title: '', body: '', is_pro: false });
     } catch (err) {
       console.error('Error creating update:', err);
     } finally {
@@ -428,15 +429,15 @@ const SuperAdminDashboard: React.FC = () => {
     try {
       const { error } = await supabase
         .from('platform_updates')
-        .update({ type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim(), updated_at: new Date().toISOString() })
+        .update({ type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim(), is_pro: updateForm.is_pro, updated_at: new Date().toISOString() })
         .eq('update_id', updateId);
 
       if (error) throw error;
       setUpdates(prev => prev.map(u =>
-        u.update_id === updateId ? { ...u, type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim() } : u
+        u.update_id === updateId ? { ...u, type: updateForm.type, title: updateForm.title.trim(), body: updateForm.body.trim(), is_pro: updateForm.is_pro } : u
       ));
       setEditingUpdate(null);
-      setUpdateForm({ type: 'update', title: '', body: '' });
+      setUpdateForm({ type: 'update', title: '', body: '', is_pro: false });
     } catch (err) {
       console.error('Error updating update:', err);
     } finally {
@@ -573,7 +574,7 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
           {!newUpdate && (
             <button
-              onClick={() => { setNewUpdate(true); setEditingUpdate(null); setUpdateForm({ type: 'update', title: '', body: '' }); }}
+              onClick={() => { setNewUpdate(true); setEditingUpdate(null); setUpdateForm({ type: 'update', title: '', body: '', is_pro: false }); }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors"
             >
               <PlusCircle size={14} />
@@ -611,21 +612,32 @@ const SuperAdminDashboard: React.FC = () => {
                   rows={2}
                   className="w-full px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                 />
-                <div className="flex items-center gap-2 justify-end">
-                  <button
-                    onClick={() => { setNewUpdate(false); setUpdateForm({ type: 'update', title: '', body: '' }); }}
-                    className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateUpdate}
-                    disabled={savingUpdate || !updateForm.title.trim() || !updateForm.body.trim()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors"
-                  >
-                    {savingUpdate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                    Publish
-                  </button>
+                <div className="flex items-center gap-2 justify-between mt-1">
+                  <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={updateForm.is_pro}
+                      onChange={(e) => setUpdateForm(prev => ({ ...prev, is_pro: e.target.checked }))}
+                      className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span className="font-semibold">Pro Exclusive Update</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setNewUpdate(false); setUpdateForm({ type: 'update', title: '', body: '', is_pro: false }); }}
+                      className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCreateUpdate}
+                      disabled={savingUpdate || !updateForm.title.trim() || !updateForm.body.trim()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors"
+                    >
+                      {savingUpdate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                      Publish
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -668,21 +680,32 @@ const SuperAdminDashboard: React.FC = () => {
                     rows={2}
                     className="w-full px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                   />
-                  <div className="flex items-center gap-2 justify-end">
-                    <button
-                      onClick={() => { setEditingUpdate(null); setUpdateForm({ type: 'update', title: '', body: '' }); }}
-                      className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => handleSaveUpdate(u.update_id)}
-                      disabled={savingUpdate || !updateForm.title.trim() || !updateForm.body.trim()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors"
-                    >
-                      {savingUpdate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                      Save
-                    </button>
+                  <div className="flex items-center justify-between mt-1">
+                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={updateForm.is_pro}
+                        onChange={(e) => setUpdateForm(prev => ({ ...prev, is_pro: e.target.checked }))}
+                        className="rounded border-slate-300 text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
+                      />
+                      <span className="font-semibold">Pro Exclusive Update</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setEditingUpdate(null); setUpdateForm({ type: 'update', title: '', body: '', is_pro: false }); }}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSaveUpdate(u.update_id)}
+                        disabled={savingUpdate || !updateForm.title.trim() || !updateForm.body.trim()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg transition-colors"
+                      >
+                        {savingUpdate ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                        Save
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -693,6 +716,11 @@ const SuperAdminDashboard: React.FC = () => {
                         }`}>
                         {u.type}
                       </span>
+                      {u.is_pro && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-black uppercase rounded bg-slate-800 text-white tracking-wide">
+                          Pro
+                        </span>
+                      )}
                       <span className="text-sm font-bold text-slate-800">{u.title}</span>
                       {!u.is_active && (
                         <span className="px-1.5 py-0.5 text-[10px] font-black uppercase rounded bg-slate-100 text-slate-400">Hidden</span>
@@ -712,7 +740,7 @@ const SuperAdminDashboard: React.FC = () => {
                       {u.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
                     </button>
                     <button
-                      onClick={() => { setEditingUpdate(u.update_id); setNewUpdate(false); setUpdateForm({ type: u.type, title: u.title, body: u.body }); }}
+                      onClick={() => { setEditingUpdate(u.update_id); setNewUpdate(false); setUpdateForm({ type: u.type, title: u.title, body: u.body, is_pro: u.is_pro }); }}
                       className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title="Edit"
                     >
@@ -822,11 +850,10 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
-                      sub.plan_tier === 'Pro'
+                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${sub.plan_tier === 'Pro'
                         ? 'bg-amber-50 text-amber-600 border-amber-100'
                         : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}>
+                      }`}>
                       {sub.plan_tier}
                     </span>
                   </td>
@@ -872,11 +899,10 @@ const SuperAdminDashboard: React.FC = () => {
                       <Mail size={12} />
                       <span className="text-xs font-medium">{ps.customer_email}</span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${
-                      ps.plan_tier === 'Pro'
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${ps.plan_tier === 'Pro'
                         ? 'bg-amber-50 text-amber-600 border-amber-100'
                         : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}>
+                      }`}>
                       {ps.plan_tier}
                     </span>
                     <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase ${subStatusColor(ps.status)}`}>
@@ -1029,7 +1055,7 @@ const SuperAdminDashboard: React.FC = () => {
                       className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border cursor-pointer transition-colors ${firm.subscriptionTier === 'Pro'
                         ? 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100'
                         : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                      }`}
+                        }`}
                       title={`Click to switch to ${firm.subscriptionTier === 'Pro' ? 'Core' : 'Pro'}`}
                     >
                       {firm.subscriptionTier}
@@ -1056,11 +1082,10 @@ const SuperAdminDashboard: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => handleOverrideAccess(firm.id, firm.subscriptionStatus)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition-colors ${
-                          firm.subscriptionStatus === 'active'
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition-colors ${firm.subscriptionStatus === 'active'
                             ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                             : 'bg-amber-50 text-amber-600 hover:bg-amber-100'
-                        }`}
+                          }`}
                         title={firm.subscriptionStatus === 'active' ? 'Click to revoke manual access' : 'Click to grant manual access'}
                       >
                         <ShieldCheck size={12} />

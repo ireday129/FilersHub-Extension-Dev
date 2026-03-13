@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, ShieldX, CheckCircle, Circle, Calendar, Sparkles, Play, Rocket, Youtube, MessageCircle } from 'lucide-react';
+import { Loader2, ShieldX, CheckCircle, Circle, Calendar, Sparkles, Play, Rocket, Youtube, MessageCircle, X } from 'lucide-react';
 import WidgetSupportTickets from './WidgetSupportTickets';
 
 const FH_GREEN = '#42ab30';
@@ -54,6 +54,7 @@ interface PlatformUpdate {
   title: string;
   body: string;
   date: string;
+  isPro?: boolean;
 }
 
 const WIDGET_KEYFRAMES = `
@@ -107,12 +108,34 @@ const GhlWidget: React.FC = () => {
             title: u.title,
             body: u.body,
             date: formatRelativeDate(u.date),
+            isPro: u.isPro,
           })));
         }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleArchiveUpdate = async (updateId: string) => {
+    // Optimistic UI update
+    setUpdates(prev => prev.filter(u => u.id !== updateId));
+
+    const params = new URLSearchParams(window.location.search);
+    const locationId = params.get('location_id');
+    const email = params.get('email');
+
+    if (!locationId || !email) return;
+
+    try {
+      await fetch('/api/widget-archive-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locationId, email, updateId }),
+      });
+    } catch (err) {
+      console.error('Failed to archive update:', err);
+    }
+  };
 
   // Inject keyframe animations
   useEffect(() => {
@@ -277,20 +300,30 @@ const GhlWidget: React.FC = () => {
           {updates.length > 0 ? (
             <div className="space-y-3">
               {updates.map((item) => (
-                <div key={item.id} className="flex items-start gap-3">
+                <div key={item.id} className="flex items-start gap-3 relative group">
                   {item.type === 'deadline'
                     ? <Calendar className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                     : <Sparkles className="w-4 h-4 shrink-0 mt-0.5" style={{ color: FH_ORANGE }} />
                   }
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 pr-6">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-slate-800">{item.title}</p>
+                      {item.isPro && (
+                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-slate-800 text-white tracking-wide">Pro Exclusive</span>
+                      )}
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${item.type === 'deadline' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'}`}>
                         {item.date}
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{item.body}</p>
                   </div>
+                  <button
+                    onClick={() => handleArchiveUpdate(item.id)}
+                    className="absolute top-0 right-0 p-1 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    title="Archive this update"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>
