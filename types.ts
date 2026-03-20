@@ -49,6 +49,7 @@ export interface Firm {
   ghlIntegrated: boolean;
   slug: string;
   irsAlertsEnabled?: boolean;
+  queueCounterEnabled?: boolean;
   stripeSubscriptionId?: string | null;
 }
 
@@ -221,6 +222,7 @@ export interface FirmOption {
   slug: string;
   isStaff: boolean;
   irsAlertsEnabled: boolean;
+  queueCounterEnabled?: boolean;
   ghlAlertWebhookUrl?: string | null;
   staffName?: string;
   portalMessage?: string;

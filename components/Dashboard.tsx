@@ -257,6 +257,52 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
   });
   const [staffListWithIds, setStaffListWithIds] = useState<{ id: string; name: string }[]>([]);
 
+  // Queue Positions
+  const [queuePositions, setQueuePositions] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!isClient || !firmId || returns.length === 0) return;
+    
+    let stale = false;
+    const fetchQueuePositions = async () => {
+      // First, check if firm has queue_counter_enabled
+      const { data: firmData, error: firmError } = await supabase
+        .from('firms')
+        .select('queue_counter_enabled')
+        .eq('firm_id', firmId)
+        .single();
+        
+      if (firmError || !firmData?.queue_counter_enabled) return;
+        
+      const positions: Record<string, number> = {};
+      const eligibleStatuses = [
+        TaxReturnStatus.IntakeReceived, 
+        TaxReturnStatus.ComplianceReview, 
+        TaxReturnStatus.InPreparation, 
+        TaxReturnStatus.BankProduct
+      ];
+
+      for (const tr of returns) {
+        if (eligibleStatuses.includes(tr.status as TaxReturnStatus)) {
+          const { data, error } = await supabase.rpc('get_client_queue_position', {
+            p_tax_return_id: tr.id,
+            p_firm_id: firmId,
+            p_status: tr.status
+          });
+          if (!error && data) {
+            positions[tr.id] = data;
+          }
+        }
+      }
+      if (!stale) {
+        setQueuePositions(positions);
+      }
+    };
+    
+    fetchQueuePositions();
+    return () => { stale = true; };
+  }, [firmId, isClient, returns]);
+
   // "New" badge tracking: compare current return IDs per status against last-visit snapshot
   const [prevSnapshot] = useState<Record<string, string[]> | null>(() => {
     try {
@@ -1923,6 +1969,11 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                             }`}>
                             {STATUS_EMOJIS[tr.status]} {tr.status}
                           </span>
+                          {queuePositions[tr.id] && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mt-1 sm:mt-0 sm:ml-2">
+                              Queue Position: #{queuePositions[tr.id]}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-500 font-medium">{tr.type}</p>
                         <div className="flex items-center gap-4 mt-2">

@@ -156,6 +156,7 @@ const SuperAdminDashboard: React.FC = () => {
             ghlIntegrated: !!f.ghl_location_id,
             slug: f.slug || '',
             irsAlertsEnabled: !!f.irs_alerts_enabled,
+            queueCounterEnabled: !!f.queue_counter_enabled,
             stripeSubscriptionId: f.stripe_subscription_id || null,
           };
         });
@@ -225,6 +226,23 @@ const SuperAdminDashboard: React.FC = () => {
       ));
     } catch (err) {
       console.error('Error toggling IRS Alerts:', err);
+    }
+  };
+
+  const handleToggleQueueCounter = async (firmId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('firms')
+        .update({ queue_counter_enabled: !currentStatus })
+        .eq('firm_id', firmId);
+
+      if (error) throw error;
+
+      setFirms(prev => prev.map(f =>
+        f.id === firmId ? { ...f, queueCounterEnabled: !currentStatus } : f
+      ));
+    } catch (err) {
+      console.error('Error toggling Queue Counter:', err);
     }
   };
 
@@ -1007,6 +1025,7 @@ const SuperAdminDashboard: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Clients</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Install Date</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">IRS</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Queue</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1163,6 +1182,16 @@ const SuperAdminDashboard: React.FC = () => {
                     >
                       <span
                         className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${firm.irsAlertsEnabled ? 'translate-x-1.5' : '-translate-x-1.5'}`}
+                      />
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button
+                      onClick={() => handleToggleQueueCounter(firm.id, firm.queueCounterEnabled || false)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 outline-none ${firm.queueCounterEnabled ? 'bg-indigo-500' : 'bg-slate-200'}`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${firm.queueCounterEnabled ? 'translate-x-1.5' : '-translate-x-1.5'}`}
                       />
                     </button>
                   </td>
