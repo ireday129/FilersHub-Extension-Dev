@@ -35,6 +35,7 @@ interface SettingsProps {
     slug?: string;
     portalMessage?: string;
     irsAlertsEnabled?: boolean;
+    queueCounterEnabled?: boolean;
     ghlAlertWebhookUrl?: string | null;
   };
   setFirmSettings: React.Dispatch<React.SetStateAction<{
@@ -1021,6 +1022,64 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
                   onChange={(e) => setLocalSettings(prev => ({ ...prev, ghlAlertWebhookUrl: e.target.value }))}
                   className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                 />
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Client Queue Counter Section */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 delay-[200ms]">
+        <div className={`${isExtension ? 'p-4' : 'p-6'} border-b border-slate-100 ${isExtension ? 'space-y-3' : 'flex items-center justify-between'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${firmSettings.queueCounterEnabled ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400'}`}>
+              <Hash size={20} />
+            </div>
+            <div>
+              <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold text-slate-800 flex items-center gap-2 flex-wrap`}>
+                Client Queue Counter
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${firmSettings.queueCounterEnabled ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'}`}>
+                  PREMIUM FEATURE
+                </span>
+                {!firmSettings.queueCounterEnabled && (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full uppercase">
+                    <Lock size={10} /> Locked
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">Show clients their real-time position in your processing queue.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className={`${isExtension ? 'p-4' : 'p-6 bg-slate-50/50'}`}>
+          {!firmSettings.queueCounterEnabled ? (
+            <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm text-center relative overflow-hidden">
+              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 opacity-50"></div>
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100 shadow-sm">
+                <Lock size={28} className="text-amber-500" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">Unlock Client Queue Counter</h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto mb-6 leading-relaxed">
+                Elevate your client experience by taking the mystery out of tax prep. The Queue Counter gives clients peace of mind by showing exactly where their return is in line. Upgrade to Pro to enable this automated transparency tool.
+              </p>
+              <a
+                href="mailto:support@filershub.com?subject=Upgrade to Pro Tier"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-amber-500 text-white text-sm font-bold rounded-lg hover:bg-amber-600 transition-all shadow-sm active:scale-95"
+              >
+                <Sparkles size={16} /> Contact Support to Upgrade
+              </a>
+            </div>
+          ) : (
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="max-w-xl">
+                <div className="flex items-start gap-3 mb-2">
+                  <CheckCircle2 className="text-emerald-500 shrink-0 mt-0.5" size={20} />
+                  <h3 className="text-sm font-bold text-slate-800">Queue Counter Active</h3>
+                </div>
+                <p className="text-xs text-slate-500 ml-8 leading-relaxed flex-wrap">
+                  Your clients can now see their real-time position in the processing queue when they log into the portal. The counter only displays when their status is set to Intake Received, Compliance Review, In Preparation, or Bank Product. 
+                </p>
               </div>
             </div>
           )}

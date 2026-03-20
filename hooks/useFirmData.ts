@@ -22,6 +22,7 @@ export const useFirmData = () => {
         slug: '',
         portalMessage: '',
         irsAlertsEnabled: false,
+        queueCounterEnabled: false,
         subscriptionStatus: 'active' as string
     });
 
@@ -123,7 +124,8 @@ export const useFirmData = () => {
                             brandColor: '',
                             slug: '',
                             isStaff: true,
-                            irsAlertsEnabled: false
+                            irsAlertsEnabled: false,
+                            queueCounterEnabled: false
                         });
                     }
                 }
@@ -142,6 +144,7 @@ export const useFirmData = () => {
                             slug: '',
                             isStaff: false,
                             irsAlertsEnabled: false,
+                            queueCounterEnabled: false,
                             ghlAlertWebhookUrl: null
                         });
                     }
@@ -169,7 +172,7 @@ export const useFirmData = () => {
             const firmIds = Array.from(allFirmsMap.keys());
             const { data: firmsDetails, error: firmsError } = await supabase
                 .from('firms')
-                .select('firm_id, firm_name, logo_url, brand_color, slug, portal_message, irs_alerts_enabled, ghl_alert_webhook_url, subscription_status')
+                .select('firm_id, firm_name, logo_url, brand_color, slug, portal_message, irs_alerts_enabled, queue_counter_enabled, ghl_alert_webhook_url, subscription_status')
                 .in('firm_id', firmIds);
 
             if (firmsError) {
@@ -186,6 +189,7 @@ export const useFirmData = () => {
                         existing.slug = f.slug || '';
                         existing.portalMessage = f.portal_message || '';
                         existing.irsAlertsEnabled = f.irs_alerts_enabled || false;
+                        existing.queueCounterEnabled = f.queue_counter_enabled || false;
                         existing.ghlAlertWebhookUrl = f.ghl_alert_webhook_url || null;
                         existing.subscriptionStatus = f.subscription_status || 'active';
                     }
@@ -226,6 +230,7 @@ export const useFirmData = () => {
                 slug: selectedFirm.slug || '',
                 portalMessage: selectedFirm.portalMessage || '',
                 irsAlertsEnabled: selectedFirm.irsAlertsEnabled || false,
+                queueCounterEnabled: selectedFirm.queueCounterEnabled || false,
                 subscriptionStatus: selectedFirm.subscriptionStatus || 'active'
             });
 
