@@ -117,7 +117,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const handleConnectIrs = () => {
     if (!user) return;
     const clientId = import.meta.env.VITE_IRS_CLIENT_ID || 'PENDING_IRS_CLIENT_ID';
-    const redirectUri = 'https://app.filershub.com/api/irs-callback';
+    const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/irs-oauth`;
     const irsAuthorizeUrl = import.meta.env.VITE_IRS_AUTHORIZE_URL
       || 'https://api.alt.www4.irs.gov/auth/oauth/v2/authorize';
 
