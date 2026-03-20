@@ -129,7 +129,11 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       state: user.id,
     });
 
-    window.location.href = `${irsAuthorizeUrl}?${params.toString()}`;
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    window.open(`${irsAuthorizeUrl}?${params.toString()}`, 'IRS Auth', `width=${width},height=${height},top=${top},left=${left}`);
   };
 
   const handleDisconnectIrs = async () => {
@@ -145,14 +149,17 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('irs_success') === 'true') {
-      alert('IRS e-Services account connected successfully!');
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (params.get('irs_error')) {
-      alert(`Failed to connect to IRS e-Services: ${params.get('irs_error')}`);
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'IRS_AUTH_SUCCESS') {
+        alert('IRS e-Services account connected successfully!');
+        window.location.reload();
+      } else if (event.data?.type === 'IRS_AUTH_ERROR') {
+        alert(`Failed to connect to IRS e-Services: ${event.data.payload}`);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   useEffect(() => {

@@ -14,14 +14,11 @@ serve(async (req) => {
     try {
         const url = new URL(req.url)
 
-        // Intended for local dev and testing
-        const appUrl = Deno.env.get('APP_URL') || 'http://localhost:5173'
-
         const code = url.searchParams.get('code')
         const state = url.searchParams.get('state') // Contains user_id
 
         if (!code || !state) {
-            return Response.redirect(`${appUrl}/settings?irs_error=missing_params`, 302)
+            return new Response(`<html><script>window.opener?.postMessage({ type: 'IRS_AUTH_ERROR', payload: 'missing_params' }, '*'); window.close();</script></html>`, { headers: { ...corsHeaders, 'Content-Type': 'text/html' } })
         }
 
         const userId = state;
@@ -66,10 +63,10 @@ serve(async (req) => {
 
         if (upsertErr) {
             console.error("Failed to upsert irs_connections:", upsertErr);
-            return Response.redirect(`${appUrl}/settings?irs_error=db_error`, 302);
+            return new Response(`<html><script>window.opener?.postMessage({ type: 'IRS_AUTH_ERROR', payload: 'db_error' }, '*'); window.close();</script></html>`, { headers: { ...corsHeaders, 'Content-Type': 'text/html' } })
         }
 
-        return Response.redirect(`${appUrl}/settings?irs_success=true`, 302);
+        return new Response(`<html><script>window.opener?.postMessage({ type: 'IRS_AUTH_SUCCESS' }, '*'); window.close();</script></html>`, { headers: { ...corsHeaders, 'Content-Type': 'text/html' } })
 
     } catch (error) {
         console.error("Internal Edge Function Error:", error);
