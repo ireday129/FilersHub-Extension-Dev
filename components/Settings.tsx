@@ -118,7 +118,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const handleConnectIrs = () => {
     if (!user) return;
     const clientId = import.meta.env.VITE_IRS_CLIENT_ID || 'PENDING_IRS_CLIENT_ID';
-    const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/irs-oauth`;
+    const redirectUri = import.meta.env.VITE_IRS_REDIRECT_URI 
+      || `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/irs-oauth`;
     const irsAuthorizeUrl = import.meta.env.VITE_IRS_AUTHORIZE_URL
       || 'https://api.alt.www4.irs.gov/auth/oauth/v2/authorize';
     const scope = import.meta.env.VITE_IRS_SCOPE || 'tds.read';
