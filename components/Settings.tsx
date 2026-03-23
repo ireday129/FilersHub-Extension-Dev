@@ -128,7 +128,6 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       response_type: 'code',
       client_id: clientId,
       redirect_uri: redirectUri,
-      scope: scope,
       state: user.id,
     });
 
