@@ -121,12 +121,13 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/irs-oauth`;
     const irsAuthorizeUrl = import.meta.env.VITE_IRS_AUTHORIZE_URL
       || 'https://api.alt.www4.irs.gov/auth/oauth/v2/authorize';
+    const scope = import.meta.env.VITE_IRS_SCOPE || 'tds.read';
 
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: clientId,
       redirect_uri: redirectUri,
-      scope: 'tds.read',
+      scope: scope,
       state: user.id,
     });
 
