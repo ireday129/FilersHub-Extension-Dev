@@ -4,7 +4,7 @@ import { FILERSHUB_LOGO_URL } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { WatermarkBackground } from './WatermarkBackground';
 
-const LAUNCH_DATE = new Date('2026-04-15T00:00:00');
+const LAUNCH_DATE = new Date('2026-08-01T00:00:00');
 
 function getTimeRemaining() {
     const now = new Date().getTime();

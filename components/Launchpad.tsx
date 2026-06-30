@@ -67,7 +67,7 @@ const WIDGET_KEYFRAMES = `
 `;
 
 
-const LAUNCH_DATE = new Date('2026-04-15T00:00:00');
+const LAUNCH_DATE = new Date('2026-08-01T00:00:00');
 const isPreLaunch = new Date() < LAUNCH_DATE;
 
 const Launchpad: React.FC = () => {

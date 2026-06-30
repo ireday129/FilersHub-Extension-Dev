@@ -20,7 +20,7 @@ import Tutorials from './components/Tutorials';
 import CrmAccessPage from './components/CrmAccessPage';
 import PreLaunchScreen from './components/PreLaunchScreen';
 
-const LAUNCH_DATE = new Date('2026-04-15T00:00:00');
+const LAUNCH_DATE = new Date('2026-08-01T00:00:00');
 
 const DASHBOARD_FLOATERS = [
   { src: 'https://storage.googleapis.com/msgsndr/4X2JY0JipOsTk1oyWC4a/media/6993c6753b3cc9e7ef06603a.png', style: { top: 40, left: -60, width: 480 }, anim: 'floatA 5s ease-in-out infinite' },
