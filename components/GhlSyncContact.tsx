@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Link2, Loader2, UserPlus, XCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { syncGhlContact, GhlContactSyncResult } from '../services/ghlConnection';
@@ -7,6 +7,7 @@ import WidgetSignIn from './WidgetSignIn';
 
 // Popup opened by the "Sync to FilersHub" button on GHL contact pages
 // (public/ghl-contact-button.js): /ghl/sync-contact?location_id=…&contact_id=…
+// Syncing needs a click, so a forwarded link can't change anything on its own.
 const HEADLINES: Record<GhlContactSyncResult['outcome'], string> = {
   already: 'Already synced',
   linked: 'Linked to existing client',
@@ -22,53 +23,87 @@ const DETAILS: Record<GhlContactSyncResult['outcome'], string> = {
 type State =
   | { kind: 'checking' }
   | { kind: 'signin' }
-  | { kind: 'syncing' }
+  | { kind: 'ready'; email: string }
+  | { kind: 'syncing'; email: string }
   | { kind: 'done'; result: GhlContactSyncResult }
   | { kind: 'error'; message: string };
+
+const isSessionProblem = (message: string) => /session has expired|please sign in/i.test(message);
+
+const switchAccount = async () => {
+  await supabase.auth.signOut();
+  window.location.reload();
+};
 
 const GhlSyncContact: React.FC = () => {
   const params = new URLSearchParams(window.location.search);
   const locationId = params.get('location_id') || '';
   const contactId = params.get('contact_id') || '';
   const [state, setState] = useState<State>({ kind: 'checking' });
-  const started = useRef(false);
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-
     if (!locationId || !contactId) {
       setState({ kind: 'error', message: 'This link is missing the GHL location or contact. Open it from a contact page in GHL.' });
       return;
     }
-
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        setState({ kind: 'signin' });
-        return;
-      }
-      setState({ kind: 'syncing' });
-      try {
-        const result = await syncGhlContact(locationId, contactId);
-        setState({ kind: 'done', result });
-      } catch (e: any) {
-        setState({ kind: 'error', message: e?.message || 'Could not sync this contact.' });
-      }
-    })();
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) setState({ kind: 'signin' });
+      else setState({ kind: 'ready', email: data.session.user.email || '' });
+    });
   }, [locationId, contactId]);
 
-  if (state.kind === 'signin') return <WidgetSignIn />;
+  const runSync = async (email: string) => {
+    setState({ kind: 'syncing', email });
+    try {
+      const result = await syncGhlContact(locationId, contactId);
+      setState({ kind: 'done', result });
+    } catch (e: any) {
+      const message = e?.message || 'Could not sync this contact.';
+      if (isSessionProblem(message)) {
+        await supabase.auth.signOut();
+        setState({ kind: 'signin' });
+      } else {
+        setState({ kind: 'error', message });
+      }
+    }
+  };
+
+  if (state.kind === 'signin') {
+    return <WidgetSignIn subtitle="Sign in to sync this GHL contact with FilersHub." />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-center space-y-4">
         <img src={FILERSHUB_LOGO_URL} alt="FilersHub" className="h-8 mx-auto" />
 
-        {(state.kind === 'checking' || state.kind === 'syncing') && (
-          <div className="py-6 space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin text-brand mx-auto" />
-            <p className="text-sm text-slate-600">Syncing this contact with FilersHub…</p>
+        {state.kind === 'checking' && (
+          <Loader2 className="w-8 h-8 animate-spin text-brand mx-auto" />
+        )}
+
+        {(state.kind === 'ready' || state.kind === 'syncing') && (
+          <div className="space-y-3">
+            <h1 className="text-lg font-bold text-slate-800">Sync this contact to FilersHub</h1>
+            <p className="text-sm text-slate-600">
+              Links this GHL contact to the FilersHub client with the same email, or creates the client if there isn't one.
+            </p>
+            <button
+              type="button"
+              disabled={state.kind === 'syncing'}
+              onClick={() => runSync(state.email)}
+              className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {state.kind === 'syncing' && <Loader2 className="w-4 h-4 animate-spin" />}
+              {state.kind === 'syncing' ? 'Syncing…' : 'Sync contact'}
+            </button>
+            {state.email && (
+              <p className="text-xs text-slate-400">
+                Signed in as {state.email} ·{' '}
+                <button type="button" onClick={switchAccount} className="underline hover:text-slate-600">
+                  Not you?
+                </button>
+              </p>
+            )}
           </div>
         )}
 
@@ -94,6 +129,9 @@ const GhlSyncContact: React.FC = () => {
             <XCircle className="w-10 h-10 text-red-500 mx-auto" />
             <h1 className="text-lg font-bold text-slate-800">Couldn't sync</h1>
             <p className="text-sm text-red-600 break-words">{state.message}</p>
+            <button type="button" onClick={switchAccount} className="text-xs font-semibold text-slate-500 underline hover:text-slate-700">
+              Sign in with a different FilersHub account
+            </button>
           </div>
         )}
 

@@ -28,25 +28,28 @@
   }
 
   // Only show the button in sub-accounts that use FilersHub. If the check is
-  // blocked, show it anyway: the popup still enforces sign-in and firm access.
+  // blocked, show it anyway (without remembering that): the popup still
+  // enforces sign-in and firm access. One check per location at a time.
   function isActive(locationId) {
-    if (activeByLocation[locationId] !== undefined) return Promise.resolve(activeByLocation[locationId]);
+    if (activeByLocation[locationId]) return activeByLocation[locationId];
     var cacheKey = 'filershub-active:' + locationId;
     try {
       var cached = window.sessionStorage.getItem(cacheKey);
       if (cached === '1' || cached === '0') {
-        activeByLocation[locationId] = cached === '1';
-        return Promise.resolve(activeByLocation[locationId]);
+        activeByLocation[locationId] = Promise.resolve(cached === '1');
+        return activeByLocation[locationId];
       }
     } catch (e) { /* storage blocked */ }
-    return window.fetch(APP + '/api/check-location?locationId=' + encodeURIComponent(locationId))
+    activeByLocation[locationId] = window.fetch(APP + '/api/check-location?locationId=' + encodeURIComponent(locationId))
       .then(function (r) { return r.json(); })
-      .then(function (body) { return !!(body && body.active); }, function () { return true; })
-      .then(function (active) {
-        activeByLocation[locationId] = active;
+      .then(function (body) {
+        var active = !!(body && body.active);
         try { window.sessionStorage.setItem(cacheKey, active ? '1' : '0'); } catch (e) { /* ignore */ }
         return active;
+      }, function () {
+        return true;
       });
+    return activeByLocation[locationId];
   }
 
   function createButton() {
@@ -71,7 +74,7 @@
     btn.addEventListener('click', function () {
       var ids = parse(window.location.pathname);
       if (!ids) return;
-      window.open(syncUrl(ids.locationId, ids.contactId), 'filershub-sync', 'width=440,height=600');
+      window.open(syncUrl(ids.locationId, ids.contactId), '_blank', 'width=440,height=600,noopener,noreferrer');
     });
     document.body.appendChild(btn);
     return btn;

@@ -3,7 +3,10 @@ import { Loader2, Lock } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
 // Compact sign-in form shown inside the GHL widget when no FilersHub session exists.
-const WidgetSignIn: React.FC<{ defaultEmail?: string }> = ({ defaultEmail = '' }) => {
+const WidgetSignIn: React.FC<{ defaultEmail?: string; subtitle?: string }> = ({
+    defaultEmail = '',
+    subtitle = 'Sign in once to see your dashboard here.',
+}) => {
     const [email, setEmail] = useState(defaultEmail);
     const [password, setPassword] = useState('');
     const [busy, setBusy] = useState(false);
@@ -37,7 +40,7 @@ const WidgetSignIn: React.FC<{ defaultEmail?: string }> = ({ defaultEmail = '' }
         <div className="min-h-[300px] flex flex-col items-center justify-center p-6 text-center">
             <Lock className="w-10 h-10 text-slate-300 mb-3" />
             <h2 className="text-base font-semibold text-slate-800">Sign in to FilersHub</h2>
-            <p className="text-sm text-slate-500 mb-4">Sign in once to see your dashboard here.</p>
+            <p className="text-sm text-slate-500 mb-4">{subtitle}</p>
             <form onSubmit={handleSignIn} className="w-full max-w-xs space-y-2 text-left">
                 <input
                     type="email"

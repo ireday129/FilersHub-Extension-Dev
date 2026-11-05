@@ -4,33 +4,49 @@
 import { normalizeLocationId } from '../_shared/ghl-core.ts';
 import { adminClient, firmGhl, getConnectionByLocation, GhlNotConnectedError } from '../_shared/ghl.ts';
 import { syncContactToClient } from '../_shared/clients.ts';
-import { corsHeadersFor, json, requireFirmStaff } from '../_shared/http.ts';
+import { authenticate, corsHeadersFor, isActiveStaff, json } from '../_shared/http.ts';
 
 const CONTACT_ID = /^[A-Za-z0-9]{6,64}$/;
+
+// Same answer for "not connected" and "not your firm", so the reply never
+// reveals which GHL sub-accounts belong to other FilersHub firms.
+const NO_ACCESS =
+  'This GHL sub-account is not connected to a FilersHub firm you belong to. Check that you are signed in with the right FilersHub account.';
+
+// Database details stay in the logs; the person sees a plain message.
+function publicError(message: string): string {
+  if (/lookup failed|Failed to (create|link) client/i.test(message)) {
+    console.error('ghl-sync-contact:', message);
+    return 'Could not save the client in FilersHub. Try again.';
+  }
+  return message;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeadersFor(req) });
   if (req.method !== 'POST') return json(req, { error: 'Method not allowed.' }, 405);
 
-  let body: Record<string, unknown>;
-  try {
-    body = (await req.json()) as Record<string, unknown>;
-  } catch {
-    return json(req, { error: 'Missing GHL location or contact.' }, 400);
-  }
-  const locationId = normalizeLocationId(String(body?.locationId ?? ''));
-  const contactId = String(body?.contactId ?? '').trim();
-  if (!locationId || !CONTACT_ID.test(contactId)) {
-    return json(req, { error: 'Missing GHL location or contact.' }, 400);
-  }
-
   try {
     const admin = adminClient();
-    const conn = await getConnectionByLocation(admin, locationId);
-    if (!conn) return json(req, { error: 'This GHL sub-account is not connected to FilersHub.' }, 404);
-
-    const auth = await requireFirmStaff(admin, req, conn.firm_id);
+    const auth = await authenticate(admin, req);
     if (auth instanceof Response) return auth;
+
+    let body: Record<string, unknown>;
+    try {
+      body = (await req.json()) as Record<string, unknown>;
+    } catch {
+      return json(req, { error: 'Missing GHL location or contact.' }, 400);
+    }
+    const locationId = normalizeLocationId(String(body?.locationId ?? ''));
+    const contactId = String(body?.contactId ?? '').trim();
+    if (!locationId || !CONTACT_ID.test(contactId)) {
+      return json(req, { error: 'Missing GHL location or contact.' }, 400);
+    }
+
+    const conn = await getConnectionByLocation(admin, locationId);
+    if (!conn || !(await isActiveStaff(admin, auth.userId, conn.firm_id))) {
+      return json(req, { error: NO_ACCESS }, 403);
+    }
 
     let ghl;
     try {
@@ -41,7 +57,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const result = await syncContactToClient(admin, ghl, conn.firm_id, contactId);
-    if (!result.ok) return json(req, { error: result.error }, 422);
+    if (!result.ok) return json(req, { error: publicError(result.error) }, 422);
 
     const { data: firm } = await admin
       .from('firms')
