@@ -4,7 +4,7 @@ import {
   normalizeToken, normalizeLocationId, bearerFrom, secretsMatch, generateSecret,
   buildStatusUpdate, describeGhlFailure, menuLinkPayload, findFirmMenuLink,
   validateActionRequest, isFilersHubAgency, isScopeError, SCOPE_ERROR_MESSAGE,
-  actionHttpStatus, escapeLikePattern,
+  actionHttpStatus, escapeLikePattern, pickEmailMatch,
 } from './ghl-core.ts';
 
 test('normalizeToken', () => {
@@ -132,4 +132,19 @@ test('escapeLikePattern', () => {
   assert.equal(escapeLikePattern('100%@x.com'), '100\\%@x.com');
   assert.equal(escapeLikePattern('a\\b@x.com'), 'a\\\\b@x.com');
   assert.equal(escapeLikePattern('plain@example.com'), 'plain@example.com');
+});
+
+test('pickEmailMatch', () => {
+  const unlinked = { client_id: 'u', email: 'Jane@Example.com ', ghl_contact_id: null };
+  const mine = { client_id: 'm', email: 'jane@example.com', ghl_contact_id: 'c1' };
+  const other = { client_id: 'o', email: 'jane@example.com', ghl_contact_id: 'c2' };
+  const wildcardHit = { client_id: 'w', email: 'aXYZb@x.com', ghl_contact_id: null };
+
+  assert.deepEqual(pickEmailMatch([], 'jane@example.com', 'c1'), { kind: 'none' });
+  // a "*" in the GHL email must not match other addresses
+  assert.deepEqual(pickEmailMatch([wildcardHit], 'a*b@x.com', 'c1'), { kind: 'none' });
+  assert.deepEqual(pickEmailMatch([unlinked], ' JANE@example.com', 'c1'), { kind: 'link', client: unlinked });
+  assert.deepEqual(pickEmailMatch([other], 'jane@example.com', 'c1'), { kind: 'conflict', client: other });
+  assert.deepEqual(pickEmailMatch([other, unlinked, mine], 'jane@example.com', 'c1'), { kind: 'already', client: mine });
+  assert.deepEqual(pickEmailMatch([other, unlinked], 'jane@example.com', 'c1'), { kind: 'link', client: unlinked });
 });

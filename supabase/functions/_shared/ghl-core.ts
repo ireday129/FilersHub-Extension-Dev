@@ -201,6 +201,35 @@ export function escapeLikePattern(value: string): string {
   return String(value ?? '').replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
+type EmailCandidate = { email?: string | null; ghl_contact_id?: string | null };
+
+export type EmailMatch<T> =
+  | { kind: 'none' }
+  | { kind: 'already'; client: T }
+  | { kind: 'link'; client: T }
+  | { kind: 'conflict'; client: T };
+
+/**
+ * Picks the client to link to a GHL contact from email-lookup candidates.
+ * Only exact (trimmed, case-insensitive) email matches count, so database
+ * wildcard hits are ignored. Prefers a client already linked to this contact,
+ * then an unlinked one; otherwise reports a conflict.
+ */
+export function pickEmailMatch<T extends EmailCandidate>(
+  candidates: T[],
+  email: string,
+  contactId: string,
+): EmailMatch<T> {
+  const target = String(email ?? '').trim().toLowerCase();
+  const exact = candidates.filter((c) => String(c.email ?? '').trim().toLowerCase() === target);
+  const already = exact.find((c) => c.ghl_contact_id === contactId);
+  if (already) return { kind: 'already', client: already };
+  const unlinked = exact.find((c) => !c.ghl_contact_id);
+  if (unlinked) return { kind: 'link', client: unlinked };
+  if (exact.length > 0) return { kind: 'conflict', client: exact[0] };
+  return { kind: 'none' };
+}
+
 export function isFilersHubAgency(
   companyId: string | null | undefined,
   agencyCompanyId: string | null | undefined,

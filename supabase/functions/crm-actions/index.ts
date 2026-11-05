@@ -4,6 +4,7 @@ import {
     actionHttpStatus,
     bearerFrom,
     escapeLikePattern,
+    pickEmailMatch,
     secretsMatch,
     validateActionRequest,
 } from '../_shared/ghl-core.ts';
@@ -55,33 +56,38 @@ async function findClientByContactId(supabase: any, firmId: string, contactId: s
 
 // Case-insensitive exact email match within the firm (wildcards escaped).
 async function findClientByEmail(supabase: any, firmId: string, email: string) {
-    const { data: client, error } = await supabase
+    // ILIKE narrows the search; pickEmailMatch then keeps exact matches only
+    // (PostgREST treats "*" as a wildcard, so DB hits are not trusted as-is).
+    const { data: candidates, error } = await supabase
         .from('clients')
         .select('client_id, full_name, email, ghl_contact_id')
         .eq('firm_id', firmId)
         .ilike('email', escapeLikePattern(email.trim()))
-        .limit(1)
-        .maybeSingle();
+        .limit(10);
 
-    if (error) return { client: null, error: `Client lookup failed: ${error.message}` };
-    return { client: client ?? null, error: null };
+    if (error) return { candidates: [], error: `Client lookup failed: ${error.message}` };
+    return { candidates: candidates ?? [], error: null };
 }
 
 // Links an existing FilersHub client (matched by email) to this GHL contact.
-// Refuses if the client is already linked to a different contact.
+// Returns null when no client has that email. Refuses if the client is already
+// linked to a different contact.
 async function linkClientByEmail(supabase: any, firmId: string, email: string, contactId: string) {
-    const { client, error } = await findClientByEmail(supabase, firmId, email);
+    const { candidates, error } = await findClientByEmail(supabase, firmId, email);
     if (error) return jsonResponse({ success: false, error });
-    if (!client) return null;
 
-    if (client.ghl_contact_id && client.ghl_contact_id !== contactId) {
+    const match = pickEmailMatch(candidates, email, contactId);
+    if (match.kind === 'none') return null;
+
+    const client = match.client;
+    if (match.kind === 'conflict') {
         return jsonResponse({
             success: false,
             error: `The FilersHub client with ${client.email} is already linked to a different GHL contact.`,
         });
     }
 
-    if (!client.ghl_contact_id) {
+    if (match.kind === 'link') {
         const { data: linked, error: linkError } = await supabase
             .from('clients')
             .update({ ghl_contact_id: contactId })
@@ -93,10 +99,22 @@ async function linkClientByEmail(supabase: any, firmId: string, email: string, c
             return jsonResponse({ success: false, error: `Failed to link client: ${linkError.message}` });
         }
         if (!linked || linked.length === 0) {
-            // Another request linked it between our read and write.
-            return jsonResponse({ success: false, error: 'This client was just linked by another request. Run the action again.' });
+            // Changed between read and write (e.g. a GHL retry). Fine if it now points at this contact.
+            const { data: now } = await supabase
+                .from('clients')
+                .select('ghl_contact_id')
+                .eq('client_id', client.client_id)
+                .eq('firm_id', firmId)
+                .maybeSingle();
+            if (now?.ghl_contact_id !== contactId) {
+                return jsonResponse({
+                    success: false,
+                    error: `The FilersHub client with ${client.email} is already linked to a different GHL contact.`,
+                });
+            }
+        } else {
+            console.log(`Linked existing client ${client.client_id} to contact ${contactId}`);
         }
-        console.log(`Linked existing client ${client.client_id} to contact ${contactId}`);
     }
 
     return jsonResponse({
@@ -147,7 +165,7 @@ async function handleCreateClient(
     const contact = contactData.contact || contactData;
 
     const fullName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-    const email = contact.email || '';
+    const email = String(contact.email || '').trim();
     const phone = contact.phone || null;
 
     if (!email) {
