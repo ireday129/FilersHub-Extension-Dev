@@ -26,7 +26,6 @@ jobs:
       - name: Deploy Public Functions (No JWT Check)
         run: |
           supabase functions deploy crm-auth --project-ref $PROJECT_ID --no-verify-jwt --yes
-          supabase functions deploy crm-webhook --project-ref $PROJECT_ID --no-verify-jwt --yes
           supabase functions deploy crm-logo-lookup --project-ref $PROJECT_ID --no-verify-jwt --yes
           supabase functions deploy crm-users --project-ref $PROJECT_ID --no-verify-jwt --yes
           supabase functions deploy stripe-webhook --project-ref $PROJECT_ID --no-verify-jwt --yes

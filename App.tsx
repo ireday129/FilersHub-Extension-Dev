@@ -339,7 +339,6 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
 import RoleSelection from './components/RoleSelection';
 import StaffLogin from './components/StaffLogin';
 import SuperAdminLogin from './components/SuperAdminLogin';
-import InstallSuccess from './components/InstallSuccess';
 
 import { getFirmBySlug } from './services/firms';
 import Login from './components/auth/Login';
@@ -429,11 +428,6 @@ const AppContent: React.FC = () => {
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
-  }
-
-  // Install Success Page (no auth required)
-  if (path === '/install-success') {
-    return <InstallSuccess />;
   }
 
   // Auto-redirect super admins to /super-admin if they land on root
