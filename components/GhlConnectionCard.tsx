@@ -48,6 +48,8 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [secretBusy, setSecretBusy] = useState<'reveal' | 'regenerate' | null>(null);
+  const anyBusy = busy || secretBusy !== null;
   const [editing, setEditing] = useState(false);
   const [locationId, setLocationId] = useState('');
   const [token, setToken] = useState('');
@@ -77,6 +79,7 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
   }, [firmId]);
 
   const handleConnect = async () => {
+    if (anyBusy) return;
     setBusy(true);
     setError('');
     try {
@@ -94,6 +97,7 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
   };
 
   const handleDisconnect = async () => {
+    if (anyBusy) return;
     if (!confirm('Disconnect GoHighLevel? Workflow actions and CRM sync will stop working until you reconnect.')) return;
     setBusy(true);
     setError('');
@@ -113,24 +117,32 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
   };
 
   const handleReveal = async () => {
+    if (secretBusy) return;
     if (secretVisible) { setSecretVisible(false); return; }
     setError('');
+    setSecretBusy('reveal');
     try {
       if (secret === null) setSecret(await revealActionsSecret(firmId));
       setSecretVisible(true);
     } catch (e: any) {
       setError(e.message || 'Could not reveal secret.');
+    } finally {
+      setSecretBusy(null);
     }
   };
 
   const handleRegenerate = async () => {
+    if (anyBusy) return;
     if (!confirm('Regenerate the secret? Any GHL workflows using the old secret will stop working until you update them.')) return;
     setError('');
+    setSecretBusy('regenerate');
     try {
       setSecret(await regenerateActionsSecret(firmId));
       setSecretVisible(true);
     } catch (e: any) {
       setError(e.message || 'Could not regenerate secret.');
+    } finally {
+      setSecretBusy(null);
     }
   };
 
@@ -185,8 +197,8 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
             <p className="text-xs text-slate-400">Last checked {fmtDateTime(status.lastCheckedAt)}</p>
             {!editing && (
               <div className="flex gap-4 pt-1">
-                <button type="button" disabled={busy} onClick={() => { setEditing(true); setError(''); }} className="text-xs font-bold text-indigo-600 hover:underline">Replace token</button>
-                <button type="button" disabled={busy} onClick={handleDisconnect} className="text-xs font-bold text-red-600 hover:underline">Disconnect</button>
+                <button type="button" disabled={anyBusy} onClick={() => { setEditing(true); setError(''); }} className="text-xs font-bold text-indigo-600 hover:underline">Replace token</button>
+                <button type="button" disabled={anyBusy} onClick={handleDisconnect} className="text-xs font-bold text-red-600 hover:underline">Disconnect</button>
               </div>
             )}
           </div>
@@ -220,7 +232,7 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
                 <button
                   type="button"
                   onClick={handleConnect}
-                  disabled={busy || !locationId.trim() || !token.trim()}
+                  disabled={anyBusy || !locationId.trim() || !token.trim()}
                   className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
                 >
                   {busy ? 'Connecting...' : connected ? 'Save new token' : 'Connect'}
@@ -250,13 +262,13 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
                 <code className="flex-1 min-w-0 text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 break-all">
                   {secretVisible && secret ? secret : '••••••••••••••••••••'}
                 </code>
-                <button type="button" onClick={handleReveal} className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:underline shrink-0">
+                <button type="button" disabled={anyBusy} onClick={handleReveal} className="disabled:opacity-50 inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:underline shrink-0">
                   {secretVisible ? <EyeOff size={12} /> : <Eye size={12} />}
-                  {secretVisible ? 'Hide' : 'Reveal'}
+                  {secretBusy === 'reveal' ? 'Revealing…' : secretVisible ? 'Hide' : 'Reveal'}
                 </button>
                 {secret && <CopyButton text={secret} />}
-                <button type="button" onClick={handleRegenerate} className="inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:underline shrink-0">
-                  <RefreshCw size={12} /> Regenerate
+                <button type="button" disabled={anyBusy} onClick={handleRegenerate} className="disabled:opacity-50 inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:underline shrink-0">
+                  <RefreshCw size={12} /> {secretBusy === 'regenerate' ? 'Regenerating…' : 'Regenerate'}
                 </button>
               </div>
             </div>
