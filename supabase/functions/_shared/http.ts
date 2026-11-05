@@ -44,15 +44,18 @@ export async function requireFirmOwner(
   const userId = data?.user?.id;
   if (error || !userId) return json(req, { error: 'Please sign in.' }, 401);
 
-  const { data: staff } = await admin
+  const { data: staff, error: staffError } = await admin
     .from('staff')
-    .select('id')
+    .select('staff_id')
     .eq('auth_user_id', userId)
     .eq('firm_id', firmId)
     .eq('role', 'Firm Owner')
     .eq('is_active', true)
     .limit(1)
     .maybeSingle();
+  if (staffError) {
+    return json(req, { error: 'Could not check your firm access. Try again.' }, 500);
+  }
   if (!staff) {
     return json(req, { error: 'Only the firm owner can manage the GHL connection.' }, 403);
   }
