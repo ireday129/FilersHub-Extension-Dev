@@ -742,9 +742,15 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
               {/* CRM Branding Sync Indicator */}
               <div className="flex items-center gap-2">
                 <Sparkles size={12} className="text-indigo-500" />
-                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
-                  Branding Syncs to CRM for Pro Users
-                </span>
+                {ghlStatus?.connected && !ghlStatus.isFilersHubAgency ? (
+                  <span className="text-[10px] font-medium text-slate-500">
+                    Branding sync to GHL is available for sub-accounts in the FilersHub agency only.
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                    Branding Syncs to CRM for Pro Users
+                  </span>
+                )}
                 {logoSyncStatus === 'syncing' && (
                   <div className="flex items-center gap-1 text-[10px] text-slate-400">
                     <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />

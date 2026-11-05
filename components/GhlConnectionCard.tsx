@@ -56,6 +56,7 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
   const [secret, setSecret] = useState<string | null>(null);
   const [secretVisible, setSecretVisible] = useState(false);
   const [openTemplate, setOpenTemplate] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const apply = (s: GhlConnectionStatus) => {
     setStatus(s);
@@ -66,6 +67,7 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
     if (!firmId) return;
     let cancelled = false;
     setLoading(true);
+    setError('');
     getGhlStatus(firmId)
       .then(s => {
         if (cancelled) return;
@@ -76,7 +78,7 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firmId]);
+  }, [firmId, reloadKey]);
 
   const handleConnect = async () => {
     if (anyBusy) return;
@@ -98,7 +100,7 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
 
   const handleDisconnect = async () => {
     if (anyBusy) return;
-    if (!confirm('Disconnect GoHighLevel? Workflow actions and CRM sync will stop working until you reconnect.')) return;
+    if (!confirm('Disconnect GoHighLevel? This deletes the stored token AND the workflow secret. Workflow actions and CRM sync will stop working. If you reconnect later, a NEW secret is created, so you must update your GHL workflows with it.')) return;
     setBusy(true);
     setError('');
     try {
@@ -180,7 +182,10 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
         {!loading && error && (
           <div className="flex gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
-            <span className="break-words min-w-0">{error}</span>
+            <span className="break-words min-w-0 flex-1">{error}</span>
+            {!status && (
+              <button type="button" onClick={() => setReloadKey(k => k + 1)} className="shrink-0 text-xs font-bold text-red-700 underline">Retry</button>
+            )}
           </div>
         )}
 
@@ -248,7 +253,16 @@ const GhlConnectionCard: React.FC<Props> = ({ firmId, onStatus }) => {
         {!loading && connected && status && (
           <div className="border-t border-slate-100 pt-4 space-y-3">
             <h3 className="text-sm font-bold text-slate-800">Workflow actions</h3>
-            <p className="text-xs text-slate-500">Use GHL's Custom Webhook action with the URL and secret below.</p>
+            <div className="text-xs text-slate-600 space-y-1">
+              <p>In your GHL workflow add a <strong>Custom Webhook</strong> action:</p>
+              <ul className="list-disc pl-5 space-y-0.5">
+                <li>Method: <strong>POST</strong></li>
+                <li>URL: the Actions URL below</li>
+                <li>Authorization: <strong>Bearer Token</strong> = your secret (header <code className="bg-slate-100 rounded px-1">Authorization: Bearer &lt;secret&gt;</code>)</li>
+                <li>Content-Type: <strong>application/json</strong></li>
+                <li>Body: paste a template below</li>
+              </ul>
+            </div>
             <div className="space-y-1">
               <span className="text-xs font-bold text-slate-500">Actions URL</span>
               <div className="flex items-center gap-2">

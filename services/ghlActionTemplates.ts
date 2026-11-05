@@ -30,8 +30,8 @@ export const ACTION_TEMPLATES: ActionTemplate[] = [
   {
     key: 'update_return_stage',
     label: 'Update return status',
-    description: 'Moves a tax return to a new status in FilersHub and updates the status tag on the GHL contact.',
-    data: { return_id: 'PASTE_RETURN_ID', new_status: 'Ready for Signature' },
+    description: "Moves the contact's latest tax return to a new status in FilersHub and updates the status tag on the GHL contact. Add return_id or tax_year to data to target a specific return.",
+    data: { new_status: 'Ready for Signature' },
   },
   {
     key: 'assign_preparer',
@@ -66,7 +66,7 @@ export const ACTION_TEMPLATES: ActionTemplate[] = [
   {
     key: 'create_task',
     label: 'Create task',
-    description: 'Creates a task in FilersHub with a due date and priority, assigned to the staff member with the given email.',
+    description: 'Creates a task in FilersHub with a title, description and priority, assigned to the staff member with the given email.',
     data: {
       title: 'Follow up',
       description: '',

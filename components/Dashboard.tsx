@@ -55,6 +55,7 @@ interface DashboardProps {
   firmId: string | null;
   isExtension?: boolean;
   currentStaffName?: string;
+  onOpenSettings?: () => void;
 }
 
 const STATUS_EMOJIS: Record<TaxReturnStatus, string> = {
@@ -201,7 +202,7 @@ const StatusStepper = ({ currentStatus, paymentType, isClientWorkspace }: { curr
   );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, selectedReturnId, setSelectedReturnId, refreshData, firmId, isExtension, currentStaffName }) => {
+const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, selectedReturnId, setSelectedReturnId, refreshData, firmId, isExtension, currentStaffName, onOpenSettings }) => {
   const isFirmOwner = role === UserRole.FirmOwner;
   const isManager = role === UserRole.Manager;
   const isTaxPro = role === UserRole.TaxPro;
@@ -237,6 +238,7 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [ghlNotice, setGhlNotice] = useState(false);
 
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
@@ -477,13 +479,16 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
 
       // 2. Trigger GHL Sync via Edge Function
       // Fire and forget (don't block UI on this)
+      setGhlNotice(false);
       supabase.functions.invoke('crm-update', {
         body: {
           clientId: selectedReturn.clientId,
           status: selectedReturn.status,
           firmId: firmId
         }
-      });
+      }).then(({ error: syncError }) => {
+        if (syncError) setGhlNotice(true);
+      }).catch(() => setGhlNotice(true));
 
       setSaveStatus('success');
 
@@ -1434,6 +1439,21 @@ const Dashboard: React.FC<DashboardProps> = ({ role, returns, setReturns, select
                     />
                   </div>
                 </div>
+
+                {ghlNotice && (
+                  <div className="mt-6 flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-xs">
+                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                    <span className="min-w-0 flex-1 break-words">
+                      GHL connection needs attention — this status change didn't reach GHL.{' '}
+                      {onOpenSettings ? (
+                        <button type="button" onClick={onOpenSettings} className="font-bold underline">Open Settings</button>
+                      ) : (
+                        <span className="font-bold">Open Settings → GoHighLevel connection</span>
+                      )}
+                    </span>
+                    <button type="button" aria-label="Dismiss" onClick={() => setGhlNotice(false)} className="shrink-0 font-bold">×</button>
+                  </div>
+                )}
 
                 <div className={`mt-8 pt-6 border-t border-slate-50 ${isExtension ? 'flex flex-col items-center gap-3' : 'flex items-center justify-between'}`}>
                   {saveStatus === 'success' ? (

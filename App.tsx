@@ -166,6 +166,7 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
             firmId={firmId}
             isExtension={isExtension}
             currentStaffName={staffName}
+            onOpenSettings={() => setActiveTab(NavItem.Settings)}
           />
         );
       case NavItem.Clients:
