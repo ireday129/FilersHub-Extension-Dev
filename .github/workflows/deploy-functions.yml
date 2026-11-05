@@ -30,6 +30,7 @@ jobs:
           supabase functions deploy crm-logo-lookup --project-ref $PROJECT_ID --no-verify-jwt --yes
           supabase functions deploy crm-users --project-ref $PROJECT_ID --no-verify-jwt --yes
           supabase functions deploy stripe-webhook --project-ref $PROJECT_ID --no-verify-jwt --yes
+          supabase functions deploy crm-actions --project-ref $PROJECT_ID --no-verify-jwt --yes
 
       - name: Deploy Protected Functions (Require JWT)
         run: |
