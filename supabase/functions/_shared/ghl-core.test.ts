@@ -4,6 +4,7 @@ import {
   normalizeToken, normalizeLocationId, bearerFrom, secretsMatch, generateSecret,
   buildStatusUpdate, describeGhlFailure, menuLinkPayload, findFirmMenuLink,
   validateActionRequest, isFilersHubAgency, isScopeError, SCOPE_ERROR_MESSAGE,
+  actionHttpStatus, escapeLikePattern, pickEmailMatch,
 } from './ghl-core.ts';
 
 test('normalizeToken', () => {
@@ -115,4 +116,35 @@ test('isScopeError', () => {
   assert.equal(isScopeError('GHL rejected the token.'), false);
   assert.equal(isScopeError(null), false);
   assert.equal(isScopeError(undefined), false);
+});
+
+test('actionHttpStatus', () => {
+  assert.equal(actionHttpStatus({ success: true }), 200);
+  assert.equal(actionHttpStatus({ found: true, returnId: 'r1' }), 200);
+  assert.equal(actionHttpStatus({ found: false, message: 'No matching return' }), 200);
+  assert.equal(actionHttpStatus({ success: false, error: 'No client found for contact c1' }), 422);
+  assert.equal(actionHttpStatus({ success: false }), 422);
+  assert.equal(actionHttpStatus({ found: false, error: 'contactId is required in extras' }), 422);
+});
+
+test('escapeLikePattern', () => {
+  assert.equal(escapeLikePattern('jane_doe@example.com'), 'jane\\_doe@example.com');
+  assert.equal(escapeLikePattern('100%@x.com'), '100\\%@x.com');
+  assert.equal(escapeLikePattern('a\\b@x.com'), 'a\\\\b@x.com');
+  assert.equal(escapeLikePattern('plain@example.com'), 'plain@example.com');
+});
+
+test('pickEmailMatch', () => {
+  const unlinked = { client_id: 'u', email: 'Jane@Example.com ', ghl_contact_id: null };
+  const mine = { client_id: 'm', email: 'jane@example.com', ghl_contact_id: 'c1' };
+  const other = { client_id: 'o', email: 'jane@example.com', ghl_contact_id: 'c2' };
+  const wildcardHit = { client_id: 'w', email: 'aXYZb@x.com', ghl_contact_id: null };
+
+  assert.deepEqual(pickEmailMatch([], 'jane@example.com', 'c1'), { kind: 'none' });
+  // a "*" in the GHL email must not match other addresses
+  assert.deepEqual(pickEmailMatch([wildcardHit], 'a*b@x.com', 'c1'), { kind: 'none' });
+  assert.deepEqual(pickEmailMatch([unlinked], ' JANE@example.com', 'c1'), { kind: 'link', client: unlinked });
+  assert.deepEqual(pickEmailMatch([other], 'jane@example.com', 'c1'), { kind: 'conflict', client: other });
+  assert.deepEqual(pickEmailMatch([other, unlinked, mine], 'jane@example.com', 'c1'), { kind: 'already', client: mine });
+  assert.deepEqual(pickEmailMatch([other, unlinked], 'jane@example.com', 'c1'), { kind: 'link', client: unlinked });
 });

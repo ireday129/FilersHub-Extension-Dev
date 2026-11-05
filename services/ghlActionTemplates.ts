@@ -12,7 +12,7 @@ export const ACTION_TEMPLATES: ActionTemplate[] = [
   {
     key: 'fh_newclientaccess',
     label: 'Create client in FilersHub',
-    description: 'Creates a FilersHub client from the GHL contact, or returns the existing client if one is already linked.',
+    description: 'Links the GHL contact to the FilersHub client with the same email, or creates a new FilersHub client if there is none. Run it once per contact before the other actions.',
     data: {},
   },
   {

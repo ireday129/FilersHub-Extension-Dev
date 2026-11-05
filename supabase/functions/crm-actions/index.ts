@@ -1,6 +1,13 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { bearerFrom, secretsMatch, validateActionRequest } from '../_shared/ghl-core.ts';
+import {
+    actionHttpStatus,
+    bearerFrom,
+    escapeLikePattern,
+    pickEmailMatch,
+    secretsMatch,
+    validateActionRequest,
+} from '../_shared/ghl-core.ts';
 import { firmGhl, getConnectionByLocation, GhlNotConnectedError, syncContactStatus, vaultRead } from '../_shared/ghl.ts';
 import type { FirmGhl } from '../_shared/ghl.ts';
 
@@ -18,9 +25,10 @@ const VALID_STATUSES = [
 // HELPERS
 // =====================================================
 
-function jsonResponse(body: object): Response {
+// Failed actions reply 422 (not 200) so GHL marks the workflow step as failed.
+function jsonResponse(body: Record<string, unknown>, status?: number): Response {
     return new Response(JSON.stringify(body), {
-        status: 200,
+        status: status ?? actionHttpStatus(body),
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 }
@@ -44,6 +52,78 @@ async function findClientByContactId(supabase: any, firmId: string, contactId: s
     if (!client) return { client: null, error: null };
 
     return { client, error: null };
+}
+
+// Case-insensitive exact email match within the firm (wildcards escaped).
+async function findClientByEmail(supabase: any, firmId: string, email: string) {
+    // ILIKE narrows the search; pickEmailMatch then keeps exact matches only
+    // (PostgREST treats "*" as a wildcard, so DB hits are not trusted as-is).
+    const { data: candidates, error } = await supabase
+        .from('clients')
+        .select('client_id, full_name, email, ghl_contact_id')
+        .eq('firm_id', firmId)
+        .ilike('email', escapeLikePattern(email.trim()))
+        .limit(10);
+
+    if (error) return { candidates: [], error: `Client lookup failed: ${error.message}` };
+    return { candidates: candidates ?? [], error: null };
+}
+
+// Links an existing FilersHub client (matched by email) to this GHL contact.
+// Returns null when no client has that email. Refuses if the client is already
+// linked to a different contact.
+async function linkClientByEmail(supabase: any, firmId: string, email: string, contactId: string) {
+    const { candidates, error } = await findClientByEmail(supabase, firmId, email);
+    if (error) return jsonResponse({ success: false, error });
+
+    const match = pickEmailMatch(candidates, email, contactId);
+    if (match.kind === 'none') return null;
+
+    const client = match.client;
+    if (match.kind === 'conflict') {
+        return jsonResponse({
+            success: false,
+            error: `The FilersHub client with ${client.email} is already linked to a different GHL contact.`,
+        });
+    }
+
+    if (match.kind === 'link') {
+        const { data: linked, error: linkError } = await supabase
+            .from('clients')
+            .update({ ghl_contact_id: contactId })
+            .eq('client_id', client.client_id)
+            .eq('firm_id', firmId)
+            .is('ghl_contact_id', null)
+            .select('client_id');
+        if (linkError) {
+            return jsonResponse({ success: false, error: `Failed to link client: ${linkError.message}` });
+        }
+        if (!linked || linked.length === 0) {
+            // Changed between read and write (e.g. a GHL retry). Fine if it now points at this contact.
+            const { data: now } = await supabase
+                .from('clients')
+                .select('ghl_contact_id')
+                .eq('client_id', client.client_id)
+                .eq('firm_id', firmId)
+                .maybeSingle();
+            if (now?.ghl_contact_id !== contactId) {
+                return jsonResponse({
+                    success: false,
+                    error: `The FilersHub client with ${client.email} is already linked to a different GHL contact.`,
+                });
+            }
+        } else {
+            console.log(`Linked existing client ${client.client_id} to contact ${contactId}`);
+        }
+    }
+
+    return jsonResponse({
+        success: true,
+        clientId: client.client_id,
+        clientName: client.full_name,
+        clientEmail: client.email,
+        message: 'Linked existing FilersHub client to this GHL contact',
+    });
 }
 
 // =====================================================
@@ -85,12 +165,16 @@ async function handleCreateClient(
     const contact = contactData.contact || contactData;
 
     const fullName = contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-    const email = contact.email || '';
+    const email = String(contact.email || '').trim();
     const phone = contact.phone || null;
 
     if (!email) {
         return jsonResponse({ success: false, error: 'Contact has no email address in CRM' });
     }
+
+    // Existing FilersHub client with this email? Link it instead of creating a duplicate.
+    const linkedResponse = await linkClientByEmail(supabase, firmId, email, contactId);
+    if (linkedResponse) return linkedResponse;
 
     // Insert client
     const { data: newClient, error: insertError } = await supabase
@@ -106,18 +190,10 @@ async function handleCreateClient(
         .single();
 
     if (insertError) {
-        // Handle duplicate email
+        // Duplicate email (created by a concurrent request): link that client instead.
         if (insertError.code === '23505') {
-            const { client: existingByEmail } = await findClientByContactId(supabase, firmId, contactId);
-            if (existingByEmail) {
-                return jsonResponse({
-                    success: true,
-                    clientId: existingByEmail.client_id,
-                    clientName: existingByEmail.full_name,
-                    clientEmail: existingByEmail.email,
-                    message: 'Client already exists (matched by email)',
-                });
-            }
+            const raceResponse = await linkClientByEmail(supabase, firmId, email, contactId);
+            if (raceResponse) return raceResponse;
         }
         return jsonResponse({ success: false, error: `Failed to create client: ${insertError.message}` });
     }
@@ -843,6 +919,6 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('crm-actions error:', error?.message || error);
-        return jsonResponse({ success: false, error: 'Something went wrong. Try again.' });
+        return jsonResponse({ success: false, error: 'Something went wrong. Try again.' }, 500);
     }
 });

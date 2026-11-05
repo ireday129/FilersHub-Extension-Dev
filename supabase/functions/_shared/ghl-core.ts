@@ -187,6 +187,49 @@ export function validateActionRequest(body: unknown): ActionRequest {
   return { ok: true, key: key as ActionKey, locationId, contactId };
 }
 
+/**
+ * HTTP status for a workflow-action reply. Failures get 422 so GHL marks the
+ * workflow step as failed; a search that simply found nothing stays 200.
+ */
+export function actionHttpStatus(body: Record<string, unknown>): number {
+  const failed = body?.success === false || typeof body?.error === 'string';
+  return failed ? 422 : 200;
+}
+
+/** Escapes LIKE/ILIKE wildcards so an email matches only itself. */
+export function escapeLikePattern(value: string): string {
+  return String(value ?? '').replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+type EmailCandidate = { email?: string | null; ghl_contact_id?: string | null };
+
+export type EmailMatch<T> =
+  | { kind: 'none' }
+  | { kind: 'already'; client: T }
+  | { kind: 'link'; client: T }
+  | { kind: 'conflict'; client: T };
+
+/**
+ * Picks the client to link to a GHL contact from email-lookup candidates.
+ * Only exact (trimmed, case-insensitive) email matches count, so database
+ * wildcard hits are ignored. Prefers a client already linked to this contact,
+ * then an unlinked one; otherwise reports a conflict.
+ */
+export function pickEmailMatch<T extends EmailCandidate>(
+  candidates: T[],
+  email: string,
+  contactId: string,
+): EmailMatch<T> {
+  const target = String(email ?? '').trim().toLowerCase();
+  const exact = candidates.filter((c) => String(c.email ?? '').trim().toLowerCase() === target);
+  const already = exact.find((c) => c.ghl_contact_id === contactId);
+  if (already) return { kind: 'already', client: already };
+  const unlinked = exact.find((c) => !c.ghl_contact_id);
+  if (unlinked) return { kind: 'link', client: unlinked };
+  if (exact.length > 0) return { kind: 'conflict', client: exact[0] };
+  return { kind: 'none' };
+}
+
 export function isFilersHubAgency(
   companyId: string | null | undefined,
   agencyCompanyId: string | null | undefined,
