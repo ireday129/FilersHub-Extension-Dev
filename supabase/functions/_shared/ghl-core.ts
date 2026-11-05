@@ -230,6 +230,14 @@ export function pickEmailMatch<T extends EmailCandidate>(
   return { kind: 'none' };
 }
 
+/**
+ * Platform Super Admin: the server-set app_metadata flag only (users cannot
+ * edit app_metadata). Matches the app's own check (=== true).
+ */
+export function isSuperAdmin(user: { app_metadata?: Record<string, unknown> } | null | undefined): boolean {
+  return user?.app_metadata?.is_super_admin === true;
+}
+
 export function isFilersHubAgency(
   companyId: string | null | undefined,
   agencyCompanyId: string | null | undefined,

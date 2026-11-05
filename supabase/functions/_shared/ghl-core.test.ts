@@ -4,8 +4,17 @@ import {
   normalizeToken, normalizeLocationId, bearerFrom, secretsMatch, generateSecret,
   buildStatusUpdate, describeGhlFailure, menuLinkPayload, findFirmMenuLink,
   validateActionRequest, isFilersHubAgency, isScopeError, SCOPE_ERROR_MESSAGE,
-  actionHttpStatus, escapeLikePattern, pickEmailMatch,
+  actionHttpStatus, escapeLikePattern, pickEmailMatch, isSuperAdmin,
 } from './ghl-core.ts';
+
+test('isSuperAdmin', () => {
+  assert.equal(isSuperAdmin({ app_metadata: { is_super_admin: true } }), true);
+  // only the server-set app_metadata flag counts, and only a real boolean true
+  assert.equal(isSuperAdmin({ app_metadata: { is_super_admin: 'true' } }), false);
+  assert.equal(isSuperAdmin({ user_metadata: { is_super_admin: true } }), false);
+  assert.equal(isSuperAdmin({ app_metadata: {} }), false);
+  assert.equal(isSuperAdmin(null), false);
+});
 
 test('normalizeToken', () => {
   assert.equal(normalizeToken('  Bearer pit-abc-123\n'), 'pit-abc-123');

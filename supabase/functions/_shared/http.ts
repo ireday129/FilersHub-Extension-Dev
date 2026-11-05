@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isSuperAdmin } from './ghl-core.ts';
 
 function allowedOrigins(): string[] {
   return [
@@ -50,14 +51,14 @@ export function json(req: Request, body: unknown, status = 200): Response {
 export async function authenticate(
   admin: SupabaseClient,
   req: Request,
-): Promise<{ userId: string } | Response> {
+): Promise<{ userId: string; superAdmin: boolean } | Response> {
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^bearer\s+/i, '').trim();
   if (!jwt) return json(req, { error: 'Please sign in.' }, 401);
 
   const { data, error } = await admin.auth.getUser(jwt);
   const userId = data?.user?.id;
   if (error || !userId) return json(req, { error: 'Please sign in.' }, 401);
-  return { userId };
+  return { userId, superAdmin: isSuperAdmin(data.user) };
 }
 
 /** Whether userId is active staff of firmId (optionally with one role). Throws on a database error. */
