@@ -5,7 +5,40 @@ import {
   buildStatusUpdate, describeGhlFailure, menuLinkPayload, findFirmMenuLink,
   validateActionRequest, isFilersHubAgency, isScopeError, SCOPE_ERROR_MESSAGE,
   actionHttpStatus, escapeLikePattern, pickEmailMatch, isSuperAdmin, normalizeContactId,
+  customValueRefs, workflowNames, snippet,
 } from './ghl-core.ts';
+
+test('customValueRefs keeps names and merge keys, never the values', () => {
+  const refs = customValueRefs({
+    customValues: [
+      { id: 'a', name: 'FilersHub Webhook', fieldKey: '{{ custom_values.filershub_webhook }}', value: 'https://x' },
+      { id: 'b', name: 'Bearer', fieldKey: '{{ custom_values.bearer }}', value: 'Bearer secret-123' },
+      { id: 'c', name: 'No key' },
+      'junk',
+    ],
+  });
+  assert.deepEqual(refs, [
+    { name: 'FilersHub Webhook', fieldKey: '{{ custom_values.filershub_webhook }}' },
+    { name: 'Bearer', fieldKey: '{{ custom_values.bearer }}' },
+  ]);
+  assert.ok(!JSON.stringify(refs).includes('secret-123'));
+  assert.deepEqual(customValueRefs(null), []);
+  assert.deepEqual(customValueRefs({ customValues: 'nope' }), []);
+});
+
+test('workflowNames lists existing workflow names', () => {
+  assert.deepEqual(
+    workflowNames({ workflows: [{ id: '1', name: 'A' }, { id: '2', name: '' }, { id: '3' }, { name: 'B' }] }),
+    ['A', 'B'],
+  );
+  assert.deepEqual(workflowNames(undefined), []);
+});
+
+test('snippet shortens long GHL replies', () => {
+  assert.equal(snippet('short'), 'short');
+  assert.equal(snippet('x'.repeat(2000)).length, 1001);
+  assert.ok(snippet('x'.repeat(2000)).endsWith('…'));
+});
 
 test('normalizeContactId', () => {
   assert.equal(normalizeContactId(' V0H9HpQqvpt7g5U9JU6Z '), 'V0H9HpQqvpt7g5U9JU6Z');

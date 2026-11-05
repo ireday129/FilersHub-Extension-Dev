@@ -97,11 +97,17 @@ export async function setConnectionHealth(
   if (error) throw new Error(`Could not update GHL connection health: ${error.message}`);
 }
 
+export interface FirmGhlRequestOptions {
+  /** Default true. Pass false for optional features (e.g. the workflow API) whose refusal
+   *  must not mark the whole connection as broken. */
+  trackHealth?: boolean;
+}
+
 export interface FirmGhl {
   firmId: string;
   locationId: string;
   companyId: string | null;
-  request(path: string, init?: RequestInit): Promise<Response>;
+  request(path: string, init?: RequestInit, options?: FirmGhlRequestOptions): Promise<Response>;
 }
 
 export async function firmGhl(admin: SupabaseClient, firmId: string): Promise<FirmGhl> {
@@ -116,7 +122,7 @@ export async function firmGhl(admin: SupabaseClient, firmId: string): Promise<Fi
     firmId,
     locationId: conn.locationId,
     companyId: conn.companyId,
-    async request(path: string, init?: RequestInit): Promise<Response> {
+    async request(path: string, init?: RequestInit, options?: FirmGhlRequestOptions): Promise<Response> {
       const resp = await fetch(`${GHL_API_BASE}${path}`, {
         ...init,
         signal: init?.signal ?? AbortSignal.timeout(15000),
@@ -125,6 +131,7 @@ export async function firmGhl(admin: SupabaseClient, firmId: string): Promise<Fi
           ...(init?.headers as Record<string, string> | undefined),
         },
       });
+      if (options?.trackHealth === false) return resp;
       try {
         if (!resp.ok) {
           const failure = describeGhlFailure(resp.status, await resp.clone().text());

@@ -255,3 +255,44 @@ export function isFilersHubAgency(
 ): boolean {
   return !!companyId && !!agencyCompanyId && companyId === agencyCompanyId;
 }
+
+// ---- GHL workflow setup -------------------------------------------------
+
+/** Version header for GHL's workflow API (v3). */
+export const GHL_WORKFLOW_API_VERSION = 'v3';
+
+export interface CustomValueRef {
+  name: string;
+  fieldKey: string;
+}
+
+/**
+ * Names and merge keys of a sub-account's custom values, from
+ * GET /locations/{id}/customValues. Values are dropped: some (like the
+ * FilersHub Bearer secret) must never leave the server.
+ */
+export function customValueRefs(body: unknown): CustomValueRef[] {
+  const list = (body as { customValues?: unknown } | null)?.customValues;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((item) => {
+    const cv = item as { name?: unknown; fieldKey?: unknown } | null;
+    if (!cv || typeof cv.name !== 'string' || typeof cv.fieldKey !== 'string' || !cv.fieldKey) return [];
+    return [{ name: cv.name, fieldKey: cv.fieldKey }];
+  });
+}
+
+/** Names of a sub-account's workflows, from GET /workflows/. */
+export function workflowNames(body: unknown): string[] {
+  const list = (body as { workflows?: unknown } | null)?.workflows;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((w) => {
+    const name = (w as { name?: unknown } | null)?.name;
+    return typeof name === 'string' && name ? [name] : [];
+  });
+}
+
+/** First 1000 characters of a GHL reply, for showing why a request failed. */
+export function snippet(text: string): string {
+  const s = String(text ?? '');
+  return s.length > 1000 ? s.slice(0, 1000) + '…' : s;
+}

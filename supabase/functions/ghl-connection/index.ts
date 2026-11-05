@@ -2,17 +2,23 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   FUNCTIONS_PUBLIC_URL,
   GHL_API_BASE,
+  GHL_WORKFLOW_API_VERSION,
+  customValueRefs,
   describeGhlFailure,
   generateSecret,
   ghlHeaders,
   isFilersHubAgency,
   normalizeLocationId,
   normalizeToken,
+  snippet,
+  workflowNames,
 } from '../_shared/ghl-core.ts';
 import {
   adminClient,
   filersHubAgencyId,
+  firmGhl,
   getConnection,
+  GhlNotConnectedError,
   vaultDelete,
   vaultStore,
 } from '../_shared/ghl.ts';
@@ -207,6 +213,49 @@ async function actionsSecret(
   return json(req, { secret });
 }
 
+// Read-only look at what's needed to set up the FilersHub workflows in GHL:
+// whether GHL's workflow API (limited availability) is on for this sub-account,
+// how its webhook steps are described, the custom value merge keys (never the
+// values), and the names of existing workflows. Changes nothing in GHL, and a
+// refusal here never marks the connection as broken.
+async function workflowCheck(req: Request, admin: SupabaseClient, firmId: string): Promise<Response> {
+  let ghl;
+  try {
+    ghl = await firmGhl(admin, firmId);
+  } catch (e) {
+    if (e instanceof GhlNotConnectedError) return json(req, { error: 'Connect GHL first.' }, 400);
+    throw e;
+  }
+  const loc = encodeURIComponent(ghl.locationId);
+  const quiet = { trackHealth: false };
+  const v3 = { headers: { Version: GHL_WORKFLOW_API_VERSION } };
+
+  const read = async (path: string, init?: RequestInit) => {
+    const resp = await ghl.request(path, init, quiet);
+    const text = await resp.text();
+    let body: unknown = null;
+    try { body = JSON.parse(text); } catch { /* not JSON */ }
+    return { ok: resp.ok, status: resp.status, body, text };
+  };
+
+  const stepTypes = await read(`/workflows/step-types?locationId=${loc}&kind=action&types=webhook&limit=20`, v3);
+  const customValues = await read(`/locations/${loc}/customValues`);
+  const workflows = await read(`/workflows/?locationId=${loc}`);
+
+  return json(req, {
+    locationId: ghl.locationId,
+    workflowApi: stepTypes.ok
+      ? { enabled: true, webhookSteps: stepTypes.body }
+      : { enabled: false, status: stepTypes.status, reply: snippet(stepTypes.text) },
+    customValues: customValues.ok
+      ? customValueRefs(customValues.body)
+      : { status: customValues.status, reply: snippet(customValues.text) },
+    existingWorkflows: workflows.ok
+      ? workflowNames(workflows.body)
+      : { status: workflows.status, reply: snippet(workflows.text) },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeadersFor(req) });
   if (req.method !== 'POST') return json(req, { error: 'Method not allowed.' }, 405);
@@ -221,7 +270,9 @@ Deno.serve(async (req: Request) => {
   if (!firmId) return json(req, { error: 'firmId is required.' }, 400);
 
   const action = String(body.action ?? '');
-  const known = ['status', 'connect', 'disconnect', 'reveal-actions-secret', 'regenerate-actions-secret'];
+  const known = [
+    'status', 'connect', 'disconnect', 'reveal-actions-secret', 'regenerate-actions-secret', 'workflow-check',
+  ];
   if (!known.includes(action)) return json(req, { error: 'Unknown action.' }, 400);
 
   try {
@@ -238,6 +289,8 @@ Deno.serve(async (req: Request) => {
         return await disconnect(req, admin, firmId);
       case 'reveal-actions-secret':
         return await actionsSecret(req, admin, firmId, await getConnection(admin, firmId), false);
+      case 'workflow-check':
+        return await workflowCheck(req, admin, firmId);
       default:
         return await actionsSecret(req, admin, firmId, await getConnection(admin, firmId), true);
     }
