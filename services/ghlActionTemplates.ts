@@ -19,7 +19,7 @@ export const ACTION_TEMPLATES: ActionTemplate[] = [
     key: 'create_tax_return',
     label: 'Create tax return',
     description: "Creates a new tax return of the given year and type for the contact's client.",
-    data: { tax_year: '2025', return_type: '1040' },
+    data: { tax_year: '2025', return_type: 'Individual Tax Return (Form 1040)' },
   },
   {
     key: 'search_existing_return',
@@ -55,7 +55,7 @@ export const ACTION_TEMPLATES: ActionTemplate[] = [
     key: 'set_return_info',
     label: 'Set return info',
     description: "Sets the tax year and return type on the contact's existing tax return.",
-    data: { tax_year: '2025', return_type: '1040' },
+    data: { tax_year: '2025', return_type: 'Individual Tax Return (Form 1040)' },
   },
   {
     key: 'deactivate_client',

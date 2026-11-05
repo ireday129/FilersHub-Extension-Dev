@@ -17,6 +17,14 @@ test('every action body is valid JSON with the location merge field and key', ()
   }
 });
 
+// Must match the app's TAX_RETURN_TYPES label in types.ts (not imported: it has enums).
+test('return type templates use the app label for Form 1040', () => {
+  for (const key of ['create_tax_return', 'set_return_info']) {
+    const t = ACTION_TEMPLATES.find((x) => x.key === key);
+    assert.equal(t?.data.return_type, 'Individual Tax Return (Form 1040)', key);
+  }
+});
+
 test('update_return_stage template uses Ready for Signature', () => {
   const t = ACTION_TEMPLATES.find((x) => x.key === 'update_return_stage');
   assert.equal(t?.data.new_status, 'Ready for Signature');
