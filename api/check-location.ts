@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req: any, res: any) {
+    // Read by the GHL contact-page button (public/ghl-contact-button.js) from GHL's own domain.
+    // Returns only whether a location is a FilersHub firm, so any origin may read it.
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }

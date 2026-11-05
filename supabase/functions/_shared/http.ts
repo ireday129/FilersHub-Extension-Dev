@@ -31,11 +31,16 @@ export function json(req: Request, body: unknown, status = 200): Response {
   });
 }
 
-/** Resolves to the signed-in active Firm Owner of firmId, or to a ready-to-return error Response. */
-export async function requireFirmOwner(
+/**
+ * Resolves to the signed-in user if they are active staff of firmId (optionally
+ * limited to one role), or to a ready-to-return error Response.
+ */
+async function requireStaff(
   admin: SupabaseClient,
   req: Request,
   firmId: string,
+  role: string | null,
+  deniedMessage: string,
 ): Promise<{ userId: string } | Response> {
   const jwt = (req.headers.get('Authorization') ?? '').replace(/^bearer\s+/i, '').trim();
   if (!jwt) return json(req, { error: 'Please sign in.' }, 401);
@@ -44,20 +49,35 @@ export async function requireFirmOwner(
   const userId = data?.user?.id;
   if (error || !userId) return json(req, { error: 'Please sign in.' }, 401);
 
-  const { data: staff, error: staffError } = await admin
+  let query = admin
     .from('staff')
     .select('staff_id')
     .eq('auth_user_id', userId)
     .eq('firm_id', firmId)
-    .eq('role', 'Firm Owner')
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
+    .eq('is_active', true);
+  if (role) query = query.eq('role', role);
+  const { data: staff, error: staffError } = await query.limit(1).maybeSingle();
   if (staffError) {
     return json(req, { error: 'Could not check your firm access. Try again.' }, 500);
   }
-  if (!staff) {
-    return json(req, { error: 'Only the firm owner can manage the GHL connection.' }, 403);
-  }
+  if (!staff) return json(req, { error: deniedMessage }, 403);
   return { userId };
+}
+
+/** Signed-in active Firm Owner of firmId, or an error Response. */
+export function requireFirmOwner(
+  admin: SupabaseClient,
+  req: Request,
+  firmId: string,
+): Promise<{ userId: string } | Response> {
+  return requireStaff(admin, req, firmId, 'Firm Owner', 'Only the firm owner can manage the GHL connection.');
+}
+
+/** Signed-in active staff (any role) of firmId, or an error Response. */
+export function requireFirmStaff(
+  admin: SupabaseClient,
+  req: Request,
+  firmId: string,
+): Promise<{ userId: string } | Response> {
+  return requireStaff(admin, req, firmId, null, 'Your FilersHub login is not staff of the firm connected to this GHL sub-account.');
 }
