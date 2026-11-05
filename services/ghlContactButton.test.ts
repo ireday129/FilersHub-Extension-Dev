@@ -3,27 +3,59 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-// Runs public/ghl-contact-button.js in a fake GHL page.
-function loadButton(pathname: string, active: boolean | 'network-error') {
-  const appended: any[] = [];
-  const elements: Record<string, any> = {};
+// Minimal DOM, enough to run public/ghl-contact-button.js as on a GHL page.
+class FakeEl {
+  tagName: string;
+  children: FakeEl[] = [];
+  parentElement: FakeEl | null = null;
+  text = '';
+  id = '';
+  style: Record<string, string> = {};
+  listeners: Record<string, Function> = {};
+  attrs: Record<string, string> = {};
+  constructor(tag: string, text = '') { this.tagName = tag.toUpperCase(); this.text = text; }
+  get childElementCount() { return this.children.length; }
+  get textContent(): string { return this.text + this.children.map((c) => c.textContent).join(''); }
+  set textContent(v: string) { this.text = v; this.children = []; }
+  setAttribute(k: string, v: string) { this.attrs[k] = v; if (k === 'id') this.id = v; }
+  addEventListener(type: string, fn: Function) { this.listeners[type] = fn; }
+  appendChild(el: FakeEl) { el.remove(); el.parentElement = this; this.children.push(el); return el; }
+  remove() {
+    if (!this.parentElement) return;
+    const siblings = this.parentElement.children;
+    siblings.splice(siblings.indexOf(this), 1);
+    this.parentElement = null;
+  }
+  *descendants(): Generator<FakeEl> { for (const c of this.children) { yield c; yield* c.descendants(); } }
+}
+
+// A contact page whose details card has a "Contact Details" heading row.
+function contactPageBody(withHeading: boolean) {
+  const body = new FakeEl('body');
+  const card = body.appendChild(new FakeEl('div'));
+  if (withHeading) {
+    const headerRow = card.appendChild(new FakeEl('div'));
+    headerRow.appendChild(new FakeEl('img'));
+    headerRow.appendChild(new FakeEl('span', 'Contact Details'));
+  }
+  card.appendChild(new FakeEl('span', 'Irene Day'));
+  return body;
+}
+
+function loadButton(pathname: string, active: boolean | 'network-error', body = new FakeEl('body')) {
   const intervals: Function[] = [];
   const opened: string[] = [];
   const openedFeatures: string[] = [];
   let fetchCount = 0;
+  const all = () => [body, ...body.descendants()];
   const document = {
-    getElementById: (id: string) => elements[id] ?? null,
-    createElement: () => {
-      const el: any = {
-        style: {},
-        listeners: {} as Record<string, Function>,
-        setAttribute(k: string, v: string) { if (k === 'id') elements[v] = el; el[k] = v; },
-        addEventListener(type: string, fn: Function) { el.listeners[type] = fn; },
-        remove() { delete elements[el.id]; el.removed = true; },
-      };
-      return el;
+    body,
+    getElementById: (id: string) => all().find((e) => e.id === id) ?? null,
+    createElement: (tag: string) => new FakeEl(tag),
+    querySelectorAll: (sel: string) => {
+      const tags = sel.split(',').map((s) => s.trim().toUpperCase());
+      return [...body.descendants()].filter((e) => tags.includes(e.tagName));
     },
-    body: { appendChild: (el: any) => appended.push(el) },
   };
   const ctx: any = {
     location: { pathname },
@@ -44,14 +76,18 @@ function loadButton(pathname: string, active: boolean | 'network-error') {
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync('public/ghl-contact-button.js', 'utf8'), ctx);
   return {
-    ctx, appended, opened, openedFeatures,
+    ctx, body, opened, openedFeatures,
     fetches: () => fetchCount,
+    byId: (id: string) => document.getElementById(id),
     tick: () => Promise.all(intervals.map((fn) => fn())),
   };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
+const settle = async () => { await flush(); await flush(); await flush(); };
 const CONTACT_PAGE = '/v2/location/abcDEF1234567890xyz/contacts/detail/Contact123ABC';
+const INLINE = 'filershub-sync-contact-inline';
+const CORNER = 'filershub-sync-contact-btn';
 
 test('parses contact pages only', () => {
   const { ctx } = loadButton('/', false);
@@ -76,55 +112,72 @@ test('builds the FilersHub popup URL', () => {
   );
 });
 
-test('shows the button on a FilersHub sub-account contact page and opens the popup', async () => {
-  const { appended, opened, openedFeatures } = loadButton(CONTACT_PAGE, true);
-  await flush(); await flush();
-  assert.equal(appended.length, 1);
-  appended[0].listeners.click();
-  assert.equal(opened.length, 1);
-  assert.match(opened[0], /\/ghl\/sync-contact\?location_id=abcDEF1234567890xyz&contact_id=Contact123ABC$/);
-  // the popup must not get a reference back to the GHL page
-  assert.match(openedFeatures[0], /noopener/);
-  assert.match(openedFeatures[0], /noreferrer/);
+test('puts the button in the Contact Details heading row of the card', async () => {
+  const page = loadButton(CONTACT_PAGE, true, contactPageBody(true));
+  await settle();
+  const inline = page.byId(INLINE) as FakeEl;
+  assert.ok(inline, 'inline button present');
+  assert.equal(inline.parentElement?.children.some((c) => c.textContent === 'Contact Details'), true);
+  assert.equal(page.byId(CORNER), null, 'no corner button when inline is placed');
 });
 
-test('removes the button after navigating away from the contact page', async () => {
-  const { ctx, appended, tick } = loadButton(CONTACT_PAGE, true);
-  await flush(); await flush();
-  assert.equal(appended.length, 1);
-  ctx.location.pathname = '/v2/location/abcDEF1234567890xyz/dashboard';
-  await tick();
-  assert.equal(appended[0].removed, true);
+test('falls back to the corner when the card heading is not found', async () => {
+  const page = loadButton(CONTACT_PAGE, true, contactPageBody(false));
+  await settle();
+  assert.equal(page.byId(INLINE), null);
+  assert.ok(page.byId(CORNER), 'corner button present');
 });
 
-test('checks each location once, even while a check is still running', async () => {
-  const { tick, fetches } = loadButton(CONTACT_PAGE, true);
-  await tick(); await tick();
-  await flush(); await flush();
-  await tick();
-  assert.equal(fetches(), 1);
+test('moves from the corner into the card once the heading renders', async () => {
+  const body = contactPageBody(false);
+  const page = loadButton(CONTACT_PAGE, true, body);
+  await settle();
+  assert.ok(page.byId(CORNER));
+  const row = body.children[0].appendChild(new FakeEl('div'));
+  row.appendChild(new FakeEl('span', 'Contact Details'));
+  await page.tick();
+  assert.ok(page.byId(INLINE));
+  assert.equal(page.byId(CORNER), null);
 });
 
-test('does not remember a blocked check, so it retries next page load', async () => {
-  const { ctx } = loadButton(CONTACT_PAGE, 'network-error');
-  await flush(); await flush();
-  assert.equal(ctx.sessionStorage.getItem('filershub-active:abcDEF1234567890xyz'), null);
+test('clicking opens the popup without a link back to GHL', async () => {
+  const page = loadButton(CONTACT_PAGE, true, contactPageBody(true));
+  await settle();
+  (page.byId(INLINE) as FakeEl).listeners.click();
+  assert.equal(page.opened.length, 1);
+  assert.match(page.opened[0], /\/ghl\/sync-contact\?location_id=abcDEF1234567890xyz&contact_id=Contact123ABC$/);
+  assert.match(page.openedFeatures[0], /noopener/);
+  assert.match(page.openedFeatures[0], /noreferrer/);
 });
 
 test('no button for sub-accounts not connected to FilersHub', async () => {
-  const { appended } = loadButton(CONTACT_PAGE, false);
-  await flush(); await flush();
-  assert.equal(appended.length, 0);
+  const page = loadButton(CONTACT_PAGE, false, contactPageBody(true));
+  await settle();
+  assert.equal(page.byId(INLINE), null);
+  assert.equal(page.byId(CORNER), null);
 });
 
-test('shows the button if the connection check is blocked', async () => {
-  const { appended } = loadButton(CONTACT_PAGE, 'network-error');
-  await flush(); await flush();
-  assert.equal(appended.length, 1);
+test('shows the button if the connection check is blocked, without remembering that', async () => {
+  const page = loadButton(CONTACT_PAGE, 'network-error', contactPageBody(true));
+  await settle();
+  assert.ok(page.byId(INLINE));
+  assert.equal(page.ctx.sessionStorage.getItem('filershub-active:abcDEF1234567890xyz'), null);
 });
 
-test('no button away from contact pages', async () => {
-  const { appended } = loadButton('/v2/location/abcDEF1234567890xyz/dashboard', true);
-  await flush(); await flush();
-  assert.equal(appended.length, 0);
+test('removes the button after navigating away from the contact page', async () => {
+  const page = loadButton(CONTACT_PAGE, true, contactPageBody(true));
+  await settle();
+  assert.ok(page.byId(INLINE));
+  page.ctx.location.pathname = '/v2/location/abcDEF1234567890xyz/dashboard';
+  await page.tick();
+  assert.equal(page.byId(INLINE), null);
+  assert.equal(page.byId(CORNER), null);
+});
+
+test('checks each location once, even while a check is still running', async () => {
+  const page = loadButton(CONTACT_PAGE, true, contactPageBody(true));
+  await page.tick(); await page.tick();
+  await settle();
+  await page.tick();
+  assert.equal(page.fetches(), 1);
 });
