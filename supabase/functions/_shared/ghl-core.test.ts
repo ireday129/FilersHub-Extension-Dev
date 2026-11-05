@@ -4,8 +4,19 @@ import {
   normalizeToken, normalizeLocationId, bearerFrom, secretsMatch, generateSecret,
   buildStatusUpdate, describeGhlFailure, menuLinkPayload, findFirmMenuLink,
   validateActionRequest, isFilersHubAgency, isScopeError, SCOPE_ERROR_MESSAGE,
-  actionHttpStatus, escapeLikePattern, pickEmailMatch, isSuperAdmin,
+  actionHttpStatus, escapeLikePattern, pickEmailMatch, isSuperAdmin, normalizeContactId,
 } from './ghl-core.ts';
+
+test('normalizeContactId', () => {
+  assert.equal(normalizeContactId(' V0H9HpQqvpt7g5U9JU6Z '), 'V0H9HpQqvpt7g5U9JU6Z');
+  assert.equal(normalizeContactId('abc123'), 'abc123');
+  assert.equal(normalizeContactId('abc12'), '', 'too short');
+  assert.equal(normalizeContactId('a'.repeat(65)), '', 'too long');
+  assert.equal(normalizeContactId('abc-123'), '');
+  assert.equal(normalizeContactId('../contacts'), '');
+  assert.equal(normalizeContactId(undefined), '');
+  assert.equal(normalizeContactId(12345678), '12345678');
+});
 
 test('isSuperAdmin', () => {
   assert.equal(isSuperAdmin({ app_metadata: { is_super_admin: true } }), true);

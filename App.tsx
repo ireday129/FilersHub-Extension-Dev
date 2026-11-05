@@ -17,6 +17,7 @@ import { useExtensionMode } from './hooks/useExtensionMode';
 import FirmSelection from './components/FirmSelection';
 import Launchpad from './components/Launchpad';
 import GhlSyncContact from './components/GhlSyncContact';
+import GhlContactReturns from './components/GhlContactReturns';
 import Tutorials from './components/Tutorials';
 import CrmAccessPage from './components/CrmAccessPage';
 import PreLaunchScreen from './components/PreLaunchScreen';
@@ -428,6 +429,11 @@ const AppContent: React.FC = () => {
   // "Sync to FilersHub" popup from the GHL contact page button (handles its own sign-in)
   if (path === '/ghl/sync-contact') {
     return <GhlSyncContact />;
+  }
+
+  // Tax-returns panel inside the GHL contact card (handles its own sign-in)
+  if (path === '/ghl/contact-returns') {
+    return <GhlContactReturns />;
   }
 
   // GHL Tutorials Page (no auth required — uses widget_token)

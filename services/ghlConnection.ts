@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { ContactReturn } from './contactReturns';
 
 export interface GhlConnectionStatus {
   connected: boolean;
@@ -53,6 +54,19 @@ export interface GhlContactSyncResult {
 /** Links (or creates) the FilersHub client for a GHL contact. Caller must be signed in as firm staff. */
 export const syncGhlContact = (locationId: string, contactId: string) =>
   invokeFunction<GhlContactSyncResult>('ghl-sync-contact', { locationId, contactId });
+
+export interface GhlContactReturnsResult {
+  linked: boolean;
+  clientName?: string;
+  returns: ContactReturn[];
+}
+
+/** Tax returns of the FilersHub client linked to a GHL contact. Caller must be signed in as firm staff. */
+export const fetchGhlContactReturns = (locationId: string, contactId: string) =>
+  invokeFunction<GhlContactReturnsResult>('ghl-contact-returns', { locationId, contactId });
+
+/** True when a function error means the FilersHub sign-in is missing or expired. */
+export const isSessionProblem = (message: string) => /session has expired|please sign in/i.test(message);
 
 export const getGhlStatus = (firmId: string) =>
   call<GhlConnectionStatus>({ action: 'status', firmId });

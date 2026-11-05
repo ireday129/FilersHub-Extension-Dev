@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Link2, Loader2, UserPlus, XCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
-import { syncGhlContact, GhlContactSyncResult } from '../services/ghlConnection';
+import { isSessionProblem, syncGhlContact, GhlContactSyncResult } from '../services/ghlConnection';
 import { FILERSHUB_LOGO_URL } from '../constants';
 import WidgetSignIn from './WidgetSignIn';
 
@@ -27,8 +27,6 @@ type State =
   | { kind: 'syncing'; email: string }
   | { kind: 'done'; result: GhlContactSyncResult }
   | { kind: 'error'; message: string };
-
-const isSessionProblem = (message: string) => /session has expired|please sign in/i.test(message);
 
 const switchAccount = async () => {
   await supabase.auth.signOut();

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test --experimental-strip-types supabase/functions/_shared/ghl-core.test.ts services/ghlActionTemplates.test.ts services/ghlContactButton.test.ts services/crmAccess.test.ts"
+    "test": "node --test --experimental-strip-types supabase/functions/_shared/ghl-core.test.ts services/ghlActionTemplates.test.ts services/ghlContactButton.test.ts services/crmAccess.test.ts services/contactReturns.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.40.0",
