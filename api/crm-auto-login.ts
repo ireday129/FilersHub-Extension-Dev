@@ -5,6 +5,15 @@ export default async function handler(req: any, res: any) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
+    // SECURITY (Nov 2026): one-click sign-in is turned off. It signed in anyone who sent a
+    // firm's GHL location ID plus a staff email, with no proof they are that person.
+    // CrmAccessPage shows the password sign-in form when this returns an error.
+    // Re-enable only after GHL sign-in is verified (e.g., signed user data from GHL).
+    return res.status(403).json({
+        error: 'One-click sign-in is turned off for now. Please sign in with your email and password.',
+        code: 'AUTO_LOGIN_DISABLED'
+    });
+
     const { locationId, email } = req.body;
 
     if (!locationId || !email) {

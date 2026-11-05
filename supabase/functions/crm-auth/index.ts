@@ -132,6 +132,14 @@ serve(async (req) => {
 
         // 0. EMAIL LOOKUP: Verify staff email against GHL and create session
         if (req.method === 'POST' && body.action === 'email-lookup') {
+            // SECURITY (Nov 2026): disabled. This handed out a full login session to anyone who
+            // sent an active staff email, with no password. Staff sign in with password or email link.
+            return new Response(JSON.stringify({
+                error: 'Email lookup sign-in is turned off. Please sign in with your email and password or an email link.',
+                code: 'EMAIL_LOOKUP_DISABLED'
+            }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        if (false && req.method === 'POST' && body.action === 'email-lookup') {
             const email = (body.email || '').trim().toLowerCase();
             const requestedLocationId = (body.locationId || '').trim();
             const requestedFirmId = (body.firmId || '').trim();
@@ -439,7 +447,10 @@ serve(async (req) => {
                     .eq('location_id', locationId)
                     .maybeSingle();
 
-                if (integ?.access_token) {
+                // SECURITY (Nov 2026): silent SSO disabled. It trusted the email in the link and
+                // created a session (and a Firm Owner staff row) for it. Users go through GHL OAuth instead.
+                const ALLOW_SILENT_SSO = false;
+                if (ALLOW_SILENT_SSO && integ?.access_token) {
                     // Refresh token if expired
                     let ssoAccessToken = integ.access_token;
                     if (integ.token_expires_at && new Date(integ.token_expires_at) < new Date()) {
@@ -677,6 +688,14 @@ serve(async (req) => {
                 return new Response(`Error connecting to GHL: ${tokenData.error_description}`, { status: 400 })
             }
 
+            // SECURITY (Nov 2026): the location named in the sign-in link must be the location the
+            // user actually authorized in GHL. Otherwise someone could authorize their own location
+            // and attach themselves (and their GHL tokens) to another firm.
+            if (isSso && (!tokenData.locationId || tokenData.locationId !== locationId)) {
+                console.error('SSO location mismatch:', locationId, 'vs authorized', tokenData.locationId);
+                return new Response('This sign-in link does not match the GHL account you approved. Please sign in again from your own GHL account.', { status: 403 })
+            }
+
             // Client initialized at top scope (supabaseAdmin)
 
             // Determine Firm ID
@@ -836,8 +855,10 @@ serve(async (req) => {
             const appUrl = Deno.env.get('APP_URL') || 'https://app.filershub.com';
 
             if (isSso || isLogin) {
-                // 1. Resolve User (via Email in Params OR Fetch by ID from GHL API)
-                let email = userEmail;
+                // 1. Resolve User (from the GHL API only)
+                // SECURITY (Nov 2026): never trust the email carried in the sign-in link (state).
+                // It is accepted below only if GHL confirms it belongs to a user of this location.
+                let email: string | null = null;
                 let name = 'Firm Owner';
 
                 // For CRM login flow, resolve userId from token response
@@ -863,6 +884,34 @@ serve(async (req) => {
                         }
                     } else {
                         console.error("Failed to fetch GHL user:", userResp.status, await userResp.text());
+                    }
+                }
+
+                // Accept the email from the link only if GHL lists it as a user of this location
+                if ((!email || !email.includes('@')) && userEmail && tokenData.access_token) {
+                    const verifyLocationId = tokenData.locationId || locationId;
+                    if (verifyLocationId) {
+                        try {
+                            const verifyResp = await fetch(
+                                `https://services.leadconnectorhq.com/users/?locationId=${verifyLocationId}`,
+                                { headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Version': '2021-07-28' } }
+                            );
+                            if (verifyResp.ok) {
+                                const verifyData = await verifyResp.json();
+                                const wanted = userEmail.trim().toLowerCase();
+                                const match = (verifyData.users || []).find((u: any) => (u.email || '').trim().toLowerCase() === wanted);
+                                if (match) {
+                                    email = match.email.trim();
+                                    name = `${match.firstName || ''} ${match.lastName || ''}`.trim() || name;
+                                } else {
+                                    console.warn("SSO: email in link is not a user of this location; ignoring it");
+                                }
+                            } else {
+                                console.error("SSO email check failed:", verifyResp.status);
+                            }
+                        } catch (verifyErr) {
+                            console.error("SSO email check error:", verifyErr);
+                        }
                     }
                 }
 
