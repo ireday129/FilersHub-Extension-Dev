@@ -136,6 +136,21 @@ const SuperAdminDashboard: React.FC = () => {
           .select('firm_id, is_active')
           .in('firm_id', firmIds);
 
+        // GHL connection status per firm (private integration)
+        const ghlStatusByFirm: Record<string, string> = {};
+        try {
+          const { data: ghlRows, error: ghlErr } = await supabase
+            .from('ghl_connections')
+            .select('firm_id, status');
+          if (ghlErr) {
+            console.error('Error fetching GHL connections:', ghlErr);
+          } else {
+            for (const r of ghlRows || []) ghlStatusByFirm[(r as any).firm_id] = (r as any).status;
+          }
+        } catch (ghlEx) {
+          console.error('Error fetching GHL connections:', ghlEx);
+        }
+
         const firmsList: Firm[] = (firmsData || []).map((f: any) => {
           const firmStaff = (allStaff || []).filter((s: any) => s.firm_id === f.firm_id && s.is_active);
           const firmClients = (allClients || []).filter((c: any) => c.firm_id === f.firm_id && c.is_active);
@@ -153,7 +168,7 @@ const SuperAdminDashboard: React.FC = () => {
             maxStaff: f.max_staff || 10,
             clientCount: firmClients.length,
             installDate: f.created_at ? new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—',
-            ghlIntegrated: !!f.ghl_location_id,
+            ghlStatus: ghlStatusByFirm[f.firm_id] === 'ok' ? 'connected' : ghlStatusByFirm[f.firm_id] === 'broken' ? 'broken' : 'none',
             slug: f.slug || '',
             irsAlertsEnabled: !!f.irs_alerts_enabled,
             queueCounterEnabled: !!f.queue_counter_enabled,
@@ -1023,6 +1038,7 @@ const SuperAdminDashboard: React.FC = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Access</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Staff Seats</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Clients</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">GHL</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Install Date</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">IRS</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Queue</th>
@@ -1031,14 +1047,14 @@ const SuperAdminDashboard: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center">
+                  <td colSpan={10} className="px-6 py-16 text-center">
                     <Loader2 size={24} className="animate-spin text-slate-300 mx-auto mb-2" />
                     <p className="text-sm text-slate-400">Loading firms...</p>
                   </td>
                 </tr>
               ) : filteredFirms.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-16 text-center">
+                  <td colSpan={10} className="px-6 py-16 text-center">
                     <Building2 size={32} className="text-slate-200 mx-auto mb-2" />
                     <p className="text-sm text-slate-400">No firms found.</p>
                   </td>
@@ -1168,6 +1184,11 @@ const SuperAdminDashboard: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-xs font-bold text-slate-600">{firm.clientCount}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-block px-2 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap ${firm.ghlStatus === 'connected' ? 'bg-emerald-50 text-emerald-600' : firm.ghlStatus === 'broken' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                      {firm.ghlStatus === 'connected' ? 'Connected' : firm.ghlStatus === 'broken' ? 'Broken' : 'Not connected'}
+                    </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-slate-500">

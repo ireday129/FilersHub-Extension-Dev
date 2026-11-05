@@ -17,6 +17,8 @@ import {
 import { UserRole } from '../types';
 import { supabase } from '../services/supabase';
 import { useExtensionMode } from '../hooks/useExtensionMode';
+import GhlConnectionCard from './GhlConnectionCard';
+import type { GhlConnectionStatus } from '../services/ghlConnection';
 import { useAuth } from '../contexts/AuthContext';
 
 interface StaffMember {
@@ -205,6 +207,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [ghlError, setGhlError] = useState('');
+  const [ghlStatus, setGhlStatus] = useState<GhlConnectionStatus | null>(null);
+  const canSyncToGhl = !!ghlStatus?.connected && !!ghlStatus?.isFilersHubAgency;
   const [copiedPortalUrl, setCopiedPortalUrl] = useState(false);
 
   // Pro plan logo sync state
@@ -252,6 +256,7 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
     setIsLoadingGHL(true);
     setShowGHLModal(true);
     setGhlError('');
+    setGhlUsers([]);
     setGrantStatus({});
     try {
       const token = await getFreshToken();
@@ -272,12 +277,29 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
         throw new Error(detail || error.message || 'Edge function error');
       }
       setGhlUsers(data?.users || []);
+      if (data?.ghlError) setGhlError(data.ghlError);
     } catch (error: any) {
       console.error('Error fetching GHL users:', error);
       setGhlError(error.message || 'Failed to load users from CRM.');
     } finally {
       setIsLoadingGHL(false);
     }
+  };
+
+  const openGhlConnection = () => {
+    setShowGHLModal(false);
+    setGhlError('');
+    setTimeout(() => document.getElementById('ghl-connection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
+  const renderOpenGhlLink = () => {
+    const msg = ghlError.toLowerCase();
+    if (!msg.includes('connect') && !msg.includes('token')) return null;
+    return (
+      <button onClick={openGhlConnection} className="inline-block px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-colors">
+        Open GHL connection
+      </button>
+    );
   };
 
   const grantAccess = async (user: GHLUser) => {
@@ -476,10 +498,12 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
       alert(`Firm branding updated to ${localSettings.name}`);
 
       // Auto-sync branding to CRM (logo + brand color)
-      syncBrandingToCrm(localSettings.logo || null, localSettings.color || null);
+      if (canSyncToGhl) {
+        syncBrandingToCrm(localSettings.logo || null, localSettings.color || null);
+      }
 
       // Auto-pin to GHL sidebar for Pro firms
-      if (isPro) {
+      if (isPro && canSyncToGhl) {
         pinToGhlSidebar();
       }
     } catch (error: any) {
@@ -514,30 +538,22 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
             </div>
 
             <div className="p-0 overflow-y-auto flex-1">
+              {!isLoadingGHL && ghlError && ghlUsers.length > 0 && (
+                <div className="px-6 py-3 bg-amber-50 border-b border-amber-100 text-xs text-amber-700 space-y-1">
+                  <p className="font-medium">{ghlError} Showing the last known team list.</p>
+                  {renderOpenGhlLink()}
+                </div>
+              )}
               {isLoadingGHL ? (
                 <div className="p-12 flex flex-col items-center justify-center space-y-4 text-slate-400">
                   <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
                   <p className="text-sm font-medium">Fetching team from CRM...</p>
                 </div>
-              ) : ghlError ? (
+              ) : ghlError && ghlUsers.length === 0 ? (
                 <div className="p-12 text-center space-y-4">
                   <p className="text-sm text-red-500 font-medium">{ghlError}</p>
-                  {(ghlError.toLowerCase().includes('token') && ghlError.toLowerCase().includes('expired')) || ghlError.toLowerCase().includes('reconnect') ? (
-                    <>
-                      <a
-                        href={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-auth/init?action=reconnect&firmId=${firmId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-block px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors"
-                      >
-                        Reconnect CRM
-                      </a>
-                      <p className="text-xs text-slate-400 mt-2">After reconnecting, close that tab and click Try Again below.</p>
-                      <button onClick={fetchGHLUsers} className="text-xs font-bold text-brand hover:underline">Try Again</button>
-                    </>
-                  ) : (
-                    <button onClick={fetchGHLUsers} className="text-xs font-bold text-brand hover:underline">Try Again</button>
-                  )}
+                  {renderOpenGhlLink()}
+                  <button onClick={fetchGHLUsers} className="block mx-auto text-xs font-bold text-brand hover:underline">Try Again</button>
                 </div>
               ) : ghlUsers.length > 0 ? (
                 <table className="w-full text-left border-collapse">
@@ -795,6 +811,8 @@ const Settings: React.FC<SettingsProps> = ({ firmSettings, setFirmSettings, firm
           </div>
         </div>
       </section>
+
+      <GhlConnectionCard firmId={firmId} onStatus={setGhlStatus} />
 
       {/* Staff Management Section */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
