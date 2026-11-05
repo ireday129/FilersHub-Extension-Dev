@@ -12,9 +12,13 @@ interface CrmAccessPageProps {
     onValidated?: (firmId: string) => void;
 }
 
-type Denied = { reason: 'location' | 'staff' | 'error' };
+type Denied = { reason: 'nolocation' | 'location' | 'staff' | 'error' };
 
 const DENIED_TEXT: Record<Denied['reason'], { title: string; body: string }> = {
+    nolocation: {
+        title: 'Open FilersHub from GHL',
+        body: 'This page needs to be opened from the FilersHub link in your GHL sub-account\u2019s sidebar.',
+    },
     location: {
         title: 'This sub-account isn’t set up in FilersHub',
         body: 'This GHL sub-account isn’t linked to a FilersHub firm yet. The firm owner can connect it in FilersHub Settings.',
@@ -49,11 +53,14 @@ const CrmAccessPage: React.FC<CrmAccessPageProps> = ({ isAuthenticated, onValida
         if (emailParam) setEmail((current) => current || emailParam);
 
         if (!isAuthenticated) {
+            // Signed out (or never signed in): show the form, not an old result.
             setChecking(false);
+            setDenied(null);
+            setSignedInEmail('');
             return;
         }
         if (!locationId) {
-            setDenied({ reason: 'location' });
+            setDenied({ reason: 'nolocation' });
             return;
         }
         validateLocation(locationId);
@@ -81,7 +88,12 @@ const CrmAccessPage: React.FC<CrmAccessPageProps> = ({ isAuthenticated, onValida
             if (outcome === 'signin') {
                 // Session expired or unreadable: start over with the sign-in form.
                 await supabase.auth.signOut();
-                setNotice('Your FilersHub session ended. Please sign in again.');
+                const { data: after } = await supabase.auth.getSession();
+                if (after.session) {
+                    setDenied({ reason: 'error' }); // couldn't sign out; don't leave a spinner up
+                } else {
+                    setNotice('Your FilersHub session ended. Please sign in again.');
+                }
                 setChecking(false);
                 return;
             }
@@ -106,6 +118,7 @@ const CrmAccessPage: React.FC<CrmAccessPageProps> = ({ isAuthenticated, onValida
         try {
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
+            setPassword('');
             // The app re-renders this page as signed in, which runs the access check.
         } catch (error: any) {
             setLoginError(error.message || 'Failed to sign in');

@@ -359,6 +359,12 @@ const AppContent: React.FC = () => {
   const [crmFirmId, setCrmFirmId] = useState<string | null>(null);
   const [crmValidated, setCrmValidated] = useState(false);
 
+  // A different (or no) FilersHub login must pass the in-GHL access check again.
+  useEffect(() => {
+    setCrmValidated(false);
+    setCrmFirmId(null);
+  }, [user?.id]);
+
   // Reset CRM validation when URL search params change (user toggles GHL location)
   useEffect(() => {
     const currentSearch = window.location.search;
