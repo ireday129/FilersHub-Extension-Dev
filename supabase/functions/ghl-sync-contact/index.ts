@@ -1,6 +1,7 @@
 // Links (or creates) the FilersHub client for one GHL contact, for the
 // "Sync to FilersHub" button on GHL contact pages. The caller must be signed
-// in to FilersHub as active staff of the firm connected to that sub-account.
+// in to FilersHub as active staff of the firm connected to that sub-account,
+// or as a platform Super Admin.
 import { normalizeLocationId } from '../_shared/ghl-core.ts';
 import { adminClient, firmGhl, getConnectionByLocation, GhlNotConnectedError } from '../_shared/ghl.ts';
 import { syncContactToClient } from '../_shared/clients.ts';
@@ -43,8 +44,9 @@ Deno.serve(async (req: Request) => {
       return json(req, { error: 'Missing GHL location or contact.' }, 400);
     }
 
+    // Firm staff, or a platform Super Admin, may sync contacts for the connected firm.
     const conn = await getConnectionByLocation(admin, locationId);
-    if (!conn || !(await isActiveStaff(admin, auth.userId, conn.firm_id))) {
+    if (!conn || !(auth.superAdmin || await isActiveStaff(admin, auth.userId, conn.firm_id))) {
       return json(req, { error: NO_ACCESS }, 403);
     }
 
