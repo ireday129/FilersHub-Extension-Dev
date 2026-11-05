@@ -51,6 +51,17 @@ export function normalizeLocationId(input: string): string {
   return /^[A-Za-z0-9]{10,40}$/.test(candidate) ? candidate : '';
 }
 
+/** A GHL contact id (letters and digits). Returns '' when invalid. */
+export function normalizeContactId(input: unknown): string {
+  const trimmed = String(input ?? '').trim();
+  return /^[A-Za-z0-9]{6,64}$/.test(trimmed) ? trimmed : '';
+}
+
+// Same answer for "not connected" and "not your firm", so a reply never reveals
+// which GHL sub-accounts belong to other FilersHub firms.
+export const NO_LOCATION_ACCESS =
+  'This GHL sub-account is not connected to a FilersHub firm you belong to. Check that you are signed in with the right FilersHub account.';
+
 export function bearerFrom(header: string | null): string {
   if (!header) return '';
   return header.replace(/^bearer\s+/i, '').trim();

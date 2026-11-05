@@ -2,17 +2,10 @@
 // "Sync to FilersHub" button on GHL contact pages. The caller must be signed
 // in to FilersHub as active staff of the firm connected to that sub-account,
 // or as a platform Super Admin.
-import { normalizeLocationId } from '../_shared/ghl-core.ts';
+import { NO_LOCATION_ACCESS, normalizeContactId, normalizeLocationId } from '../_shared/ghl-core.ts';
 import { adminClient, firmGhl, getConnectionByLocation, GhlNotConnectedError } from '../_shared/ghl.ts';
 import { syncContactToClient } from '../_shared/clients.ts';
 import { authenticate, corsHeadersFor, isActiveStaff, json } from '../_shared/http.ts';
-
-const CONTACT_ID = /^[A-Za-z0-9]{6,64}$/;
-
-// Same answer for "not connected" and "not your firm", so the reply never
-// reveals which GHL sub-accounts belong to other FilersHub firms.
-const NO_ACCESS =
-  'This GHL sub-account is not connected to a FilersHub firm you belong to. Check that you are signed in with the right FilersHub account.';
 
 // Database details stay in the logs; the person sees a plain message.
 function publicError(message: string): string {
@@ -39,15 +32,15 @@ Deno.serve(async (req: Request) => {
       return json(req, { error: 'Missing GHL location or contact.' }, 400);
     }
     const locationId = normalizeLocationId(String(body?.locationId ?? ''));
-    const contactId = String(body?.contactId ?? '').trim();
-    if (!locationId || !CONTACT_ID.test(contactId)) {
+    const contactId = normalizeContactId(body?.contactId);
+    if (!locationId || !contactId) {
       return json(req, { error: 'Missing GHL location or contact.' }, 400);
     }
 
     // Firm staff, or a platform Super Admin, may sync contacts for the connected firm.
     const conn = await getConnectionByLocation(admin, locationId);
     if (!conn || !(auth.superAdmin || await isActiveStaff(admin, auth.userId, conn.firm_id))) {
-      return json(req, { error: NO_ACCESS }, 403);
+      return json(req, { error: NO_LOCATION_ACCESS }, 403);
     }
 
     let ghl;

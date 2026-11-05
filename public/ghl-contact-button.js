@@ -7,8 +7,10 @@
  * On contact pages of sub-accounts connected to FilersHub, adds a button to the
  * "Contact Details" heading of the contact card (or, if that heading can't be
  * found, a floating button in the corner). Clicking it opens a FilersHub popup
- * that links (or creates) the FilersHub client for that contact. This file
- * holds no secrets: the popup checks the person's own FilersHub sign-in.
+ * that links (or creates) the FilersHub client for that contact. Below the
+ * card's header it also shows a FilersHub panel listing the client's tax
+ * returns and their status. This file holds no secrets: the popup and the
+ * panel check the person's own FilersHub sign-in.
  */
 (function () {
   if (window.__filershubContactButton) return;
@@ -16,6 +18,10 @@
   var APP = 'https://app.filershub.com';
   var BUTTON_ID = 'filershub-sync-contact-btn';      // floating corner button
   var INLINE_ID = 'filershub-sync-contact-inline';   // button inside the contact card
+  var PANEL_ID = 'filershub-contact-returns';        // tax-returns panel inside the contact card
+  // Must match HEIGHT_MESSAGE in components/GhlContactReturns.tsx.
+  var HEIGHT_MESSAGE = 'filershub-contact-returns:height';
+  var MAX_PANEL_HEIGHT = 600;
   var CARD_HEADING = 'Contact Details';
   var CONTACT_PATH = /\/location\/([A-Za-z0-9]+)\/contacts\/detail\/([A-Za-z0-9]+)/;
   var activeByLocation = {};
@@ -27,6 +33,11 @@
 
   function syncUrl(locationId, contactId) {
     return APP + '/ghl/sync-contact?location_id=' + encodeURIComponent(locationId) +
+      '&contact_id=' + encodeURIComponent(contactId);
+  }
+
+  function returnsUrl(locationId, contactId) {
+    return APP + '/ghl/contact-returns?location_id=' + encodeURIComponent(locationId) +
       '&contact_id=' + encodeURIComponent(contactId);
   }
 
@@ -118,18 +129,66 @@
     if (el) el.remove();
   }
 
+  function removeAll() {
+    removeById(INLINE_ID);
+    removeById(BUTTON_ID);
+    removeById(PANEL_ID);
+  }
+
+  // The tax-returns panel goes right below the card's header (the element
+  // holding the heading row with the inline button). Moving an iframe reloads
+  // it, so it is only placed when missing or out of place.
+  function ensurePanel(ids) {
+    var inline = document.getElementById(INLINE_ID);
+    var header = inline && inline.parentElement && inline.parentElement.parentElement;
+    if (!header || !header.parentElement) {
+      removeById(PANEL_ID);
+      return;
+    }
+    var panel = document.getElementById(PANEL_ID);
+    if (!panel) {
+      panel = document.createElement('iframe');
+      panel.setAttribute('id', PANEL_ID);
+      panel.setAttribute('title', 'FilersHub tax returns');
+      var s = panel.style;
+      s.display = 'block';
+      s.flexShrink = '0'; // the card is a fixed-height flex column; don't let it squash the panel
+      s.width = 'calc(100% - 24px)';
+      s.height = '72px';
+      s.margin = '0 12px 8px';
+      s.border = '0';
+      s.background = 'transparent';
+    }
+    if (panel.parentElement !== header.parentElement || panel.previousElementSibling !== header) {
+      header.parentElement.insertBefore(panel, header.nextSibling);
+    }
+    var src = returnsUrl(ids.locationId, ids.contactId);
+    if (panel.getAttribute('src') !== src) panel.setAttribute('src', src);
+  }
+
+  // The panel reports its height so the card shows it without a scrollbar.
+  // Only messages from the FilersHub page inside our own panel count.
+  window.addEventListener('message', function (event) {
+    if (event.origin !== APP) return;
+    var data = event.data;
+    if (!data || data.type !== HEIGHT_MESSAGE) return;
+    var panel = document.getElementById(PANEL_ID);
+    if (!panel || event.source !== panel.contentWindow) return;
+    var height = Math.ceil(Number(data.height));
+    if (!(height > 0)) return;
+    panel.style.height = Math.min(height, MAX_PANEL_HEIGHT) + 'px';
+  });
+
   function render() {
     var ids = parse(window.location.pathname);
     if (!ids) {
-      removeById(INLINE_ID);
-      removeById(BUTTON_ID);
+      removeAll();
       return Promise.resolve();
     }
     return isActive(ids.locationId).then(function (active) {
       var current = parse(window.location.pathname);
       if (!active || !current || current.locationId !== ids.locationId) {
-        removeById(INLINE_ID);
-        removeById(BUTTON_ID);
+        removeAll();
         return;
       }
       // GHL re-renders the card as you move around, so re-add the button when it disappears.
@@ -139,13 +198,15 @@
       }
       if (document.getElementById(INLINE_ID)) {
         removeById(BUTTON_ID);
-      } else if (!document.getElementById(BUTTON_ID)) {
-        addCornerButton();
+        ensurePanel(current);
+      } else {
+        removeById(PANEL_ID);
+        if (!document.getElementById(BUTTON_ID)) addCornerButton();
       }
     });
   }
 
-  window.__filershubContactButton = { parse: parse, syncUrl: syncUrl, render: render };
+  window.__filershubContactButton = { parse: parse, syncUrl: syncUrl, returnsUrl: returnsUrl, render: render };
   render();
   // GHL is a single-page app: re-check the page as the user navigates.
   window.setInterval(render, 1000);

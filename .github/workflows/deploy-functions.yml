@@ -39,6 +39,7 @@ jobs:
           supabase functions deploy crm-sidebar-pin --project-ref $PROJECT_ID --yes
           supabase functions deploy ghl-connection --project-ref $PROJECT_ID --yes
           supabase functions deploy ghl-sync-contact --project-ref $PROJECT_ID --yes
+          supabase functions deploy ghl-contact-returns --project-ref $PROJECT_ID --yes
 
       - name: Deploy Stripe Sync (No JWT - uses service role internally)
         run: |
