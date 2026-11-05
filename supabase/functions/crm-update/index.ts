@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { firmGhl, syncContactStatus, GhlNotConnectedError } from "../_shared/ghl.ts";
+import { statusTag } from "../_shared/ghl-core.ts";
 
 const ALLOWED_ORIGINS = [
     Deno.env.get('APP_URL') || 'https://app.filershub.com',
@@ -20,59 +22,6 @@ const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const GHL_API_BASE = 'https://services.leadconnectorhq.com';
-const GHL_API_VERSION = '2021-07-28';
-const TAG_PREFIX = 'fh-status:';
-
-async function getValidToken(supabase: any, firmId: string): Promise<{ accessToken: string; locationId: string }> {
-    const { data: integData, error } = await supabase
-        .from('integrations_ghl')
-        .select('access_token, refresh_token, token_expires_at, location_id')
-        .eq('firm_id', firmId)
-        .maybeSingle();
-
-    if (error) throw new Error(`Token lookup failed: ${error.message}`);
-    if (!integData?.access_token) throw new Error('No GHL access token found. Please connect GHL in Settings.');
-    if (!integData.location_id) throw new Error('No GHL location ID found. Please reconnect GHL.');
-
-    let accessToken = integData.access_token;
-
-    // Refresh if expired
-    if (integData.token_expires_at && new Date(integData.token_expires_at) < new Date()) {
-        console.log('Token expired, refreshing...');
-        const refreshResp = await fetch(`${GHL_API_BASE}/oauth/token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                client_id: Deno.env.get('GHL_CLIENT_ID')!,
-                client_secret: Deno.env.get('GHL_CLIENT_SECRET')!,
-                grant_type: 'refresh_token',
-                refresh_token: integData.refresh_token,
-            }),
-        });
-
-        if (!refreshResp.ok) {
-            const errText = await refreshResp.text();
-            console.error('Token refresh failed:', refreshResp.status, errText);
-            throw new Error('GHL token expired and refresh failed. Please reconnect the CRM integration.');
-        }
-
-        const refreshData = await refreshResp.json();
-        accessToken = refreshData.access_token;
-        const newExpiry = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-
-        await supabase.from('integrations_ghl').update({
-            access_token: refreshData.access_token,
-            refresh_token: refreshData.refresh_token,
-            token_expires_at: newExpiry,
-        }).eq('firm_id', firmId);
-
-        console.log('Token refreshed successfully');
-    }
-
-    return { accessToken, locationId: integData.location_id };
-}
 
 serve(async (req) => {
     const requestCorsHeaders = { ...corsHeaders, 'Access-Control-Allow-Origin': getCorsOrigin(req) };
@@ -96,11 +45,33 @@ serve(async (req) => {
             );
         }
 
-        // 1. Get client's GHL contact ID
+        // SECURITY (Nov 2026): only signed-in, active staff of this firm may update its GHL contacts.
+        // (The gateway JWT check also accepts the public anon key, so check the user here.)
+        const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+        const { data: authData } = jwt ? await supabaseAdmin.auth.getUser(jwt) : { data: null };
+        const caller = authData?.user;
+        if (!caller) {
+            return new Response(JSON.stringify({ error: 'Please sign in.' }),
+                { status: 401, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const { data: staffRow } = await supabaseAdmin
+            .from('staff')
+            .select('staff_id')
+            .eq('auth_user_id', caller.id)
+            .eq('firm_id', firmId)
+            .eq('is_active', true)
+            .maybeSingle();
+        if (!staffRow) {
+            return new Response(JSON.stringify({ error: 'You are not staff of this firm.' }),
+                { status: 403, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        // 1. Get client's GHL contact ID (only clients of this firm)
         const { data: client, error: clientError } = await supabaseAdmin
             .from('clients')
             .select('ghl_contact_id')
             .eq('client_id', clientId)
+            .eq('firm_id', firmId)
             .single();
 
         if (clientError || !client?.ghl_contact_id) {
@@ -113,38 +84,7 @@ serve(async (req) => {
 
         const contactId = client.ghl_contact_id;
 
-        // 2. Get valid GHL access token (refresh if expired)
-        const { accessToken } = await getValidToken(supabaseAdmin, firmId);
-
-        const ghlHeaders = {
-            'Authorization': `Bearer ${accessToken}`,
-            'Version': GHL_API_VERSION,
-            'Content-Type': 'application/json',
-        };
-
-        // 3. Fetch current contact to get existing tags
-        const contactResp = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': GHL_API_VERSION },
-        });
-
-        if (!contactResp.ok) {
-            const errText = await contactResp.text();
-            console.error('Failed to fetch GHL contact:', contactResp.status, errText);
-            if (contactResp.status === 401) {
-                throw new Error('GHL authorization failed (401). Token may be expired.');
-            }
-            throw new Error(`GHL contact fetch failed (${contactResp.status}): ${errText}`);
-        }
-
-        const contactData = await contactResp.json();
-        const existingTags: string[] = contactData.contact?.tags || [];
-
-        // 4. Build new tags: remove old fh-status tags, add new one
-        const newStatusTag = `${TAG_PREFIX}${status.toLowerCase().replace(/\s+/g, '-')}`;
-        const updatedTags = existingTags.filter((t: string) => !t.startsWith(TAG_PREFIX));
-        updatedTags.push(newStatusTag);
-
-        // 5. Get firm custom field config
+        // 2. Firm custom field config
         const { data: firmConfig } = await supabaseAdmin
             .from('firms')
             .select('ghl_custom_field_group, ghl_custom_field_name')
@@ -153,31 +93,24 @@ serve(async (req) => {
 
         const customFieldName = firmConfig?.ghl_custom_field_name || 'Return Status';
 
-        // 6. Update contact: tags + custom field
-        const updatePayload: Record<string, any> = {
-            tags: updatedTags,
-        };
-
-        // Add custom field value if configured
-        if (customFieldName) {
-            updatePayload.customFields = [
-                { key: customFieldName, field_value: status },
-            ];
+        // 3. Sync tag + custom field with the firm's private token
+        try {
+            await syncContactStatus(await firmGhl(supabaseAdmin, firmId), contactId, status, customFieldName);
+        } catch (err) {
+            if (err instanceof GhlNotConnectedError) {
+                return new Response(
+                    JSON.stringify({ skipped: true, message: err.message }),
+                    { headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+                );
+            }
+            console.error('GHL sync failed:', err.message);
+            return new Response(
+                JSON.stringify({ error: err.message }),
+                { headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' }, status: 502 }
+            );
         }
 
-        const updateResp = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
-            method: 'PUT',
-            headers: ghlHeaders,
-            body: JSON.stringify(updatePayload),
-        });
-
-        if (!updateResp.ok) {
-            const errText = await updateResp.text();
-            console.error('Failed to update GHL contact:', updateResp.status, errText);
-            throw new Error(`GHL contact update failed (${updateResp.status}): ${errText}`);
-        }
-
-        const updateResult = await updateResp.json();
+        const newStatusTag = statusTag(status);
         console.log(`GHL sync complete: contact=${contactId}, tag=${newStatusTag}, status=${status}`);
 
         return new Response(

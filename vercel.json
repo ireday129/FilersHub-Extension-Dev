@@ -24,6 +24,10 @@
         {
             "path": "/api/embed-ghl-docs",
             "schedule": "30 3 * * *"
+        },
+        {
+            "path": "/api/ghl-health-check",
+            "schedule": "0 4 * * *"
         }
     ]
 }

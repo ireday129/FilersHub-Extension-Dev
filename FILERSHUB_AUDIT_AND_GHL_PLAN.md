@@ -1,3 +1,5 @@
+> **Superseded (Nov 2026):** FilersHub now uses per-firm GoHighLevel Private Integration tokens. The marketplace workflow actions, webhooks and OAuth app described below are gone. See `docs/superpowers/specs/2026-11-05-ghl-private-integration-design.md`. The rest of this document is historical.
+
 # FilersHub Codebase Audit & GHL Workflow Integration Plan
 
 ## Context

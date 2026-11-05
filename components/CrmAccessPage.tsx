@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { widgetAuthHeaders } from '../services/widgetAuth';
 import { Loader2, Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, ShieldX } from 'lucide-react';
 import { WatermarkBackground } from './WatermarkBackground';
 import { supabase } from '../services/supabase';
@@ -49,7 +50,7 @@ const CrmAccessPage: React.FC<CrmAccessPageProps> = ({ isAuthenticated, onValida
         try {
             const response = await fetch('/api/crm-validate-location', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(await widgetAuthHeaders()) },
                 body: JSON.stringify({ locationId, email: userEmail }),
             });
 

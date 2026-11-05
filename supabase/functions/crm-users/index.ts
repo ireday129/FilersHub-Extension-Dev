@@ -2,6 +2,8 @@
 // Deployed with --no-verify-jwt (public endpoint for GHL staff sync)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { firmGhl, GhlNotConnectedError } from '../_shared/ghl.ts'
+import { describeGhlFailure } from '../_shared/ghl-core.ts'
 
 const ALLOWED_ORIGINS = [
     Deno.env.get('APP_URL') || 'https://app.filershub.com',
@@ -20,100 +22,6 @@ function getCorsOrigin(req: Request): string {
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-// Try to get a valid GHL access token — returns null if unavailable
-async function getAccessToken(supabaseAdmin: any, firmId: string): Promise<string | null> {
-    // Try integrations_ghl first
-    const { data: integData } = await supabaseAdmin
-        .from('integrations_ghl')
-        .select('access_token, refresh_token, token_expires_at')
-        .eq('firm_id', firmId)
-        .maybeSingle();
-
-    if (integData?.access_token) {
-        // Token is still valid
-        if (!integData.token_expires_at || new Date(integData.token_expires_at) > new Date()) {
-            return integData.access_token;
-        }
-        // Try refresh
-        try {
-            const refreshResp = await fetch('https://services.leadconnectorhq.com/oauth/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    client_id: Deno.env.get('GHL_CLIENT_ID')!,
-                    client_secret: Deno.env.get('GHL_CLIENT_SECRET')!,
-                    grant_type: 'refresh_token',
-                    refresh_token: integData.refresh_token,
-                })
-            });
-            if (refreshResp.ok) {
-                const refreshData = await refreshResp.json();
-                const newExpiry = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-                await supabaseAdmin.from('integrations_ghl').update({
-                    access_token: refreshData.access_token,
-                    refresh_token: refreshData.refresh_token,
-                    token_expires_at: newExpiry,
-                }).eq('firm_id', firmId);
-                await supabaseAdmin.from('firms').update({
-                    ghl_access_token: refreshData.access_token,
-                    ghl_refresh_token: refreshData.refresh_token,
-                    ghl_token_expires_at: newExpiry,
-                }).eq('firm_id', firmId);
-                console.log("Token refreshed successfully");
-                return refreshData.access_token;
-            }
-        } catch (e) {
-            console.warn("Token refresh failed:", e.message);
-        }
-    }
-
-    // Fallback: try firms table
-    const { data: firm } = await supabaseAdmin
-        .from('firms')
-        .select('ghl_access_token, ghl_refresh_token, ghl_token_expires_at')
-        .eq('firm_id', firmId)
-        .maybeSingle();
-
-    if (firm?.ghl_access_token) {
-        if (!firm.ghl_token_expires_at || new Date(firm.ghl_token_expires_at) > new Date()) {
-            return firm.ghl_access_token;
-        }
-        try {
-            const refreshResp = await fetch('https://services.leadconnectorhq.com/oauth/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    client_id: Deno.env.get('GHL_CLIENT_ID')!,
-                    client_secret: Deno.env.get('GHL_CLIENT_SECRET')!,
-                    grant_type: 'refresh_token',
-                    refresh_token: firm.ghl_refresh_token,
-                })
-            });
-            if (refreshResp.ok) {
-                const refreshData = await refreshResp.json();
-                const newExpiry = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-                await supabaseAdmin.from('integrations_ghl').update({
-                    access_token: refreshData.access_token,
-                    refresh_token: refreshData.refresh_token,
-                    token_expires_at: newExpiry,
-                }).eq('firm_id', firmId);
-                await supabaseAdmin.from('firms').update({
-                    ghl_access_token: refreshData.access_token,
-                    ghl_refresh_token: refreshData.refresh_token,
-                    ghl_token_expires_at: newExpiry,
-                }).eq('firm_id', firmId);
-                console.log("Token refreshed from firms fallback");
-                return refreshData.access_token;
-            }
-        } catch (e) {
-            console.warn("Firms token refresh failed:", e.message);
-        }
-    }
-
-    console.warn("No valid GHL token available — will use database fallback");
-    return null;
 }
 
 serve(async (req) => {
@@ -187,34 +95,16 @@ serve(async (req) => {
             let ghlUsers: any[] = [];
             let source = 'database';
 
-            // Helper: fetch users from GHL API
-            const fetchGhlUsers = async (token: string, label: string): Promise<any[] | null> => {
-                try {
-                    const response = await fetch(
-                        `https://services.leadconnectorhq.com/users/?locationId=${ghlLocationId}`,
-                        { headers: { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' } }
-                    );
-                    if (!response.ok) {
-                        const errBody = await response.text().catch(() => '');
-                        console.warn(`GHL API (${label}) failed: ${response.status} — ${errBody}`);
-                        return null;
-                    }
-                    const data = await response.json();
-                    const users = data.users || [];
-                    console.log(`GHL (${label}): fetched ${users.length} users`);
-                    return users;
-                } catch (err) {
-                    console.warn(`GHL API (${label}) error:`, err.message);
-                    return null;
-                }
-            };
+            let ghlError: string | null = null;
 
-            // Try agency API key first (never expires)
-            const agencyApiKey = Deno.env.get('GHL_AGENCY_API_KEY');
-            if (agencyApiKey) {
-                const rawUsers = await fetchGhlUsers(agencyApiKey, 'agency key');
-                if (rawUsers) {
-                    ghlUsers = rawUsers.map((u: any) => ({
+            try {
+                const ghl = await firmGhl(supabaseAdmin, firmId);
+                const resp = await ghl.request(
+                    '/users/?locationId=' + encodeURIComponent(ghl.locationId)
+                );
+                if (resp.ok) {
+                    const data = await resp.json();
+                    ghlUsers = (data.users || []).map((u: any) => ({
                         id: u.id,
                         name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
                         firstName: u.firstName,
@@ -224,27 +114,15 @@ serve(async (req) => {
                         type: u.type,
                     }));
                     source = 'ghl_api';
+                    console.log(`GHL: fetched ${ghlUsers.length} users`);
+                } else {
+                    const text = await resp.text().catch(() => '');
+                    ghlError = describeGhlFailure(resp.status, text).message;
+                    console.warn(`GHL users fetch failed: ${resp.status}`);
                 }
-            }
-
-            // Fallback: try OAuth token if agency key failed
-            if (source === 'database') {
-                const accessToken = await getAccessToken(supabaseAdmin, firmId);
-                if (accessToken) {
-                    const rawUsers = await fetchGhlUsers(accessToken, 'OAuth token');
-                    if (rawUsers) {
-                        ghlUsers = rawUsers.map((u: any) => ({
-                            id: u.id,
-                            name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-                            firstName: u.firstName,
-                            lastName: u.lastName,
-                            email: u.email,
-                            role: u.role,
-                            type: u.type,
-                        }));
-                        source = 'ghl_api';
-                    }
-                }
+            } catch (err) {
+                console.warn('GHL users fetch error:', err?.message || err);
+                ghlError = err?.message || 'Could not reach GHL.';
             }
 
             // Sync live GHL data back to users table for future fallback
@@ -310,7 +188,7 @@ serve(async (req) => {
             }));
 
             return new Response(
-                JSON.stringify({ users: enrichedUsers, source }),
+                JSON.stringify(ghlError ? { users: enrichedUsers, source, ghlError } : { users: enrichedUsers, source }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }

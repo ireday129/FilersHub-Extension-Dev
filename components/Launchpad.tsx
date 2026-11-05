@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, ShieldX, CheckCircle, Circle, Calendar, Sparkles, Play, Rocket, Youtube, MessageCircle, X } from 'lucide-react';
 import WidgetSupportTickets from './WidgetSupportTickets';
+import WidgetSignIn from './WidgetSignIn';
+import { widgetAuthHeaders } from '../services/widgetAuth';
 
 const FH_GREEN = '#42ab30';
 const FH_ORANGE = '#f69109';
@@ -72,6 +74,7 @@ const isPreLaunch = new Date() < LAUNCH_DATE;
 
 const Launchpad: React.FC = () => {
   const [authorized, setAuthorized] = useState(false);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
@@ -89,13 +92,18 @@ const Launchpad: React.FC = () => {
       return;
     }
 
-    fetch('/api/widget-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locationId, email }),
-    })
+    widgetAuthHeaders()
+      .then((authHeaders) => fetch('/api/widget-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ locationId, email }),
+      }))
       .then(async (res) => {
         const data = await res.json();
+        if (res.status === 401) {
+          setNeedsSignIn(true);
+          return;
+        }
         if (!res.ok) throw new Error(data.error || 'Failed to load data');
         setAuthorized(true);
         if (data.subscriptionTier && data.subscriptionTier.toLowerCase().includes('pro')) {
@@ -129,7 +137,7 @@ const Launchpad: React.FC = () => {
     try {
       await fetch('/api/widget-archive-update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await widgetAuthHeaders()) },
         body: JSON.stringify({ locationId, email, updateId }),
       });
     } catch (err) {
@@ -165,6 +173,10 @@ const Launchpad: React.FC = () => {
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: FH_GREEN }} />
       </div>
     );
+  }
+
+  if (needsSignIn) {
+    return <WidgetSignIn defaultEmail={new URLSearchParams(window.location.search).get('email') || ''} />;
   }
 
   if (error || !authorized) {

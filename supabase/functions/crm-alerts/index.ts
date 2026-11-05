@@ -13,6 +13,23 @@ Deno.serve(async (req) => {
         return new Response('ok', { headers: corsHeaders });
     }
 
+    // SECURITY (Nov 2026): only the IRS polling engine may send alerts. It must send the shared
+    // secret (Supabase secret CRM_ALERTS_SECRET) in the x-filershub-secret header.
+    const expectedSecret = Deno.env.get('CRM_ALERTS_SECRET') || '';
+    const providedSecret = req.headers.get('x-filershub-secret') || '';
+    let secretOk = expectedSecret.length >= 32 && providedSecret.length === expectedSecret.length;
+    if (secretOk) {
+        let diff = 0;
+        for (let i = 0; i < expectedSecret.length; i++) diff |= expectedSecret.charCodeAt(i) ^ providedSecret.charCodeAt(i);
+        secretOk = diff === 0;
+    }
+    if (!secretOk) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 401,
+        });
+    }
+
     try {
         const payload = await req.json();
         const { firm_id, client_id, alert_data } = payload;
@@ -50,6 +67,7 @@ Deno.serve(async (req) => {
             .from('clients')
             .select('full_name, email, phone, ghl_contact_id')
             .eq('client_id', client_id)
+            .eq('firm_id', firm_id) // SECURITY (Nov 2026): the client must belong to this firm
             .single();
 
         if (clientError || !client) {

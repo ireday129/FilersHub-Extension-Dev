@@ -1,14 +1,13 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { bearerFrom, secretsMatch, validateActionRequest } from '../_shared/ghl-core.ts';
+import { firmGhl, getConnectionByLocation, GhlNotConnectedError, syncContactStatus, vaultRead } from '../_shared/ghl.ts';
+import type { FirmGhl } from '../_shared/ghl.ts';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const GHL_API_BASE = 'https://services.leadconnectorhq.com';
-const GHL_API_VERSION = '2021-07-28';
-const TAG_PREFIX = 'fh-status:';
 
 const VALID_STATUSES = [
     'Intake Received', 'Compliance Review', 'In Preparation', 'Missing Documents',
@@ -26,67 +25,11 @@ function jsonResponse(body: object): Response {
     });
 }
 
-async function resolveLocation(supabase: any, locationId: string | undefined) {
-    if (!locationId) return { firmId: null, error: 'No locationId provided in extras' };
-
-    const { data: firm, error } = await supabase
-        .from('firms')
-        .select('firm_id')
-        .eq('ghl_location_id', locationId)
-        .maybeSingle();
-
-    if (error) return { firmId: null, error: `Database error: ${error.message}` };
-    if (!firm) return { firmId: null, error: `No firm found for locationId: ${locationId}` };
-
-    return { firmId: firm.firm_id, error: null };
-}
-
-async function getValidToken(supabase: any, firmId: string): Promise<{ accessToken: string; locationId: string }> {
-    const { data: integData, error } = await supabase
-        .from('integrations_ghl')
-        .select('access_token, refresh_token, token_expires_at, location_id')
-        .eq('firm_id', firmId)
-        .maybeSingle();
-
-    if (error) throw new Error(`Token lookup failed: ${error.message}`);
-    if (!integData?.access_token) throw new Error('No CRM access token found. Please connect your CRM in Settings.');
-    if (!integData.location_id) throw new Error('No CRM location ID found. Please reconnect your CRM integration.');
-
-    let accessToken = integData.access_token;
-
-    if (integData.token_expires_at && new Date(integData.token_expires_at) < new Date()) {
-        console.log('Token expired, refreshing...');
-        const refreshResp = await fetch(`${GHL_API_BASE}/oauth/token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                client_id: Deno.env.get('GHL_CLIENT_ID')!,
-                client_secret: Deno.env.get('GHL_CLIENT_SECRET')!,
-                grant_type: 'refresh_token',
-                refresh_token: integData.refresh_token,
-            }),
-        });
-
-        if (!refreshResp.ok) {
-            const errText = await refreshResp.text();
-            console.error('Token refresh failed:', refreshResp.status, errText);
-            throw new Error('CRM token expired and refresh failed. Please reconnect the CRM integration.');
-        }
-
-        const refreshData = await refreshResp.json();
-        accessToken = refreshData.access_token;
-        const newExpiry = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-
-        await supabase.from('integrations_ghl').update({
-            access_token: refreshData.access_token,
-            refresh_token: refreshData.refresh_token,
-            token_expires_at: newExpiry,
-        }).eq('firm_id', firmId);
-
-        console.log('Token refreshed successfully');
-    }
-
-    return { accessToken, locationId: integData.location_id };
+function failure(status: number, error: string): Response {
+    return new Response(JSON.stringify({ success: false, error }), {
+        status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 }
 
 async function findClientByContactId(supabase: any, firmId: string, contactId: string) {
@@ -103,71 +46,15 @@ async function findClientByContactId(supabase: any, firmId: string, contactId: s
     return { client, error: null };
 }
 
-async function syncStatusTagToGhl(
-    supabase: any,
-    accessToken: string,
-    contactId: string,
-    newStatus: string,
-    firmId: string,
-) {
-    const ghlHeaders = {
-        'Authorization': `Bearer ${accessToken}`,
-        'Version': GHL_API_VERSION,
-        'Content-Type': 'application/json',
-    };
-
-    // Fetch current contact tags
-    const contactResp = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': GHL_API_VERSION },
-    });
-
-    if (!contactResp.ok) {
-        throw new Error(`GHL contact fetch failed (${contactResp.status})`);
-    }
-
-    const contactData = await contactResp.json();
-    const existingTags: string[] = contactData.contact?.tags || [];
-
-    // Strip old fh-status tags, add new one
-    const newStatusTag = `${TAG_PREFIX}${newStatus.toLowerCase().replace(/\s+/g, '-')}`;
-    const updatedTags = existingTags.filter((t: string) => !t.startsWith(TAG_PREFIX));
-    updatedTags.push(newStatusTag);
-
-    // Get firm custom field config
-    const { data: firmConfig } = await supabase
-        .from('firms')
-        .select('ghl_custom_field_name')
-        .eq('firm_id', firmId)
-        .maybeSingle();
-
-    const customFieldName = firmConfig?.ghl_custom_field_name || 'Return Status';
-
-    // Update contact: tags + custom field
-    const updatePayload: Record<string, any> = { tags: updatedTags };
-    if (customFieldName) {
-        updatePayload.customFields = [{ key: customFieldName, field_value: newStatus }];
-    }
-
-    const updateResp = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
-        method: 'PUT',
-        headers: ghlHeaders,
-        body: JSON.stringify(updatePayload),
-    });
-
-    if (!updateResp.ok) {
-        throw new Error(`GHL contact update failed (${updateResp.status})`);
-    }
-
-    console.log(`GHL tag sync: contact=${contactId}, tag=${newStatusTag}`);
-}
-
 // =====================================================
 // ACTION HANDLERS
 // =====================================================
 
 async function handleCreateClient(
-    supabase: any, extras: any, data: any, firmId: string, accessToken: string,
+    supabase: any, extras: any, data: any, firmId: string, ghl: FirmGhl | null,
 ) {
+    if (!ghl) return jsonResponse({ success: false, error: 'This firm is not connected to GoHighLevel.' });
+
     const contactId = extras?.contactId;
     if (!contactId) return jsonResponse({ success: false, error: 'contactId is required in extras' });
 
@@ -185,9 +72,7 @@ async function handleCreateClient(
     }
 
     // Fetch contact from GHL API
-    const contactResp = await fetch(`${GHL_API_BASE}/contacts/${contactId}`, {
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Version': GHL_API_VERSION },
-    });
+    const contactResp = await ghl.request('/contacts/' + encodeURIComponent(contactId));
 
     if (!contactResp.ok) {
         return jsonResponse({
@@ -373,13 +258,13 @@ async function handleSearchExistingReturn(
 }
 
 async function handleUpdateReturnStage(
-    supabase: any, extras: any, data: any, firmId: string, accessToken: string,
+    supabase: any, extras: any, data: any, firmId: string, ghl: FirmGhl | null, customFieldName: string,
 ) {
-    const returnId = data?.return_id;
+    let returnId = data?.return_id;
     const newStatus = data?.new_status;
 
-    if (!returnId || !newStatus) {
-        return jsonResponse({ success: false, error: 'return_id and new_status are required in data' });
+    if (!newStatus) {
+        return jsonResponse({ success: false, error: 'new_status is required in data' });
     }
 
     if (!VALID_STATUSES.includes(newStatus)) {
@@ -387,6 +272,30 @@ async function handleUpdateReturnStage(
             success: false,
             error: `Invalid status "${newStatus}". Must be one of: ${VALID_STATUSES.join(', ')}`,
         });
+    }
+
+    if (!returnId) {
+        const contactId = extras?.contactId;
+        if (!contactId) {
+            return jsonResponse({ success: false, error: 'Provide data.return_id or a contact (extras.contactId).' });
+        }
+        const { client, error: clientError } = await findClientByContactId(supabase, firmId, contactId);
+        if (!client) {
+            return jsonResponse({ success: false, error: clientError || 'No tax return found for this contact.' });
+        }
+        let q = supabase
+            .from('tax_returns')
+            .select('return_id')
+            .eq('client_id', client.client_id)
+            .eq('firm_id', firmId);
+        if (data?.tax_year) q = q.eq('tax_year', data.tax_year);
+        const { data: latest, error: latestErr } = await q
+            .order('updated_at', { ascending: false })
+            .limit(1);
+        if (latestErr || !latest || latest.length === 0) {
+            return jsonResponse({ success: false, error: 'No tax return found for this contact.' });
+        }
+        returnId = latest[0].return_id;
     }
 
     // Fetch current return (with firm ownership check)
@@ -436,8 +345,8 @@ async function handleUpdateReturnStage(
             .eq('client_id', taxReturn.client_id)
             .single();
 
-        if (client?.ghl_contact_id) {
-            await syncStatusTagToGhl(supabase, accessToken, client.ghl_contact_id, newStatus, firmId);
+        if (client?.ghl_contact_id && ghl) {
+            await syncContactStatus(ghl, client.ghl_contact_id, newStatus, customFieldName);
         } else {
             warning = 'No CRM contact linked — tag sync skipped';
         }
@@ -577,7 +486,7 @@ async function handleAddNote(
 }
 
 async function handleRequestDocs(
-    supabase: any, extras: any, data: any, firmId: string, accessToken: string,
+    supabase: any, extras: any, data: any, firmId: string, ghl: FirmGhl | null, customFieldName: string,
 ) {
     const contactId = extras?.contactId;
     const categories = data?.categories;
@@ -629,8 +538,8 @@ async function handleRequestDocs(
 
     // Sync tag to GHL (best-effort)
     try {
-        if (client.ghl_contact_id && accessToken) {
-            await syncStatusTagToGhl(supabase, accessToken, client.ghl_contact_id, 'Missing Documents', firmId);
+        if (client.ghl_contact_id && ghl) {
+            await syncContactStatus(ghl, client.ghl_contact_id, 'Missing Documents', customFieldName);
         }
     } catch (syncErr) {
         console.warn('GHL tag sync skipped:', syncErr.message);
@@ -855,51 +764,73 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const body = await req.json();
-        const { data, extras, meta } = body;
-        const actionKey = meta?.key;
+        let body;
+        try {
+            body = await req.json();
+        } catch {
+            return failure(400, 'Body must be JSON.');
+        }
 
-        console.log(`crm-actions: received action=${actionKey}, locationId=${extras?.locationId}`);
+        const validated = validateActionRequest(body);
+        if (!validated.ok) return failure(400, validated.error);
+        const actionKey = validated.key;
+        const { data, extras } = body;
+
+        console.log(`crm-actions: received action=${actionKey}, locationId=${validated.locationId}`);
 
         const supabase = createClient(
             Deno.env.get('URL') ?? Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
         );
 
-        // Resolve location -> firm
-        const { firmId, error: locationError } = await resolveLocation(supabase, extras?.locationId);
-        if (locationError || !firmId) {
-            return jsonResponse({ success: false, error: locationError || 'Could not resolve firm' });
+        // Resolve location -> connection -> firm, then check that firm's own secret
+        const connection = await getConnectionByLocation(supabase, validated.locationId);
+        if (!connection) {
+            return failure(401, 'This GHL sub-account is not connected to FilersHub.');
+        }
+        const expectedSecret = connection.actions_secret_id
+            ? (await vaultRead(supabase, connection.actions_secret_id)) ?? ''
+            : '';
+        if (!secretsMatch(expectedSecret, bearerFrom(req.headers.get('Authorization')))) {
+            return failure(401, 'Unauthorized');
+        }
+        const firmId = connection.firm_id;
+
+        // Per-firm GHL client (null when the token is missing)
+        let ghl: FirmGhl | null = null;
+        try {
+            ghl = await firmGhl(supabase, firmId);
+        } catch (ghlErr) {
+            if (!(ghlErr instanceof GhlNotConnectedError)) throw ghlErr;
+            // GHL access is required for actions that call the GHL API
+            if (['fh_newclientaccess', 'update_return_stage', 'request_docs'].includes(actionKey)) {
+                return jsonResponse({ success: false, error: ghlErr.message });
+            }
+            console.warn('GHL connection unavailable, proceeding without GHL API access:', ghlErr.message);
         }
 
-        // Get valid GHL token
-        let accessToken = '';
-        try {
-            const tokenResult = await getValidToken(supabase, firmId);
-            accessToken = tokenResult.accessToken;
-        } catch (tokenErr) {
-            // Token is required for actions that call GHL API
-            if (['fh_newclientaccess', 'update_return_stage', 'request_docs'].includes(actionKey)) {
-                return jsonResponse({ success: false, error: tokenErr.message });
-            }
-            console.warn('Token unavailable, proceeding without GHL API access:', tokenErr.message);
-        }
+        const { data: firmConfig } = await supabase
+            .from('firms')
+            .select('ghl_custom_field_name')
+            .eq('firm_id', firmId)
+            .maybeSingle();
+        const customFieldName = firmConfig?.ghl_custom_field_name || 'Return Status';
 
         switch (actionKey) {
             case 'fh_newclientaccess':
-                return await handleCreateClient(supabase, extras, data, firmId, accessToken);
+                return await handleCreateClient(supabase, extras, data, firmId, ghl);
             case 'create_tax_return':
                 return await handleCreateTaxReturn(supabase, extras, data, firmId);
             case 'search_existing_return':
                 return await handleSearchExistingReturn(supabase, extras, data, firmId);
             case 'update_return_stage':
-                return await handleUpdateReturnStage(supabase, extras, data, firmId, accessToken);
+                return await handleUpdateReturnStage(supabase, extras, data, firmId, ghl, customFieldName);
             case 'assign_preparer':
                 return await handleAssignPreparer(supabase, extras, data, firmId);
             case 'add_note':
                 return await handleAddNote(supabase, extras, data, firmId);
             case 'request_docs':
-                return await handleRequestDocs(supabase, extras, data, firmId, accessToken);
+                return await handleRequestDocs(supabase, extras, data, firmId, ghl, customFieldName);
             case 'set_return_info':
                 return await handleSetReturnInfo(supabase, extras, data, firmId);
             case 'deactivate_client':
@@ -912,6 +843,6 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('crm-actions error:', error?.message || error);
-        return jsonResponse({ success: false, error: error?.message || 'Unknown error' });
+        return jsonResponse({ success: false, error: 'Something went wrong. Try again.' });
     }
 });

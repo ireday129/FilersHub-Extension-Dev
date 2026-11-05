@@ -7,7 +7,7 @@ export default async function handler(req: any, res: any) {
 
     const { locationId, email, updateId } = req.body;
 
-    if (!locationId || !email || !updateId) {
+    if (!locationId || !updateId) {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
 
@@ -31,12 +31,20 @@ export default async function handler(req: any, res: any) {
 
         const firmId = firm.firm_id;
 
-        // Layer 2: Verify email is an active staff member for this firm
+        // Layer 2 (SECURITY, Nov 2026): the caller must be signed in to FilersHub as an active
+        // staff member of this firm. The email sent in the request is no longer trusted.
+        const accessToken = String(req.headers?.authorization || '').replace(/^Bearer\s+/i, '');
+        const { data: authData } = accessToken
+            ? await supabaseAdmin.auth.getUser(accessToken)
+            : { data: { user: null } };
+        if (!authData?.user) {
+            return res.status(401).json({ error: 'Please sign in to FilersHub.', code: 'SIGN_IN_REQUIRED' });
+        }
         const { data: staffMember, error: staffError } = await supabaseAdmin
             .from('staff')
             .select('staff_id')
             .eq('firm_id', firmId)
-            .ilike('email', email.toLowerCase())
+            .eq('auth_user_id', authData.user.id)
             .eq('is_active', true)
             .maybeSingle();
 

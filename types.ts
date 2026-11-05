@@ -46,7 +46,7 @@ export interface Firm {
   maxStaff: number;
   clientCount: number;
   installDate: string;
-  ghlIntegrated: boolean;
+  ghlStatus: 'connected' | 'broken' | 'none';
   slug: string;
   irsAlertsEnabled?: boolean;
   queueCounterEnabled?: boolean;

@@ -166,6 +166,7 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
             firmId={firmId}
             isExtension={isExtension}
             currentStaffName={staffName}
+            onOpenSettings={() => setActiveTab(NavItem.Settings)}
           />
         );
       case NavItem.Clients:
@@ -339,7 +340,6 @@ const AuthenticatedApp: React.FC<{ targetFirmId?: string | null }> = ({ targetFi
 import RoleSelection from './components/RoleSelection';
 import StaffLogin from './components/StaffLogin';
 import SuperAdminLogin from './components/SuperAdminLogin';
-import InstallSuccess from './components/InstallSuccess';
 
 import { getFirmBySlug } from './services/firms';
 import Login from './components/auth/Login';
@@ -413,7 +413,7 @@ const AppContent: React.FC = () => {
   }, [path]);
 
 
-  // GHL Dashboard Widget (no auth required — uses widget_token)
+  // GHL Dashboard Widget (data requires a signed-in staff session; shows sign-in if needed)
   if (path === '/widget') {
     return <Launchpad />;
   }
@@ -431,13 +431,8 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Install Success Page (no auth required)
-  if (path === '/install-success') {
-    return <InstallSuccess />;
-  }
-
   // Auto-redirect super admins to /super-admin if they land on root
-  if (user?.user_metadata?.is_super_admin === true && path === '/') {
+  if (user?.app_metadata?.is_super_admin === true && path === '/') {
     window.history.replaceState(null, '', '/super-admin');
     setPath('/super-admin');
   }
@@ -448,7 +443,7 @@ const AppContent: React.FC = () => {
       return <SuperAdminLogin />;
     }
 
-    if (user.user_metadata?.is_super_admin === true) {
+    if (user.app_metadata?.is_super_admin === true) {
       return (
         <div className="flex flex-col min-h-screen bg-slate-50 p-8">
           <SuperAdminDashboard />
