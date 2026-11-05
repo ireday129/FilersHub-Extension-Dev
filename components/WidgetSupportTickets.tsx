@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { widgetAuthHeaders } from '../services/widgetAuth';
 import { ArrowLeft, Plus, Send, Loader2, MessageCircle, ChevronRight, Inbox } from 'lucide-react';
 
 const FH_GREEN = '#42ab30';
@@ -102,7 +103,7 @@ const WidgetSupportTickets: React.FC<WidgetSupportTicketsProps> = ({ locationId,
   const apiCall = async (payload: Record<string, any>) => {
     const res = await fetch('/api/support-tickets', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await widgetAuthHeaders()) },
       body: JSON.stringify({ locationId, email, ...payload }),
     });
     const data = await res.json();

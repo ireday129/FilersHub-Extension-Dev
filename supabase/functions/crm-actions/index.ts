@@ -854,6 +854,24 @@ Deno.serve(async (req) => {
         return new Response('ok', { headers: corsHeaders });
     }
 
+    // SECURITY (Nov 2026): GHL workflow actions must send the shared secret
+    // (Supabase secret CRM_ACTIONS_SECRET) as "Authorization: Bearer <secret>".
+    // If the secret is not set, every request is refused.
+    const expectedSecret = Deno.env.get('CRM_ACTIONS_SECRET') || '';
+    const providedSecret = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    let secretOk = expectedSecret.length >= 32 && providedSecret.length === expectedSecret.length;
+    if (secretOk) {
+        let diff = 0;
+        for (let i = 0; i < expectedSecret.length; i++) diff |= expectedSecret.charCodeAt(i) ^ providedSecret.charCodeAt(i);
+        secretOk = diff === 0;
+    }
+    if (!secretOk) {
+        return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+    }
+
     try {
         const body = await req.json();
         const { data, extras, meta } = body;

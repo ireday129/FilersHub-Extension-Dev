@@ -96,11 +96,33 @@ serve(async (req) => {
             );
         }
 
-        // 1. Get client's GHL contact ID
+        // SECURITY (Nov 2026): only signed-in, active staff of this firm may update its GHL contacts.
+        // (The gateway JWT check also accepts the public anon key, so check the user here.)
+        const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+        const { data: authData } = jwt ? await supabaseAdmin.auth.getUser(jwt) : { data: null };
+        const caller = authData?.user;
+        if (!caller) {
+            return new Response(JSON.stringify({ error: 'Please sign in.' }),
+                { status: 401, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const { data: staffRow } = await supabaseAdmin
+            .from('staff')
+            .select('staff_id')
+            .eq('auth_user_id', caller.id)
+            .eq('firm_id', firmId)
+            .eq('is_active', true)
+            .maybeSingle();
+        if (!staffRow) {
+            return new Response(JSON.stringify({ error: 'You are not staff of this firm.' }),
+                { status: 403, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        // 1. Get client's GHL contact ID (only clients of this firm)
         const { data: client, error: clientError } = await supabaseAdmin
             .from('clients')
             .select('ghl_contact_id')
             .eq('client_id', clientId)
+            .eq('firm_id', firmId)
             .single();
 
         if (clientError || !client?.ghl_contact_id) {

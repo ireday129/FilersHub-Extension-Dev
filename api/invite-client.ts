@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req: any, res: any) {
+    // SECURITY (Nov 2026): turned off. Nothing in the app calls this route, and it accepted any
+    // email and firmId with no sign-in, overwriting existing users' account details.
+    return res.status(403).json({ error: 'This endpoint is turned off.' });
+
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }

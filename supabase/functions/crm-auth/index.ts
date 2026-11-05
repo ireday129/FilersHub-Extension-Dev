@@ -393,6 +393,40 @@ serve(async (req) => {
                 });
             }
 
+            // SECURITY (Nov 2026): only the platform admin, or a signed-in Firm Owner of this firm
+            // claiming a purchase made with their own login email, may link a subscription.
+            const claimJwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+            const { data: claimAuth } = claimJwt ? await supabaseAdmin.auth.getUser(claimJwt) : { data: null };
+            const claimCaller = claimAuth?.user;
+            if (!claimCaller) {
+                return new Response(JSON.stringify({ error: 'Please sign in to link a subscription.' }), {
+                    status: 401, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+            const callerEmail = (claimCaller.email || '').toLowerCase();
+            const isPlatformAdmin = claimCaller.app_metadata?.is_super_admin === true && callerEmail === 'irene@hannahfinancial.com';
+            if (!isPlatformAdmin) {
+                const { data: ownerRow } = await supabaseAdmin
+                    .from('staff')
+                    .select('staff_id')
+                    .eq('auth_user_id', claimCaller.id)
+                    .eq('firm_id', firmId)
+                    .eq('role', 'Firm Owner')
+                    .eq('is_active', true)
+                    .maybeSingle();
+                if (!ownerRow) {
+                    return new Response(JSON.stringify({ error: 'Only the Firm Owner can link a subscription.' }), {
+                        status: 403, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+                if (email !== callerEmail) {
+                    return new Response(JSON.stringify({
+                        linked: false,
+                        message: 'Purchases can only be linked to the account that uses the same email. Please contact FilersHub support to link a purchase made with a different email.'
+                    }), { status: 200, headers: { ...requestCorsHeaders, 'Content-Type': 'application/json' } });
+                }
+            }
+
             // Check for unlinked pending subscriptions for this email
             const { data: pendingList } = await supabaseAdmin
                 .from('pending_subscriptions')

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { widgetAuthHeaders } from '../services/widgetAuth';
 import { Loader2, Play, Lock, Mail, Zap, X } from 'lucide-react';
 
 const FH_GREEN = '#42ab30';
@@ -77,11 +78,12 @@ const Tutorials: React.FC = () => {
       return;
     }
 
-    fetch('/api/widget-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locationId, email }),
-    })
+    widgetAuthHeaders()
+      .then((authHeaders) => fetch('/api/widget-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ locationId, email }),
+      }))
       .then(async (res) => {
         const data = await res.json();
         if (res.ok && data.subscriptionTier) {

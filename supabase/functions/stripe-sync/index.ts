@@ -202,6 +202,19 @@ Deno.serve(async (req) => {
         Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // SECURITY (Nov 2026): only the platform admin may run a Stripe sync.
+    const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    const { data: authData } = jwt ? await supabase.auth.getUser(jwt) : { data: null };
+    const caller = authData?.user;
+    const isPlatformAdmin = caller?.app_metadata?.is_super_admin === true
+        && (caller?.email || '').toLowerCase() === 'irene@hannahfinancial.com';
+    if (!isPlatformAdmin) {
+        return new Response(JSON.stringify({ error: 'Only the FilersHub admin can run a Stripe sync.' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
     if (!stripeKey) {
         return new Response(JSON.stringify({ error: 'STRIPE_SECRET_KEY not configured' }), {

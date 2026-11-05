@@ -7,6 +7,42 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// SECURITY (Nov 2026): only act on webhooks signed by GoHighLevel.
+// GHL signs marketplace webhooks with Ed25519 in the X-GHL-Signature header (base64).
+// Public key from https://marketplace.gohighlevel.com/docs/webhook/WebhookIntegrationGuide
+const GHL_ED25519_PUBLIC_KEY_B64 = 'MCowBQYDK2VwAyEAi2HR1srL4o18O8BRa7gVJY7G7bupbN3H9AwJrHCDiOg=';
+let ghlKeyPromise: Promise<CryptoKey> | null = null;
+
+function base64ToBytes(b64: string): Uint8Array {
+    return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+function getGhlKey(): Promise<CryptoKey> {
+    if (!ghlKeyPromise) {
+        ghlKeyPromise = crypto.subtle.importKey('spki', base64ToBytes(GHL_ED25519_PUBLIC_KEY_B64), { name: 'Ed25519' }, false, ['verify']);
+    }
+    return ghlKeyPromise;
+}
+
+async function verifyGhlSignature(rawBody: string, signatureB64: string | null): Promise<boolean> {
+    if (!signatureB64 || signatureB64 === 'N/A') return false;
+    try {
+        const key = await getGhlKey();
+        const signature = base64ToBytes(signatureB64.trim());
+        const encoder = new TextEncoder();
+        if (await crypto.subtle.verify('Ed25519', key, signature, encoder.encode(rawBody))) return true;
+        // GHL's sample code verifies JSON.stringify(body); accept that form too
+        const reserialized = JSON.stringify(JSON.parse(rawBody));
+        if (reserialized !== rawBody) {
+            return await crypto.subtle.verify('Ed25519', key, signature, encoder.encode(reserialized));
+        }
+        return false;
+    } catch (e) {
+        console.error('Webhook signature check error:', e?.message || e);
+        return false;
+    }
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -18,7 +54,19 @@ Deno.serve(async (req) => {
             Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
-        const payload = await req.json();
+        const rawBody = await req.text();
+        const signatureOk = await verifyGhlSignature(rawBody, req.headers.get('x-ghl-signature'));
+        if (!signatureOk) {
+            // Not from GoHighLevel (or unsigned): do nothing. Return 200 so a genuine GHL
+            // webhook is never disabled if this check ever misfires; the warning shows in logs.
+            console.warn('Rejected webhook: missing or invalid X-GHL-Signature');
+            return new Response(JSON.stringify({ message: 'Ignored: invalid signature' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 200,
+            });
+        }
+
+        const payload = JSON.parse(rawBody);
         const { locationId: rawLocationId, location_id, type } = payload;
         const locationId = rawLocationId || location_id;
 
