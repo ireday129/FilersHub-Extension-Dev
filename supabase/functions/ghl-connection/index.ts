@@ -65,7 +65,7 @@ async function buildStatus(admin: SupabaseClient, firmId: string) {
 }
 
 async function ghlGet(token: string, path: string): Promise<Response> {
-  return await fetch(`${GHL_API_BASE}${path}`, { headers: ghlHeaders(token) });
+  return await fetch(`${GHL_API_BASE}${path}`, { headers: ghlHeaders(token), signal: AbortSignal.timeout(15000) });
 }
 
 async function connect(
@@ -122,15 +122,25 @@ async function connect(
   const locationName = typeof loc.name === 'string' && loc.name ? loc.name : null;
 
   const contactsResp = await ghlGet(token, `/contacts/?locationId=${encLoc}&limit=1`);
-  await contactsResp.text();
+  const contactsText = await contactsResp.text();
   if (!contactsResp.ok) {
-    return json(req, { error: 'The token is missing the contacts.readonly scope.' }, 400);
+    if (contactsResp.status === 401 || contactsResp.status === 403) {
+      return json(req, { error: 'The token is missing the contacts.readonly scope.' }, 400);
+    }
+    return json(req, {
+      error: 'GHL refused the token: ' + describeGhlFailure(contactsResp.status, contactsText).message,
+    }, 400);
   }
 
   const usersResp = await ghlGet(token, `/users/?locationId=${encLoc}`);
-  await usersResp.text();
+  const usersText = await usersResp.text();
   if (!usersResp.ok) {
-    return json(req, { error: 'The token is missing the users.readonly scope.' }, 400);
+    if (usersResp.status === 401 || usersResp.status === 403) {
+      return json(req, { error: 'The token is missing the users.readonly scope.' }, 400);
+    }
+    return json(req, {
+      error: 'GHL refused the token: ' + describeGhlFailure(usersResp.status, usersText).message,
+    }, 400);
   }
 
   const existing = await getConnection(admin, firmId);

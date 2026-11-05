@@ -22,7 +22,7 @@ const corsHeaders = {
 };
 
 import { getConnection, agencyRequest, filersHubAgencyId } from '../_shared/ghl.ts';
-import { isFilersHubAgency, menuLinkPayload, findFirmMenuLink } from '../_shared/ghl-core.ts';
+import { isFilersHubAgency } from '../_shared/ghl-core.ts';
 
 const json = (body: unknown, status: number, headers: Record<string, string>) =>
     new Response(JSON.stringify(body), { status, headers: { ...headers, 'Content-Type': 'application/json' } });
@@ -135,7 +135,7 @@ serve(async (req) => {
 
         const putErrorText = await putResp.text();
         console.error(`PUT /locations/${locationId} failed (${putResp.status}):`, putErrorText);
-        throw new Error(`Failed to sync branding to CRM (status ${putResp.status}). Please reconnect the CRM integration in Settings.`);
+        throw new Error(`Failed to sync branding to GHL (status ${putResp.status}). Try again or contact support.`);
 
     } catch (error) {
         console.error('crm-logo-sync error:', error.message);

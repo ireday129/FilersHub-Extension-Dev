@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   normalizeToken, normalizeLocationId, bearerFrom, secretsMatch, generateSecret,
   buildStatusUpdate, describeGhlFailure, menuLinkPayload, findFirmMenuLink,
-  validateActionRequest, isFilersHubAgency,
+  validateActionRequest, isFilersHubAgency, isScopeError, SCOPE_ERROR_MESSAGE,
 } from './ghl-core.ts';
 
 test('normalizeToken', () => {
@@ -108,4 +108,11 @@ test('isFilersHubAgency', () => {
   assert.equal(isFilersHubAgency('c1', 'c2'), false);
   assert.equal(isFilersHubAgency(null, 'c1'), false);
   assert.equal(isFilersHubAgency('c1', ''), false);
+});
+
+test('isScopeError', () => {
+  assert.equal(isScopeError(SCOPE_ERROR_MESSAGE), true);
+  assert.equal(isScopeError('GHL rejected the token.'), false);
+  assert.equal(isScopeError(null), false);
+  assert.equal(isScopeError(undefined), false);
 });

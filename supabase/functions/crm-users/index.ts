@@ -98,8 +98,9 @@ serve(async (req) => {
             let ghlError: string | null = null;
 
             try {
-                const resp = await (await firmGhl(supabaseAdmin, firmId)).request(
-                    '/users/?locationId=' + encodeURIComponent(ghlLocationId)
+                const ghl = await firmGhl(supabaseAdmin, firmId);
+                const resp = await ghl.request(
+                    '/users/?locationId=' + encodeURIComponent(ghl.locationId)
                 );
                 if (resp.ok) {
                     const data = await resp.json();
@@ -120,8 +121,8 @@ serve(async (req) => {
                     console.warn(`GHL users fetch failed: ${resp.status}`);
                 }
             } catch (err) {
-                if (!(err instanceof GhlNotConnectedError)) throw err;
-                ghlError = err.message;
+                console.warn('GHL users fetch error:', err?.message || err);
+                ghlError = err?.message || 'Could not reach GHL.';
             }
 
             // Sync live GHL data back to users table for future fallback

@@ -260,11 +260,11 @@ async function handleSearchExistingReturn(
 async function handleUpdateReturnStage(
     supabase: any, extras: any, data: any, firmId: string, ghl: FirmGhl | null, customFieldName: string,
 ) {
-    const returnId = data?.return_id;
+    let returnId = data?.return_id;
     const newStatus = data?.new_status;
 
-    if (!returnId || !newStatus) {
-        return jsonResponse({ success: false, error: 'return_id and new_status are required in data' });
+    if (!newStatus) {
+        return jsonResponse({ success: false, error: 'new_status is required in data' });
     }
 
     if (!VALID_STATUSES.includes(newStatus)) {
@@ -272,6 +272,30 @@ async function handleUpdateReturnStage(
             success: false,
             error: `Invalid status "${newStatus}". Must be one of: ${VALID_STATUSES.join(', ')}`,
         });
+    }
+
+    if (!returnId) {
+        const contactId = extras?.contactId;
+        if (!contactId) {
+            return jsonResponse({ success: false, error: 'Provide data.return_id or a contact (extras.contactId).' });
+        }
+        const { client, error: clientError } = await findClientByContactId(supabase, firmId, contactId);
+        if (!client) {
+            return jsonResponse({ success: false, error: clientError || 'No tax return found for this contact.' });
+        }
+        let q = supabase
+            .from('tax_returns')
+            .select('return_id')
+            .eq('client_id', client.client_id)
+            .eq('firm_id', firmId);
+        if (data?.tax_year) q = q.eq('tax_year', data.tax_year);
+        const { data: latest, error: latestErr } = await q
+            .order('updated_at', { ascending: false })
+            .limit(1);
+        if (latestErr || !latest || latest.length === 0) {
+            return jsonResponse({ success: false, error: 'No tax return found for this contact.' });
+        }
+        returnId = latest[0].return_id;
     }
 
     // Fetch current return (with firm ownership check)
@@ -819,6 +843,6 @@ Deno.serve(async (req) => {
 
     } catch (error) {
         console.error('crm-actions error:', error?.message || error);
-        return jsonResponse({ success: false, error: error?.message || 'Unknown error' });
+        return jsonResponse({ success: false, error: 'Something went wrong. Try again.' });
     }
 });

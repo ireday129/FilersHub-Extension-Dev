@@ -96,13 +96,19 @@ export function buildStatusUpdate(
   return result;
 }
 
+export const SCOPE_ERROR_MESSAGE = `The token is missing a required scope. Required: ${REQUIRED_SCOPES.join(', ')}.`;
+
+export function isScopeError(message: string | null | undefined): boolean {
+  return message === SCOPE_ERROR_MESSAGE;
+}
+
 export type GhlFailure = { broken: boolean; message: string };
 
 export function describeGhlFailure(httpStatus: number, bodyText: string): GhlFailure {
   if (/not authorized for this scope/i.test(bodyText ?? '')) {
     return {
       broken: true,
-      message: `The token is missing a required scope. Required: ${REQUIRED_SCOPES.join(', ')}.`,
+      message: SCOPE_ERROR_MESSAGE,
     };
   }
   if (httpStatus === 401) {

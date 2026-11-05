@@ -5,6 +5,7 @@ import {
   buildStatusUpdate,
   describeGhlFailure,
   ghlHeaders,
+  isScopeError,
 } from './ghl-core.ts';
 
 export type ConnectionStatus = 'ok' | 'broken';
@@ -118,6 +119,7 @@ export async function firmGhl(admin: SupabaseClient, firmId: string): Promise<Fi
     async request(path: string, init?: RequestInit): Promise<Response> {
       const resp = await fetch(`${GHL_API_BASE}${path}`, {
         ...init,
+        signal: init?.signal ?? AbortSignal.timeout(15000),
         headers: {
           ...ghlHeaders(token, !!init?.body),
           ...(init?.headers as Record<string, string> | undefined),
@@ -129,7 +131,7 @@ export async function firmGhl(admin: SupabaseClient, firmId: string): Promise<Fi
           if (failure.broken) {
             await setConnectionHealth(admin, firmId, { ok: false, message: failure.message });
           }
-        } else if (wasBroken) {
+        } else if (wasBroken && !isScopeError(conn.last_error)) {
           await setConnectionHealth(admin, firmId, { ok: true });
         }
       } catch (e) {
@@ -145,6 +147,7 @@ export async function agencyRequest(path: string, init?: RequestInit): Promise<R
   if (!key) throw new Error('Agency API key not configured.');
   return fetch(`${GHL_API_BASE}${path}`, {
     ...init,
+    signal: init?.signal ?? AbortSignal.timeout(15000),
     headers: {
       ...ghlHeaders(key, !!init?.body),
       ...(init?.headers as Record<string, string> | undefined),
