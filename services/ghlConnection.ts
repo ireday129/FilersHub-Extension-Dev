@@ -23,9 +23,9 @@ async function getAccessToken(): Promise<string> {
   throw new Error('Your session has expired. Please sign out and sign back in.');
 }
 
-async function call<T>(body: Record<string, unknown>): Promise<T> {
+async function invokeFunction<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   const accessToken = await getAccessToken();
-  const { data, error } = await supabase.functions.invoke('ghl-connection', {
+  const { data, error } = await supabase.functions.invoke(fn, {
     body,
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -40,6 +40,19 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
   }
   return data as T;
 }
+
+const call = <T,>(body: Record<string, unknown>) => invokeFunction<T>('ghl-connection', body);
+
+export interface GhlContactSyncResult {
+  outcome: 'already' | 'linked' | 'created';
+  clientName: string;
+  clientEmail: string;
+  firmName: string | null;
+}
+
+/** Links (or creates) the FilersHub client for a GHL contact. Caller must be signed in as firm staff. */
+export const syncGhlContact = (locationId: string, contactId: string) =>
+  invokeFunction<GhlContactSyncResult>('ghl-sync-contact', { locationId, contactId });
 
 export const getGhlStatus = (firmId: string) =>
   call<GhlConnectionStatus>({ action: 'status', firmId });

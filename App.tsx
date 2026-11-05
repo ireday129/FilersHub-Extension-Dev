@@ -16,6 +16,7 @@ import { useFirmData } from './hooks/useFirmData';
 import { useExtensionMode } from './hooks/useExtensionMode';
 import FirmSelection from './components/FirmSelection';
 import Launchpad from './components/Launchpad';
+import GhlSyncContact from './components/GhlSyncContact';
 import Tutorials from './components/Tutorials';
 import CrmAccessPage from './components/CrmAccessPage';
 import PreLaunchScreen from './components/PreLaunchScreen';
@@ -416,6 +417,11 @@ const AppContent: React.FC = () => {
   // GHL Dashboard Widget (data requires a signed-in staff session; shows sign-in if needed)
   if (path === '/widget') {
     return <Launchpad />;
+  }
+
+  // "Sync to FilersHub" popup from the GHL contact page button (handles its own sign-in)
+  if (path === '/ghl/sync-contact') {
+    return <GhlSyncContact />;
   }
 
   // GHL Tutorials Page (no auth required — uses widget_token)
