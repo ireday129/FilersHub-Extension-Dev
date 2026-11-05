@@ -4,16 +4,19 @@
  * Install once in GHL: Agency Settings -> Company -> Custom JS:
  *   <script src="https://app.filershub.com/ghl-contact-button.js"></script>
  *
- * Shows a floating button on contact pages of sub-accounts connected to
- * FilersHub. Clicking it opens a FilersHub popup that links (or creates) the
- * FilersHub client for that contact. This file holds no secrets: the popup
- * checks the person's own FilersHub sign-in before doing anything.
+ * On contact pages of sub-accounts connected to FilersHub, adds a button to the
+ * "Contact Details" heading of the contact card (or, if that heading can't be
+ * found, a floating button in the corner). Clicking it opens a FilersHub popup
+ * that links (or creates) the FilersHub client for that contact. This file
+ * holds no secrets: the popup checks the person's own FilersHub sign-in.
  */
 (function () {
   if (window.__filershubContactButton) return;
 
   var APP = 'https://app.filershub.com';
-  var BUTTON_ID = 'filershub-sync-contact-btn';
+  var BUTTON_ID = 'filershub-sync-contact-btn';      // floating corner button
+  var INLINE_ID = 'filershub-sync-contact-inline';   // button inside the contact card
+  var CARD_HEADING = 'Contact Details';
   var CONTACT_PATH = /\/location\/([A-Za-z0-9]+)\/contacts\/detail\/([A-Za-z0-9]+)/;
   var activeByLocation = {};
 
@@ -52,49 +55,93 @@
     return activeByLocation[locationId];
   }
 
-  function createButton() {
+  function openPopup() {
+    var ids = parse(window.location.pathname);
+    if (!ids) return;
+    window.open(syncUrl(ids.locationId, ids.contactId), '_blank', 'width=440,height=600,noopener,noreferrer');
+  }
+
+  function makeButton(id, label) {
     var btn = document.createElement('button');
-    btn.setAttribute('id', BUTTON_ID);
+    btn.setAttribute('id', id);
     btn.setAttribute('type', 'button');
     btn.setAttribute('title', 'Link this contact to a FilersHub client');
-    btn.textContent = 'Sync to FilersHub';
+    btn.textContent = label;
+    var s = btn.style;
+    s.border = 'none';
+    s.borderRadius = '999px';
+    s.background = '#42ab30';
+    s.color = '#ffffff';
+    s.cursor = 'pointer';
+    s.whiteSpace = 'nowrap';
+    btn.addEventListener('click', openPopup);
+    return btn;
+  }
+
+  function addCornerButton() {
+    var btn = makeButton(BUTTON_ID, 'Sync to FilersHub');
     var s = btn.style;
     s.position = 'fixed';
     s.right = '24px';
     s.bottom = '24px';
     s.zIndex = '2147483000';
     s.padding = '10px 16px';
-    s.borderRadius = '999px';
-    s.border = 'none';
-    s.background = '#42ab30';
-    s.color = '#ffffff';
     s.font = '600 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     s.boxShadow = '0 4px 14px rgba(0,0,0,0.18)';
-    s.cursor = 'pointer';
-    btn.addEventListener('click', function () {
-      var ids = parse(window.location.pathname);
-      if (!ids) return;
-      window.open(syncUrl(ids.locationId, ids.contactId), '_blank', 'width=440,height=600,noopener,noreferrer');
-    });
     document.body.appendChild(btn);
-    return btn;
+  }
+
+  // The row holding the card's "Contact Details" heading (matched by its text,
+  // since GHL's element names change between releases).
+  function findCardHeadingRow() {
+    var nodes = document.querySelectorAll('div,span,p,h1,h2,h3,h4,h5,h6');
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (el.childElementCount === 0 && String(el.textContent || '').trim() === CARD_HEADING) {
+        return el.parentElement;
+      }
+    }
+    return null;
+  }
+
+  function addInlineButton(row) {
+    var btn = makeButton(INLINE_ID, 'Sync to FilersHub');
+    var s = btn.style;
+    s.marginLeft = 'auto';
+    s.padding = '4px 10px';
+    s.font = '600 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    row.appendChild(btn);
+  }
+
+  function removeById(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
   }
 
   function render() {
     var ids = parse(window.location.pathname);
-    var existing = document.getElementById(BUTTON_ID);
     if (!ids) {
-      if (existing) existing.remove();
+      removeById(INLINE_ID);
+      removeById(BUTTON_ID);
       return Promise.resolve();
     }
     return isActive(ids.locationId).then(function (active) {
       var current = parse(window.location.pathname);
-      var btn = document.getElementById(BUTTON_ID);
       if (!active || !current || current.locationId !== ids.locationId) {
-        if (btn) btn.remove();
+        removeById(INLINE_ID);
+        removeById(BUTTON_ID);
         return;
       }
-      if (!btn) createButton();
+      // GHL re-renders the card as you move around, so re-add the button when it disappears.
+      if (!document.getElementById(INLINE_ID)) {
+        var row = findCardHeadingRow();
+        if (row) addInlineButton(row);
+      }
+      if (document.getElementById(INLINE_ID)) {
+        removeById(BUTTON_ID);
+      } else if (!document.getElementById(BUTTON_ID)) {
+        addCornerButton();
+      }
     });
   }
 
