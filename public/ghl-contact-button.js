@@ -152,6 +152,7 @@
       panel.setAttribute('title', 'FilersHub tax returns');
       var s = panel.style;
       s.display = 'block';
+      s.flexShrink = '0'; // the card is a fixed-height flex column; don't let it squash the panel
       s.width = 'calc(100% - 24px)';
       s.height = '72px';
       s.margin = '0 12px 8px';

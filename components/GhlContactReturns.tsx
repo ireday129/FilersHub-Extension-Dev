@@ -2,7 +2,14 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { fetchGhlContactReturns, isSessionProblem } from '../services/ghlConnection';
-import { ContactReturn, shortReturnType, sortReturns, statusClass } from '../services/contactReturns';
+import {
+  CONTACT_SYNC_CHANNEL,
+  ContactReturn,
+  ContactSyncedMessage,
+  shortReturnType,
+  sortReturns,
+  statusClass,
+} from '../services/contactReturns';
 import WidgetSignIn from './WidgetSignIn';
 
 // Read-only panel shown inside the GHL contact card by public/ghl-contact-button.js:
@@ -19,8 +26,9 @@ type State =
   | { kind: 'list'; returns: ContactReturn[] }
   | { kind: 'error'; message: string };
 
+// Signs out of FilersHub in this browser only, not on the person's other devices.
 const switchAccount = async () => {
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: 'local' });
   window.location.reload();
 };
 
@@ -29,6 +37,8 @@ const GhlContactReturns: React.FC = () => {
   const locationId = params.get('location_id') || '';
   const contactId = params.get('contact_id') || '';
   const [state, setState] = useState<State>({ kind: 'loading' });
+  // The sign-in form stays folded away until asked for, so it doesn't push the contact details down.
+  const [showSignIn, setShowSignIn] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -47,18 +57,24 @@ const GhlContactReturns: React.FC = () => {
       setState(result.linked ? { kind: 'list', returns: sortReturns(result.returns ?? []) } : { kind: 'unlinked' });
     } catch (e: any) {
       const message = e?.message || "Couldn't load tax returns.";
-      if (isSessionProblem(message)) {
-        await supabase.auth.signOut();
-        setState({ kind: 'signin' });
-      } else {
-        setState({ kind: 'error', message });
-      }
+      // Ask for a fresh sign-in; signing in again replaces the old session.
+      setState(isSessionProblem(message) ? { kind: 'signin' } : { kind: 'error', message });
     }
   }, [locationId, contactId]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Reload after the Sync to FilersHub popup links this contact.
+  useEffect(() => {
+    if (!contactId || typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel(CONTACT_SYNC_CHANNEL);
+    channel.onmessage = (event: MessageEvent<ContactSyncedMessage>) => {
+      if (event.data?.type === 'contact-synced' && event.data.contactId === contactId) load();
+    };
+    return () => channel.close();
+  }, [contactId, load]);
 
   // Tell the GHL page how tall the panel is, so the card fits it without a scrollbar.
   useEffect(() => {
@@ -95,7 +111,16 @@ const GhlContactReturns: React.FC = () => {
         </div>
       )}
 
-      {state.kind === 'signin' && <WidgetSignIn subtitle="Sign in to see this contact's tax returns." />}
+      {state.kind === 'signin' && !showSignIn && (
+        <p className="text-sm text-slate-500">
+          <button type="button" onClick={() => setShowSignIn(true)} className="font-semibold text-blue-600 hover:underline">
+            Sign in to FilersHub
+          </button>{' '}
+          to see this contact's tax returns.
+        </p>
+      )}
+
+      {state.kind === 'signin' && showSignIn && <WidgetSignIn subtitle="Sign in to see this contact's tax returns." />}
 
       {state.kind === 'unlinked' && (
         <p className="text-sm text-slate-500">

@@ -222,6 +222,8 @@ test('adds the tax-returns panel right below the card header', async () => {
   assert.ok(panel, 'panel present');
   assert.equal(panel.tagName, 'IFRAME');
   assert.equal(panel.getAttribute('src'), RETURNS_URL);
+  // GHL's card is a fixed-height flex column; without this the browser squashes the iframe.
+  assert.equal(panel.style.flexShrink, '0');
   const header = (page.byId(INLINE) as FakeEl).parentElement?.parentElement;
   assert.equal(panel.previousElementSibling, header);
 });

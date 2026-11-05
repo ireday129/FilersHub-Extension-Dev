@@ -1,6 +1,15 @@
 // Display helpers for the FilersHub tax-returns panel in GHL contact cards
 // (components/GhlContactReturns.tsx).
 
+// The Sync to FilersHub popup announces a finished sync here, so an open
+// returns panel for the same contact reloads (both pages are on app.filershub.com).
+export const CONTACT_SYNC_CHANNEL = 'filershub-ghl-contact';
+
+export interface ContactSyncedMessage {
+  type: 'contact-synced';
+  contactId: string;
+}
+
 export interface ContactReturn {
   returnId: string;
   taxYear: string;

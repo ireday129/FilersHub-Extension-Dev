@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Link2, Loader2, UserPlus, XCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { isSessionProblem, syncGhlContact, GhlContactSyncResult } from '../services/ghlConnection';
+import { CONTACT_SYNC_CHANNEL, ContactSyncedMessage } from '../services/contactReturns';
 import { FILERSHUB_LOGO_URL } from '../constants';
 import WidgetSignIn from './WidgetSignIn';
 
@@ -28,10 +29,21 @@ type State =
   | { kind: 'done'; result: GhlContactSyncResult }
   | { kind: 'error'; message: string };
 
+// Signs out of FilersHub in this browser only, not on the person's other devices.
 const switchAccount = async () => {
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: 'local' });
   window.location.reload();
 };
+
+// Lets an open tax-returns panel for this contact refresh itself.
+function announceSync(contactId: string) {
+  try {
+    const channel = new BroadcastChannel(CONTACT_SYNC_CHANNEL);
+    const message: ContactSyncedMessage = { type: 'contact-synced', contactId };
+    channel.postMessage(message);
+    channel.close();
+  } catch { /* BroadcastChannel unavailable: the panel's refresh button still works */ }
+}
 
 const GhlSyncContact: React.FC = () => {
   const params = new URLSearchParams(window.location.search);
@@ -55,10 +67,10 @@ const GhlSyncContact: React.FC = () => {
     try {
       const result = await syncGhlContact(locationId, contactId);
       setState({ kind: 'done', result });
+      announceSync(contactId);
     } catch (e: any) {
       const message = e?.message || 'Could not sync this contact.';
       if (isSessionProblem(message)) {
-        await supabase.auth.signOut();
         setState({ kind: 'signin' });
       } else {
         setState({ kind: 'error', message });
