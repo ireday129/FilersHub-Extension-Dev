@@ -187,6 +187,20 @@ export function validateActionRequest(body: unknown): ActionRequest {
   return { ok: true, key: key as ActionKey, locationId, contactId };
 }
 
+/**
+ * HTTP status for a workflow-action reply. Failures get 422 so GHL marks the
+ * workflow step as failed; a search that simply found nothing stays 200.
+ */
+export function actionHttpStatus(body: Record<string, unknown>): number {
+  const failed = body?.success === false || typeof body?.error === 'string';
+  return failed ? 422 : 200;
+}
+
+/** Escapes LIKE/ILIKE wildcards so an email matches only itself. */
+export function escapeLikePattern(value: string): string {
+  return String(value ?? '').replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export function isFilersHubAgency(
   companyId: string | null | undefined,
   agencyCompanyId: string | null | undefined,

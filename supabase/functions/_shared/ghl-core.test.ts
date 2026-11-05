@@ -4,6 +4,7 @@ import {
   normalizeToken, normalizeLocationId, bearerFrom, secretsMatch, generateSecret,
   buildStatusUpdate, describeGhlFailure, menuLinkPayload, findFirmMenuLink,
   validateActionRequest, isFilersHubAgency, isScopeError, SCOPE_ERROR_MESSAGE,
+  actionHttpStatus, escapeLikePattern,
 } from './ghl-core.ts';
 
 test('normalizeToken', () => {
@@ -115,4 +116,20 @@ test('isScopeError', () => {
   assert.equal(isScopeError('GHL rejected the token.'), false);
   assert.equal(isScopeError(null), false);
   assert.equal(isScopeError(undefined), false);
+});
+
+test('actionHttpStatus', () => {
+  assert.equal(actionHttpStatus({ success: true }), 200);
+  assert.equal(actionHttpStatus({ found: true, returnId: 'r1' }), 200);
+  assert.equal(actionHttpStatus({ found: false, message: 'No matching return' }), 200);
+  assert.equal(actionHttpStatus({ success: false, error: 'No client found for contact c1' }), 422);
+  assert.equal(actionHttpStatus({ success: false }), 422);
+  assert.equal(actionHttpStatus({ found: false, error: 'contactId is required in extras' }), 422);
+});
+
+test('escapeLikePattern', () => {
+  assert.equal(escapeLikePattern('jane_doe@example.com'), 'jane\\_doe@example.com');
+  assert.equal(escapeLikePattern('100%@x.com'), '100\\%@x.com');
+  assert.equal(escapeLikePattern('a\\b@x.com'), 'a\\\\b@x.com');
+  assert.equal(escapeLikePattern('plain@example.com'), 'plain@example.com');
 });
